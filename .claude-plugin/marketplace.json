@@ -1,0 +1,29 @@
+{
+  "name": "nullplatform",
+  "owner": {
+    "name": "Nullplatform",
+    "email": "support@nullplatform.com",
+    "url": "https://nullplatform.com"
+  },
+  "description": "Official Nullplatform plugins for Claude Code",
+  "plugins": [
+    {
+      "name": "np-troubleshooting",
+      "source": "./marketplace/plugins/np-troubleshooting",
+      "description": "Investigación y diagnóstico de problemas",
+      "version": "1.0.36",
+      "author": {
+        "name": "Nullplatform"
+      }
+    },
+    {
+      "name": "np-developer",
+      "source": "./marketplace/plugins/np-developer",
+      "description": "Herramientas para developers que usan Nullplatform día a día: consultar, operar y diagnosticar",
+      "version": "1.0.36",
+      "author": {
+        "name": "Nullplatform"
+      }
+    }
+  ]
+}

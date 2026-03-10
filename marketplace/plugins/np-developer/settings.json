@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./.claude/skills/np-api/scripts/check_auth.sh:*)",
+      "Bash(./.claude/skills/np-api/scripts/fetch_np_api_url.sh:*)",
+      "Bash(./.claude/skills/np-api/scripts/np-api.sh:*)",
+      "Bash(./.claude/skills/np-cli-assistant/scripts/check_auth.sh:*)",
+      "Bash(./.claude/skills/np-cli-assistant/scripts/fetch_np_api.sh:*)",
+      "Bash(./.claude/skills/np-developer-actions/scripts/action-api.sh:*)",
+      "Bash(./.claude/skills/np-lake/scripts/ch_query.sh:*)",
+      "Bash(./.claude/skills/np-lake/scripts/check_ch_auth.sh:*)",
+      "Bash(np *)",
+      "Skill(np-api)",
+      "Skill(np-api:*)",
+      "Skill(np-cli-assistant)",
+      "Skill(np-cli-assistant:*)",
+      "Skill(np-developer-actions)",
+      "Skill(np-developer-actions:*)",
+      "Skill(np-investigation-diagnostic)",
+      "Skill(np-investigation-diagnostic:*)",
+      "Skill(np-lake)",
+      "Skill(np-lake:*)"
+    ]
+  }
+}
