@@ -1,6 +1,6 @@
 # np-developer
 
-Herramientas para developers que usan Nullplatform día a día: consultar, operar y diagnosticar
+Day-to-day tools for developers using nullplatform: query, operate, and diagnose
 
 ## Version
 
@@ -10,11 +10,11 @@ Herramientas para developers que usan Nullplatform día a día: consultar, opera
 
 ### np-api
 
-description: Skill para explorar y consultar la API de Nullplatform
+description: This skill should be used when the user asks to "query the nullplatform API", "check authentication", "fetch API data", "search endpoints", "describe an endpoint", or needs to make any programmatic call to api.nullplatform.com. Provides centralized API access with authentication and token management.
 
 ### np-developer-actions
 
-description: Operaciones de developer en Nullplatform - crear scopes, desplegar, gestionar parametros
+description: This skill should be used when the user asks to "create a scope", "deploy an application", "manage parameters", "create an app", "trigger a build", "create a release", "link a service", or needs to perform day-to-day developer operations on nullplatform entities via the API.
 
 ### np-investigation-diagnostic
 

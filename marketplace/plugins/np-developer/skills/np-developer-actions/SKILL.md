@@ -1,6 +1,6 @@
 ---
 name: np-developer-actions
-description: Operaciones de developer en Nullplatform - crear scopes, desplegar, gestionar parametros
+description: This skill should be used when the user asks to "create a scope", "deploy an application", "manage parameters", "create an app", "trigger a build", "create a release", "link a service", or needs to perform day-to-day developer operations on nullplatform entities via the API.
 allowed-tools: Bash(${CLAUDE_PLUGIN_ROOT}/skills/np-developer-actions/scripts/*.sh)
 ---
 

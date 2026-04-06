@@ -1,13 +1,13 @@
 # Agent Commands
 
-Ejecución de comandos remotos en agents via control plane.
+Remote command execution on agents via control plane.
 
 ## @endpoint POST /controlplane/agent_command
 
-Ejecuta un comando en agents seleccionados por selector.
+Executes a command on agents selected by selector.
 
-### Método
-POST (único endpoint que no es GET)
+### Method
+POST (only endpoint that is not GET)
 
 ### Request Body
 ```json
@@ -25,18 +25,18 @@ POST (único endpoint que no es GET)
 }
 ```
 
-### Campos
-- `selector`: Matchea con `channel_selectors` de agents
+### Fields
+- `selector`: Matches with `channel_selectors` of agents
   - `cluster`: runtime (K8s agents)
   - `provisioner`: services (Service agents)
 - `command.type`: `exec`
-- `command.data.cmdline`: Script/comando a ejecutar
-- `command.data.arguments`: Array de argumentos
+- `command.data.cmdline`: Script/command to execute
+- `command.data.arguments`: Array of arguments
 
-### Comandos Conocidos
-| Comando | Propósito |
-|---------|-----------|
-| `nullplatform/scopes/k8s/troubleshooting/dump-status` | Dump estado K8s de un deployment |
+### Known Commands
+| Command | Purpose |
+|---------|---------|
+| `nullplatform/scopes/k8s/troubleshooting/dump-status` | K8s state dump of a deployment |
 
 ### Selector → Agent Channel Mapping
 ```
@@ -44,9 +44,9 @@ selector: {cluster: runtime}      →  K8s agents (Channel ~848305398)
 selector: {provisioner: services} →  Service agents (Channel ~1540233609)
 ```
 
-### Ejemplo
+### Example
 ```bash
-# Este es un POST, requiere curl directo o script especial
+# This is a POST, requires direct curl or special script
 curl -X POST "https://api.nullplatform.com/controlplane/agent_command" \
   -H "Authorization: Bearer $NP_TOKEN" \
   -H "Content-Type: application/json" \
@@ -62,21 +62,21 @@ curl -X POST "https://api.nullplatform.com/controlplane/agent_command" \
   }'
 ```
 
-### Scripts Helper
+### Helper Scripts
 
-Existen scripts en `scripts/` para simplificar:
+There are scripts in `scripts/` for simplification:
 
-**deploy-agent-dump.sh** - Dump de deployment:
+**deploy-agent-dump.sh** - Deployment dump:
 ```bash
 ./scripts/deploy-agent-dump.sh <deployment_id>
 ```
 
-**scope-agent-dump.sh** - Dump de scope:
+**scope-agent-dump.sh** - Scope dump:
 ```bash
 ./scripts/scope-agent-dump.sh <scope_id>
 ```
 
-### Notas
-- Ejecuta directamente en infraestructura K8s del cliente
-- Útil cuando info de API es insuficiente
-- Requiere que el agent esté activo y alcanzable
+### Notes
+- Executes directly on the client's K8s infrastructure
+- Useful when API info is insufficient
+- Requires the agent to be active and reachable
