@@ -1,6 +1,6 @@
 ---
 name: np-api
-description: Skill para explorar y consultar la API de Nullplatform
+description: This skill should be used when the user asks to "query the nullplatform API", "check authentication", "fetch API data", "search endpoints", "describe an endpoint", or needs to make any programmatic call to api.nullplatform.com. Provides centralized API access with authentication and token management.
 allowed-tools: Bash(${CLAUDE_PLUGIN_ROOT}/skills/np-api/scripts/*.sh)
 ---
 
@@ -92,10 +92,10 @@ Retorna el JSON de la respuesta de la API.
 
 ## Si $ARGUMENTS comienza con "resend-notification" → Redirigir
 
-> **Movido**: El comando resend-notification se movio a `/np-service-wizard resend-notification <id> [channel_id]`
+> **Movido**: El comando resend-notification se movio a `/np-service-craft resend-notification <id> [channel_id]`
 > porque requiere la API key admin (de `secrets.tfvars`), no la key de troubleshooting de np-api.
 
-Informar al usuario que use `/np-service-wizard resend-notification <id> [channel_id]` en su lugar.
+Informar al usuario que use `/np-service-craft resend-notification <id> [channel_id]` en su lugar.
 
 Para **buscar** notificaciones y **ver resultados** (lectura, no requiere admin):
 

@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./.claude/skills/np-api/scripts/check_auth.sh:*)",
+      "Bash(./.claude/skills/np-api/scripts/fetch_np_api_url.sh:*)",
+      "Bash(./.claude/skills/np-api/scripts/np-api.sh:*)",
+      "Bash(./.claude/skills/np-setup-orchestrator/scripts/check-tf-api-key.sh:*)",
+      "Skill(np-api)",
+      "Skill(np-api:*)",
+      "Skill(np-cloud-provider-setup)",
+      "Skill(np-cloud-provider-setup:*)",
+      "Skill(np-infrastructure-wizard)",
+      "Skill(np-infrastructure-wizard:*)",
+      "Skill(np-nullplatform-bindings-wizard)",
+      "Skill(np-nullplatform-bindings-wizard:*)",
+      "Skill(np-nullplatform-wizard)",
+      "Skill(np-nullplatform-wizard:*)",
+      "Skill(np-organization-create)",
+      "Skill(np-organization-create:*)",
+      "Skill(np-setup-orchestrator)",
+      "Skill(np-setup-orchestrator:*)",
+      "Skill(np-setup-troubleshooting)",
+      "Skill(np-setup-troubleshooting:*)"
+    ]
+  }
+}

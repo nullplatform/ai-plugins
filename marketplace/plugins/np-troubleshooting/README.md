@@ -1,6 +1,6 @@
 # np-troubleshooting
 
-Investigación y diagnóstico de problemas
+Investigation and diagnosis of nullplatform issues
 
 ## Version
 
@@ -10,7 +10,7 @@ Investigación y diagnóstico de problemas
 
 ### np-api
 
-description: Skill para explorar y consultar la API de Nullplatform
+description: This skill should be used when the user asks to "query the nullplatform API", "check authentication", "fetch API data", "search endpoints", "describe an endpoint", or needs to make any programmatic call to api.nullplatform.com. Provides centralized API access with authentication and token management.
 
 ### np-investigation-diagnostic
 
