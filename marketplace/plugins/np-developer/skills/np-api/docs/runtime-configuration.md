@@ -1,56 +1,56 @@
 # Runtime Configuration
 
-Runtime configurations permiten provisionar ambientes reutilizables que desacoplan la
-infraestructura (DevOps) de la operacion de aplicaciones (Developers). Funcionan como
-"facetas de busqueda para scopes": se definen atributos de dimensiones y los developers
-seleccionan combinaciones al crear scopes.
+Runtime configurations allow provisioning reusable environments that decouple
+infrastructure (DevOps) from application operation (Developers). They function as
+"search facets for scopes": dimension attributes are defined and developers
+select combinations when creating scopes.
 
-**NOTA DEPRECACION**: Esta feature podria ser removida en el futuro. Nullplatform recomienda
-usar platform settings y providers en su lugar.
+**DEPRECATION NOTE**: This feature may be removed in the future. Nullplatform recommends
+using platform settings and providers instead.
 
-## Concepto
+## Concept
 
-- Los scopes solos son suficientes para escenarios simples
-- Runtime configurations abordan infraestructura compleja (ej: produccion en diferentes cloud accounts)
-- Requieren que las dimensions y sus valores existan ANTES de crear la runtime configuration
-- Los valores se guardan internamente como NRN API profiles
+- Scopes alone are sufficient for simple scenarios
+- Runtime configurations address complex infrastructure (e.g., production in different cloud accounts)
+- Require that dimensions and their values exist BEFORE creating the runtime configuration
+- Values are stored internally as NRN API profiles
 
 ## @endpoint /runtime_configuration
 
-Lista runtime configurations.
+Lists runtime configurations.
 
-### Parametros
-- `nrn` (query, required): NRN con URL encoding
+### Parameters
+- `nrn` (query, required): URL-encoded NRN
 
-### Respuesta
-Estructura por confirmar — el endpoint requiere permisos elevados con tokens de developer.
-Con API keys estandar devuelve `"You're not authorized to perform this operation."`.
+### Response
+Structure to be confirmed — the endpoint requires elevated permissions with developer tokens.
+With standard API keys it returns `"You're not authorized to perform this operation."`.
 
-### Ejemplo
+### Example
 ```bash
-# Requiere permisos elevados (admin o platform team)
+# Requires elevated permissions (admin or platform team)
 np-api fetch-api "/runtime_configuration?nrn=organization%3D<org>%3Aaccount%3D<acc>"
 ```
 
-### Notas
-- Sin NRN devuelve `"NRN is required for this endpoint"`
-- Con NRN de developer devuelve `"You're not authorized to perform this operation."`
-- Probablemente contiene configuraciones de runtime inyectadas a scopes/deployments
-- Diferente de `parameters` que son variables de entorno explicitas
-- Requiere investigacion con un token de admin o platform team para documentar completamente
-- **Potencialmente deprecado** — considerar usar providers y platform settings
+### Notes
+- Without NRN returns `"NRN is required for this endpoint"`
+- With developer NRN returns `"You're not authorized to perform this operation."`
+- Probably contains runtime configurations injected into scopes/deployments
+- Different from `parameters` which are explicit environment variables
+- Requires investigation with an admin or platform team token to fully document
+- **Potentially deprecated** — consider using providers and platform settings
 
-## Relacion con scopes
+## Relationship with scopes
 
-Las runtime configurations se asignan a scopes via:
-- `POST /scope/{id}/runtime_configuration` — Asignar una runtime config a un scope
-- `DELETE /scope/{id}/runtime_configuration/{id}` — Remover una runtime config de un scope
+Runtime configurations are assigned to scopes via:
+- `POST /scope/{id}/runtime_configuration` — Assign a runtime config to a scope
+- `DELETE /scope/{id}/runtime_configuration/{id}` — Remove a runtime config from a scope
 
-Estas operaciones estan documentadas en la documentacion oficial pero requieren permisos elevados.
+These operations are documented in the official documentation but require elevated permissions.
 
-## Relacion con dimensions
+## Relationship with dimensions
 
-Las runtime configurations dependen del sistema de dimensions:
-1. Crear dimensions y sus valores primero (`/dimension`)
-2. Crear la runtime configuration referenciando esas dimensions
-3. Los scopes que matcheen las dimensions heredan la configuracion
+Runtime configurations depend on the dimensions system:
+1. Create dimensions and their values first (`/dimension`)
+2. Create the runtime configuration referencing those dimensions
+3. Scopes that match the dimensions inherit the configuration

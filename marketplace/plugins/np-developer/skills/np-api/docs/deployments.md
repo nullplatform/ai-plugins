@@ -1,34 +1,34 @@
 # Deployments
 
-Deployments son instancias de releases desplegadas en scopes. Incluyen mensajes de eventos K8s.
+Deployments are instances of releases deployed to scopes. They include K8s event messages.
 
 ## @endpoint /deployment/{id}
 
-Obtiene detalles de un deployment.
+Gets details of a deployment.
 
-### Parámetros
-- `id` (path, required): ID del deployment
-- `include_messages` (query, **recomendado**): Incluye mensajes de error. Default: false
+### Parameters
+- `id` (path, required): Deployment ID
+- `include_messages` (query, **recommended**): Includes error messages. Default: false
 
-### Respuesta
-- `id`: ID numérico
-- `status`: Estados posibles:
-  - **En progreso**: `pending` | `provisioning` | `deploying` | `running` | `finalizing`
-  - **Finalizados**: `finalized` | `rolled_back` | `cancelled` | `failed`
-- `scope_id`: ID del scope
-- `application_id`: ID de la aplicación
-- `release_id`: ID del release desplegado
-- `build_id`: ID del build (puede ser null en deployments sin build)
-- `deployment_group_id`: ID del grupo si es parte de deploy multi-scope
-- `specification.replicas`: Número de réplicas
+### Response
+- `id`: Numeric ID
+- `status`: Possible states:
+  - **In progress**: `pending` | `provisioning` | `deploying` | `running` | `finalizing`
+  - **Finished**: `finalized` | `rolled_back` | `cancelled` | `failed`
+- `scope_id`: Scope ID
+- `application_id`: Application ID
+- `release_id`: Deployed release ID
+- `build_id`: Build ID (may be null in deployments without a build)
+- `deployment_group_id`: Group ID if part of a multi-scope deploy
+- `specification.replicas`: Number of replicas
 - `specification.resources`: memory, cpu
-- `status_started_at`: Timestamps de cada fase (provisioning, deploying, finalized, rolled_back)
-- `messages[]`: Array de eventos (solo con `include_messages=true`)
+- `status_started_at`: Timestamps for each phase (provisioning, deploying, finalized, rolled_back)
+- `messages[]`: Array of events (only with `include_messages=true`)
   - `level`: INFO | ERROR | WARNING
-  - `message`: Texto del evento
+  - `message`: Event text
   - `timestamp`: Epoch milliseconds
 
-### Navegación
+### Navigation
 - **→ scope**: `scope_id` → `/scope/{scope_id}`
 - **→ application**: `application_id` → `/application/{application_id}`
 - **→ release**: `release_id` → `/release/{release_id}`
@@ -36,36 +36,36 @@ Obtiene detalles de un deployment.
 - **→ deployment actions**: `scope_id` → `/scope/{scope_id}` → `instance_id` → `/service/{instance_id}/action`
 - **← scope**: `/deployment?scope_id={scope_id}`
 
-### Ejemplo
+### Example
 ```bash
 np-api fetch-api "/deployment/1470739357?include_messages=true"
 ```
 
-### Notas
-- **SIEMPRE usar `?include_messages=true`** para troubleshooting
-- Sin include_messages, el array messages viene vacío o mínimo
-- Timestamps en messages son epoch milliseconds (dividir por 1000)
-- BackOff events = container crashes (indicador crítico)
-- `status: finalized` NO significa éxito - revisar messages por errores
-- Los errores reales de deployment están en `/service/{scope.instance_id}/action`, no en el deployment
-- Deployments antiguos (>30 días) pueden tener messages truncados - usar BigQuery audit logs
+### Notes
+- **ALWAYS use `?include_messages=true`** for troubleshooting
+- Without include_messages, the messages array comes empty or minimal
+- Timestamps in messages are epoch milliseconds (divide by 1000)
+- BackOff events = container crashes (critical indicator)
+- `status: finalized` does NOT mean success - review messages for errors
+- The actual deployment errors are in `/service/{scope.instance_id}/action`, not in the deployment
+- Old deployments (>30 days) may have truncated messages - use BigQuery audit logs
 
 ---
 
 ## @endpoint /deployment
 
-Lista deployments con filtros.
+Lists deployments with filters.
 
-### Parámetros
-- `scope_id` (query): Filtra por scope
-- `application_id` (query): Filtra por aplicación
-- `deployment_group_id` (query): Filtra por grupo
-- `status` (query): Filtra por status (failed, finalized, running, etc)
-- `sort` (query): Ordena resultados (ej: `created_at:desc` para más recientes primero)
-- `limit` (query): Máximo de resultados (default 30)
-- `offset` (query): Para paginación
+### Parameters
+- `scope_id` (query): Filter by scope
+- `application_id` (query): Filter by application
+- `deployment_group_id` (query): Filter by group
+- `status` (query): Filter by status (failed, finalized, running, etc)
+- `sort` (query): Sort results (e.g., `created_at:desc` for most recent first)
+- `limit` (query): Maximum results (default 30)
+- `offset` (query): For pagination
 
-### Respuesta
+### Response
 ```json
 {
   "paging": {"total": 150, "offset": 0, "limit": 30},
@@ -73,45 +73,45 @@ Lista deployments con filtros.
 }
 ```
 
-### Ejemplo
+### Example
 ```bash
 np-api fetch-api "/deployment?scope_id={scope_id}&limit=50"
 np-api fetch-api "/deployment?application_id={app_id}&status=failed&limit=50"
 
-# Obtener deployments más recientes primero (útil para encontrar deployments en progreso)
+# Get most recent deployments first (useful for finding in-progress deployments)
 np-api fetch-api "/deployment?scope_id={scope_id}&sort=created_at:desc&limit=20"
 ```
 
-### Notas
-- Usar `sort=created_at:desc` para obtener deployments más recientes primero
-- Los deployments en progreso (`running`, `deploying`, etc.) son los más recientes
-- Para verificar instancias stale, comparar `deployment_id` de instancias vs `active_deployment` del scope
+### Notes
+- Use `sort=created_at:desc` to get most recent deployments first
+- In-progress deployments (`running`, `deploying`, etc.) are the most recent ones
+- To verify stale instances, compare instance `deployment_id` vs scope's `active_deployment`
 
 ---
 
 ## @endpoint /deployment_group
 
-Obtiene detalles de un grupo de deployments (deploys multi-scope).
+Gets details of a deployment group (multi-scope deploys).
 
-### Parámetros
-- `id` (query, required): ID del grupo - **usa query param, NO path param**
-- `application_id` (query, required): ID de la aplicación
+### Parameters
+- `id` (query, required): Group ID - **uses query param, NOT path param**
+- `application_id` (query, required): Application ID
 
-### Respuesta
-- `id`: ID del grupo
+### Response
+- `id`: Group ID
 - `status`: PENDING | RUNNING | FINALIZING | FINALIZED | FAILED | CANCELED | CREATING_APPROVAL_DENIED
-- `application_id`: ID de la aplicación
-- `release_id`: ID del release
-- `deployments_amount`: Cantidad de deployments en el grupo
+- `application_id`: Application ID
+- `release_id`: Release ID
+- `deployments_amount`: Number of deployments in the group
 
-### Navegación
+### Navigation
 - **→ deployments**: `/deployment?deployment_group_id={id}&application_id={app_id}`
 
-### Ejemplo
+### Example
 ```bash
 np-api fetch-api "/deployment_group?id=541542807&application_id=30290074"
 ```
 
-### Notas
-- Usa **query parameters** (id, application_id), NO path parameters
-- Para ver deployments del grupo: `/deployment?deployment_group_id={id}`
+### Notes
+- Uses **query parameters** (id, application_id), NOT path parameters
+- To see group deployments: `/deployment?deployment_group_id={id}`

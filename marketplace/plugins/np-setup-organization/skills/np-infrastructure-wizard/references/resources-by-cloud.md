@@ -1,17 +1,17 @@
-# Recursos por Cloud Provider
+# Resources by Cloud Provider
 
 ## Networking
 
-| Recurso | AWS | Azure | Azure ARO | GCP | OCI |
-| ------- | --- | ----- | --------- | --- | --- |
-| Red Virtual | VPC | VNet | VNet | VPC | VCN |
+| Resource | AWS | Azure | Azure ARO | GCP | OCI |
+| -------- | --- | ----- | --------- | --- | --- |
+| Virtual Network | VPC | VNet | VNet | VPC | VCN |
 | Subnets | Public/Private | AKS/Gateway/Endpoints | ARO/Gateway | Public/Private | Public/Private |
 | NAT | NAT Gateway | Implicit | Implicit | Cloud NAT | NAT Gateway |
 
 ## Kubernetes
 
-| Recurso | AWS | Azure | Azure ARO | GCP | OCI |
-| ------- | --- | ----- | --------- | --- | --- |
+| Resource | AWS | Azure | Azure ARO | GCP | OCI |
+| -------- | --- | ----- | --------- | --- | --- |
 | Cluster | EKS | AKS | ARO (OpenShift) | GKE | OKE |
 | Node Pools | Managed | System + User | Worker | Default | Managed |
 | OIDC | IRSA (IAM Roles for Service Accounts) | AAD | AAD | Workload Identity | OCI IAM |
@@ -19,45 +19,45 @@
 
 ## DNS & Certificates
 
-| Recurso | AWS | Azure | Azure ARO | GCP | OCI |
-| ------- | --- | ----- | --------- | --- | --- |
+| Resource | AWS | Azure | Azure ARO | GCP | OCI |
+| -------- | --- | ----- | --------- | --- | --- |
 | DNS Zone | Route53 | Azure DNS / Cloudflare | Azure DNS / Cloudflare | Cloud DNS | OCI DNS |
 | Certificates | ACM + cert-manager | cert-manager | cert-manager | cert-manager | cert-manager |
 
 ## Nullplatform Components
 
-| Componente | Descripcion |
-| ---------- | ----------- |
-| Agent | Ejecuta acciones del control plane |
-| Base | Configuracion foundacional K8s |
-| Istio | Ingress Gateway para HTTPRoute routing |
-| External DNS | Sincroniza DNS automaticamente |
-| Prometheus | Metricas (opcional) |
+| Component | Description |
+| --------- | ----------- |
+| Agent | Executes control plane actions |
+| Base | Foundational K8s configuration |
+| Istio | Ingress Gateway for HTTPRoute routing |
+| External DNS | Syncs DNS automatically |
+| Prometheus | Metrics (optional) |
 
-## Ingress por Cloud
+## Ingress by Cloud
 
-Por default, todos los clouds usan **Istio** (Gateway API) como ingress controller.
+By default, all clouds use **Istio** (Gateway API) as the ingress controller.
 
-**Excepcion: AWS** tiene dos schemas de networking (ver [aws.md](aws.md) paso 0):
-- **Istio** (recomendado): Istio Gateways + cert-manager + Let's Encrypt
-- **ACM/Ingress**: AWS Ingress Controller + ACM (certificados nativos AWS)
+**Exception: AWS** has two networking schemas (see [aws.md](aws.md) step 0):
+- **Istio** (recommended): Istio Gateways + cert-manager + Let's Encrypt
+- **ACM/Ingress**: AWS Ingress Controller + ACM (AWS native certificates)
 
-Ambos schemas usan **ALB Controller** como load balancer. La diferencia es el ingress layer y la gestion de certificados.
+Both schemas use **ALB Controller** as the load balancer. The difference is the ingress layer and certificate management.
 
-| Cloud | Ingress por default | Alternativa | Load Balancer |
-|-------|--------------------|-------------|---------------|
-| AWS | Istio (Gateway API) | ACM/Ingress Controller | ALB Controller (ambos schemas) |
+| Cloud | Default Ingress | Alternative | Load Balancer |
+|-------|----------------|-------------|---------------|
+| AWS | Istio (Gateway API) | ACM/Ingress Controller | ALB Controller (both schemas) |
 | Azure | Istio | - | Azure LB |
 | Azure ARO | Istio | - | Azure LB |
 | GCP | Istio | - | GCP LB |
 | OCI | Istio | - | OCI LB |
 
-## Backend por Cloud
+## Backend by Cloud
 
-| Cloud | Backend | Valores requeridos |
-|-------|---------|-------------------|
+| Cloud | Backend | Required Values |
+|-------|---------|-----------------|
 | AWS | `s3` | `bucket`, `key`, `region`, `profile` |
 | Azure | `azurerm` | `resource_group_name`, `storage_account_name`, `container_name`, `key` |
-| Azure ARO | `azurerm` (crear si no existe) | Mismos que Azure |
+| Azure ARO | `azurerm` (create if not exists) | Same as Azure |
 | GCP | `gcs` | `bucket`, `prefix` |
 | OCI | `s3` (compatible) | `bucket`, `key`, `region`, `endpoints.s3` |

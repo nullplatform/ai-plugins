@@ -1,69 +1,69 @@
 # Services
 
-Services son infraestructura provisionada. Hay dos tipos:
+Services are provisioned infrastructure. There are two types:
 - **dependency**: databases, caches, load balancers, etc.
-- **scope**: representación interna de un scope (solo para providers UUID)
+- **scope**: internal representation of a scope (only for UUID providers)
 
 ## @endpoint /service/{id}
 
-Obtiene detalles de un service.
+Gets details of a service.
 
-### Parámetros
-- `id` (path, required): UUID del service
+### Parameters
+- `id` (path, required): Service UUID
 
-### Respuesta
+### Response
 - `id`: UUID
-- `name`: Nombre del service
-- `slug`: Identificador URL-friendly
+- `name`: Service name
+- `slug`: URL-friendly identifier
 - `status`: active | failed | pending | updating | deleting | creating
 - `type`: dependency | scope
-- `specification_id`: UUID del service specification (template). Para type=scope, este es el **provider** del scope
-- `desired_specification_id`: Si hay update pendiente
-- `entity_nrn`: NRN del contexto organizacional
-- `linkable_to[]`: NRNs de aplicaciones que pueden linkear este service
-- `attributes`: Configuración específica del service
+- `specification_id`: Service specification UUID (template). For type=scope, this is the scope's **provider**
+- `desired_specification_id`: If there's a pending update
+- `entity_nrn`: Organizational context NRN
+- `linkable_to[]`: NRNs of applications that can link this service
+- `attributes`: Service-specific configuration
   - Database: host, port, username, database
   - AWS: vpc_id, subnet_ids, access_key_id, secret_access_key
 - `selectors`:
   - `category`: database | cache | messaging | any
   - `provider`: aws | gcp | azure | any
-  - `sub_category`: más específico
-  - `imported`: boolean - si es recurso importado existente
-- `messages[]`: Eventos (puede estar vacío - ver service actions)
+  - `sub_category`: more specific
+  - `imported`: boolean - whether it's an imported existing resource
+- `messages[]`: Events (may be empty - see service actions)
 
-### Navegación
+### Navigation
 - **→ specification**: `specification_id` → `/service_specification/{specification_id}`
 - **→ actions**: `/service/{id}/action`
-- **→ linked apps**: parsear `linkable_to[]` NRNs
+- **→ linked apps**: parse `linkable_to[]` NRNs
 
-### Ejemplo
+### Example
 ```bash
 np-api fetch-api "/service/ef3baa4e-6144-457e-8812-280976eab7f3"
 ```
 
-### Notas
-- `status: failed` requiere intervención manual
-- `messages[]` puede estar vacío incluso para failed - revisar `/service/{id}/action`
-- `attributes` puede contener credenciales sensibles
-- Services importados (`imported: true`) no ejecutan provisioning
+### Notes
+- `status: failed` requires manual intervention
+- `messages[]` may be empty even for failed - review `/service/{id}/action`
+- `attributes` may contain sensitive credentials
+- Imported services (`imported: true`) don't execute provisioning
 
 ---
 
 ## @endpoint /service
 
-Lista services por NRN.
+Lists services by NRN.
 
-### Parámetros
-- `nrn` (query, required): NRN con URL encoding
-- `type` (query): Filtrar por tipo: `dependency` | `scope`
-- `limit` (query): Máximo de resultados (default 30)
+### Parameters
+- `nrn` (query, required): URL-encoded NRN
+- `type` (query): Filter by type: `dependency` | `scope`
+- `limit` (query): Maximum results (default 30)
 
-### NRN con Wildcards
-- `organization=123` → Solo services a nivel org
-- `organization=123:account=456` → Services de ese account
-- `organization=123:account=*` → **TODOS** los services de la org (wildcard)
+### NRN with Wildcards
+- `organization=123` → Only org-level services
+- `organization=123:account=456` → Services of that account
+- `organization=123:account=*` → **ALL** org services (wildcard)
 
-### Respuesta
+### Response
 ```json
 {
   "paging": {"offset": 0, "limit": 1500},
@@ -71,49 +71,49 @@ Lista services por NRN.
 }
 ```
 
-### Ejemplo
+### Example
 ```bash
-# Todos los services de una organización
+# All services of an organization
 np-api fetch-api "/service?nrn=organization%3D1255165411:account%3D*&limit=1500"
 
-# Services de un account específico
+# Services of a specific account
 np-api fetch-api "/service?nrn=organization%3D1255165411:account%3D95118862"
 ```
 
-### GOTCHA: No usar application_id como query param
-- `GET /service?application_id=X` **NO funciona** — devuelve HTTP 403 ("Insufficient permissions") pero el error real es que ese filtro no esta soportado.
-- Para listar services de una aplicacion, usar siempre el filtro por NRN:
+### GOTCHA: Do not use application_id as query param
+- `GET /service?application_id=X` **does NOT work** — returns HTTP 403 ("Insufficient permissions") but the real error is that this filter is not supported.
+- To list services of an application, always use NRN filter:
 ```bash
 np-api fetch-api "/service?nrn=organization%3D<org>%3Aaccount%3D<acc>%3Anamespace%3D<ns>%3Aapplication%3D<app>"
 ```
 
-### GOTCHA: Servicios visibles vs servicios propios (owned by app)
+### GOTCHA: Visible services vs owned services (owned by app)
 
-El endpoint `/service?nrn=<app_nrn>` devuelve **todos los servicios visibles** para esa aplicacion, incluyendo servicios heredados de niveles superiores (namespace, account, organización). Esto es lo mismo que el frontend muestra en la pestaña "Available".
+The `/service?nrn=<app_nrn>` endpoint returns **all visible services** for that application, including services inherited from upper levels (namespace, account, organization). This is the same as what the frontend shows in the "Available" tab.
 
-Para obtener solo los servicios **propiedad de una aplicación** (pestaña "Owned by App" en la UI), hay que filtrar client-side por `entity_nrn`:
+To get only services **owned by an application** ("Owned by App" tab in the UI), you must filter client-side by `entity_nrn`:
 
 ```bash
-# 1. Obtener todos los servicios visibles
+# 1. Get all visible services
 np-api fetch-api "/service?nrn=organization%3D<org>%3Aaccount%3D<acc>%3Anamespace%3D<ns>%3Aapplication%3D<app>&type=dependency&limit=300"
 
-# 2. Filtrar los que tengan entity_nrn == NRN de la aplicación
-# Solo los servicios cuyo entity_nrn termine en "application=<app_id>" son propiedad de esa app
+# 2. Filter those whose entity_nrn == application's NRN
+# Only services whose entity_nrn ends with "application=<app_id>" are owned by that app
 ```
 
-**No existe** un query param `entity_nrn` en la API. El filtrado es siempre client-side.
+There is **no** `entity_nrn` query param in the API. Filtering is always client-side.
 
 ---
 
 ## @endpoint /service/{id}/action
 
-Lista acciones ejecutadas en un service (GET) o crea una nueva action (POST via np-developer-actions).
+Lists actions executed on a service (GET) or creates a new action (POST via np-developer-actions).
 
-### Parámetros (GET)
-- `id` (path, required): UUID del service
-- `limit` (query): Máximo de resultados
+### Parameters (GET)
+- `id` (path, required): Service UUID
+- `limit` (query): Maximum results
 
-### Respuesta (GET)
+### Response (GET)
 ```json
 {
   "results": [
@@ -121,7 +121,7 @@ Lista acciones ejecutadas en un service (GET) o crea una nueva action (POST via 
       "id": "uuid",
       "name": "start-blue-green | switch-traffic | finalize-blue-green | create-xxx | update-xxx | delete-xxx",
       "status": "pending | in_progress | success | failed",
-      "specification_id": "uuid-de-la-action-specification",
+      "specification_id": "uuid-of-the-action-specification",
       "parameters": {"deployment_id": "123", "scope_id": "456"},
       "results": {},
       "created_at": "...",
@@ -131,54 +131,54 @@ Lista acciones ejecutadas en un service (GET) o crea una nueva action (POST via 
 }
 ```
 
-### POST (crear action) - via np-developer-actions
+### POST (create action) - via np-developer-actions
 
-Para crear una action en un service (ej: trigger provisioning):
+To create an action on a service (e.g., trigger provisioning):
 
 ```json
 POST /service/{id}/action
 {
-  "name": "create-<slug-del-servicio>",
+  "name": "create-<service-slug>",
   "specification_id": "<action_specification_id>",
   "parameters": { ... }
 }
 ```
 
-- `name`: Convencion: `<action_type>-<service_slug>` (ej: "create-my-queue")
-- `specification_id`: ID de la action specification (obtenido de `/service_specification/{spec_id}/action_specification`)
-- `parameters`: Valores segun el `parameters.schema` de la action specification
+- `name`: Convention: `<action_type>-<service_slug>` (e.g., "create-my-queue")
+- `specification_id`: Action specification ID (obtained from `/service_specification/{spec_id}/action_specification`)
+- `parameters`: Values according to the action specification's `parameters.schema`
 
-**NOTA**: Para ejecutar este POST, usar `/np-developer-actions exec-api`. Ver `docs/services.md` en np-developer-actions.
+**NOTE**: To execute this POST, use `/np-developer-actions exec-api`. See `docs/services.md` in np-developer-actions.
 
-### Navegación
+### Navigation
 - **→ action details**: `/service/{id}/action/{action_id}?include_messages=true`
-- **← deployment**: filtrar por `parameters.deployment_id`
+- **← deployment**: filter by `parameters.deployment_id`
 
-### Ejemplo
+### Example
 ```bash
-# Listar todas las acciones de un service
+# List all actions of a service
 np-api fetch-api "/service/ef3baa4e-6144-457e-8812-280976eab7f3/action?limit=200"
 ```
 
-### Notas
-- **Este es el endpoint para obtener deployment actions** - NO existe `/deployment/{id}/action`
-- Para acciones de un deployment específico: filtrar por `parameters.deployment_id`
-- Tipos de deployment actions: start-blue-green, switch-traffic, finalize-blue-green
-- Tipos de service provisioning actions: create, update, delete, custom
-- La creacion de un service requiere **dos requests**: primero `POST /service`, luego `POST /service/{id}/action` con la CREATE action spec. Sin el segundo request, el service queda en `pending` indefinidamente
+### Notes
+- **This is the endpoint for getting deployment actions** - `/deployment/{id}/action` does NOT exist
+- For actions of a specific deployment: filter by `parameters.deployment_id`
+- Deployment action types: start-blue-green, switch-traffic, finalize-blue-green
+- Service provisioning action types: create, update, delete, custom
+- Creating a service requires **two requests**: first `POST /service`, then `POST /service/{id}/action` with the CREATE action spec. Without the second request, the service stays in `pending` indefinitely
 
 ---
 
 ## @endpoint /service/{id}/action/{action_id}
 
-Obtiene detalles de una acción específica.
+Gets details of a specific action.
 
-### Parámetros
-- `id` (path, required): UUID del service
-- `action_id` (path, required): UUID de la acción
-- `include_messages` (query, **recomendado**): Incluye logs de ejecución
+### Parameters
+- `id` (path, required): Service UUID
+- `action_id` (path, required): Action UUID
+- `include_messages` (query, **recommended**): Includes execution logs
 
-### Respuesta (con include_messages=true)
+### Response (with include_messages=true)
 ```json
 {
   "id": "uuid",
@@ -193,29 +193,29 @@ Obtiene detalles de una acción específica.
 }
 ```
 
-### Ejemplo
+### Example
 ```bash
 np-api fetch-api "/service/ef3baa4e/action/a031f992?include_messages=true"
 ```
 
-### Notas
-- Sin `include_messages=true`, el array messages viene vacío
-- Action messages muestran detalles de workflow no visibles en deployment messages
-- Revela: pasos internos, comandos ejecutados, errores específicos
-- **IMPORTANTE**: El campo `specification_id` de una service action es un **action specification interno**, NO un service_specification. No confundir con `service.specification_id` que sí apunta a `/service_specification/{id}`
+### Notes
+- Without `include_messages=true`, the messages array comes empty
+- Action messages show workflow details not visible in deployment messages
+- Reveals: internal steps, executed commands, specific errors
+- **IMPORTANT**: The `specification_id` field of a service action is an **internal action specification**, NOT a service_specification. Don't confuse with `service.specification_id` which does point to `/service_specification/{id}`
 
 ---
 
 ## @endpoint /service_specification
 
-Lista las service specifications disponibles. Cada service specification define un tipo de servicio que se puede provisionar (ej: SQS Queue, Postgres DB, Redis).
+Lists available service specifications. Each service specification defines a type of service that can be provisioned (e.g., SQS Queue, Postgres DB, Redis).
 
-### Parametros
-- `nrn` (query, required): NRN con URL encoding. Usar NRN a nivel de aplicacion para obtener las specs disponibles en ese contexto.
-- `type` (query): Filtrar por tipo: `dependency` (infraestructura) | `scope` (scopes)
-- `limit` (query): Maximo de resultados (default 30)
+### Parameters
+- `nrn` (query, required): URL-encoded NRN. Use application-level NRN to get specs available in that context.
+- `type` (query): Filter by type: `dependency` (infrastructure) | `scope` (scopes)
+- `limit` (query): Maximum results (default 30)
 
-### Respuesta
+### Response
 ```json
 {
   "paging": {"offset": 0, "limit": 100},
@@ -239,69 +239,69 @@ Lista las service specifications disponibles. Cada service specification define 
 }
 ```
 
-### Ejemplo
+### Example
 ```bash
-# Service specifications de tipo dependency para una aplicacion
+# Dependency service specifications for an application
 np-api fetch-api "/service_specification?nrn=organization%3D<org>%3Aaccount%3D<acc>%3Anamespace%3D<ns>%3Aapplication%3D<app>&type=dependency&limit=100"
 
-# Service specifications de tipo scope para un account
+# Scope service specifications for an account
 np-api fetch-api "/service_specification?nrn=organization%3D<org>%3Aaccount%3D<acc>&type=scope"
 ```
 
-### Notas
-- `type=dependency`: bases de datos, colas, caches, etc. (usado por "+ New service" en la UI)
-- `type=scope`: tipos de scope/ambiente (usado por la creacion de scopes)
-- Los `selectors` (category, sub_category, provider) permiten clasificar y filtrar los tipos
+### Notes
+- `type=dependency`: databases, queues, caches, etc. (used by "+ New service" in the UI)
+- `type=scope`: scope/environment types (used by scope creation)
+- The `selectors` (category, sub_category, provider) allow classifying and filtering types
 
 ---
 
 ## @endpoint /service_specification/{id}
 
-Obtiene el template/blueprint de un service.
+Gets the template/blueprint of a service.
 
-### Parametros
-- `id` (path, required): UUID del specification
-- `application_id` (query, optional): ID de la aplicacion (el frontend lo envia para contexto)
+### Parameters
+- `id` (path, required): Specification UUID
+- `application_id` (query, optional): Application ID (the frontend sends it for context)
 
-### Respuesta
+### Response
 - `id`: UUID
-- `name`: Nombre del specification (ej: "SQS Queue", "Postgres DB")
-- `slug`: Identificador URL-friendly
+- `name`: Specification name (e.g., "SQS Queue", "Postgres DB")
+- `slug`: URL-friendly identifier
 - `type`: `dependency` | `scope`
 - `selectors`: `{category, sub_category, provider, imported}`
-- `attributes`: `{schema, values}` — schema de los atributos del service (salida del provisioning)
-- `dimensions`: restricciones de dimensions
-- `scopes`: restricciones de scopes
-- `visible_to[]`: NRNs de organizaciones/accounts que pueden ver esta spec
-- `assignable_to`: `"any"` o restricciones
-- `use_default_actions`: boolean — si genera action specs automaticamente (CREATE, UPDATE, DELETE)
+- `attributes`: `{schema, values}` — schema of the service attributes (provisioning output)
+- `dimensions`: Dimension restrictions
+- `scopes`: Scope restrictions
+- `visible_to[]`: NRNs of organizations/accounts that can see this spec
+- `assignable_to`: `"any"` or restrictions
+- `use_default_actions`: boolean — whether it auto-generates action specs (CREATE, UPDATE, DELETE)
 - `created_at`, `updated_at`: timestamps
 
-### Ejemplo
+### Example
 ```bash
 np-api fetch-api "/service_specification/529d8786-4af4-4625-87de-664ad7c9ef5f?application_id=2052735708"
 ```
 
-### Notas
-- `attributes.schema` define los **atributos de salida** del service (ej: queue_arn, host, port). No confundir con los parametros de entrada para crear el service.
-- Los **parametros de entrada** para crear un service se obtienen de la CREATE action specification via `/service_specification/{id}/action_specification`
-- `use_default_actions: true` indica que al crear esta spec se auto-generaron action specs (CREATE, UPDATE, DELETE)
-- **Campo `export` en attributes.schema.properties**: determina que atributos se inyectan como parametros al linkear el servicio:
-  - `"export": true` → se exporta como parametro plaintext
-  - `"export": {"type": "environment_variable", "secret": true}` → se exporta como parametro secreto
-  - `"export": false` o ausente → NO se exporta
-  - Ejemplo SQS: `queue_arn` (export:true) se exporta, `visibility_timeout` (sin export) no
+### Notes
+- `attributes.schema` defines the service's **output attributes** (e.g., queue_arn, host, port). Don't confuse with input parameters for creating the service.
+- The **input parameters** for creating a service are obtained from the CREATE action specification via `/service_specification/{id}/action_specification`
+- `use_default_actions: true` indicates that action specs (CREATE, UPDATE, DELETE) were auto-generated when this spec was created
+- **`export` field in attributes.schema.properties**: determines which attributes are injected as parameters when linking the service:
+  - `"export": true` → exported as plaintext parameter
+  - `"export": {"type": "environment_variable", "secret": true}` → exported as secret parameter
+  - `"export": false` or absent → NOT exported
+  - Example SQS: `queue_arn` (export:true) is exported, `visibility_timeout` (no export) is not
 
 ---
 
 ## @endpoint /service_specification/{id}/link_specification
 
-Lista las link specifications asociadas a un service specification.
+Lists link specifications associated with a service specification.
 
-### Parametros
-- `id` (path, required): UUID del service specification
+### Parameters
+- `id` (path, required): Service specification UUID
 
-### Respuesta
+### Response
 ```json
 {
   "paging": {"offset": 0, "limit": 30},
@@ -310,7 +310,7 @@ Lista las link specifications asociadas a un service specification.
       "id": "uuid",
       "name": "Link SQS Queue",
       "slug": "link-sqs-queue",
-      "specification_id": "uuid-del-service-specification",
+      "specification_id": "uuid-of-service-specification",
       "use_default_actions": false,
       "attributes": {"schema": {}, "values": {}},
       "selectors": {}
@@ -319,25 +319,25 @@ Lista las link specifications asociadas a un service specification.
 }
 ```
 
-### Ejemplo
+### Example
 ```bash
 np-api fetch-api "/service_specification/529d8786-4af4-4625-87de-664ad7c9ef5f/link_specification"
 ```
 
-### Notas
-- Util para saber que link specifications estan asociadas a un tipo de servicio
-- El frontend lo consulta al crear un servicio para mostrar opciones de linking
+### Notes
+- Useful to know which link specifications are associated with a service type
+- The frontend queries this when creating a service to show linking options
 
 ---
 
 ## @endpoint /service_specification/{id}/action_specification
 
-Lista las action specifications de un service specification (templates de acciones disponibles).
+Lists action specifications of a service specification (available action templates).
 
-### Parámetros
-- `id` (path, required): UUID del service specification
+### Parameters
+- `id` (path, required): Service specification UUID
 
-### Respuesta
+### Response
 ```json
 {
   "paging": {"offset": 0, "limit": 30},
@@ -358,32 +358,32 @@ Lista las action specifications de un service specification (templates de accion
 }
 ```
 
-### Navegación
+### Navigation
 - **← service_specification**: `/service_specification/{id}`
-- **→ action instances**: `/service/{service_id}/action` (instancias de estas specs)
+- **→ action instances**: `/service/{service_id}/action` (instances of these specs)
 
-### Ejemplo
+### Example
 ```bash
 np-api fetch-api "/service_specification/f7248a07-909f-4241-b2c7-616d2403bf54/action_specification"
 ```
 
-### Notas
-- `use_default_actions: true` genera automáticamente specs de tipo create, update, delete
-- Custom actions se agregan vía `available_actions` en el service-spec.json.tpl
-- `parameters` y `results` usan estructura `{"schema": {...}, "values": {}}`, NO JSON Schema directo
-- `type: custom` = no afecta el status del service parent (a diferencia de create/update/delete)
-- `link_specification_id: null` = action a nivel service; con valor = action a nivel link
+### Notes
+- `use_default_actions: true` automatically generates specs of type create, update, delete
+- Custom actions are added via `available_actions` in the service-spec.json.tpl
+- `parameters` and `results` use `{"schema": {...}, "values": {}}` structure, NOT direct JSON Schema
+- `type: custom` = doesn't affect the parent service status (unlike create/update/delete)
+- `link_specification_id: null` = service-level action; with value = link-level action
 
 ---
 
 ## @endpoint /link
 
-Lista links (conexiones service → application) filtrados por NRN.
+Lists links (service → application connections) filtered by NRN.
 
-### Parámetros
-- `nrn` (query, required): NRN de la aplicacion con URL encoding. Usar NRN **a nivel de aplicacion** para obtener solo los links de esa app.
+### Parameters
+- `nrn` (query, required): URL-encoded application NRN. Use **application-level** NRN to get only that app's links.
 
-### Respuesta
+### Response
 ```json
 {
   "paging": {"offset": 0, "limit": 30},
@@ -393,7 +393,7 @@ Lista links (conexiones service → application) filtrados por NRN.
       "name": "lnk fees",
       "slug": "lnk-fees",
       "status": "active | pending | creating | failed",
-      "service_id": "uuid-del-service-linkeado",
+      "service_id": "uuid-of-linked-service",
       "entity_nrn": "organization=...:application=...",
       "dimensions": {"environment": "production"},
       "specification_id": "uuid",
@@ -408,68 +408,68 @@ Lista links (conexiones service → application) filtrados por NRN.
 }
 ```
 
-### Navegación
+### Navigation
 - **→ link detail**: `/link/{id}`
 - **→ link actions**: `/link/{id}/action`
-- **→ service linkeado**: `service_id` → `/service/{service_id}`
+- **→ linked service**: `service_id` → `/service/{service_id}`
 
-### Ejemplo
+### Example
 ```bash
-# Links de una aplicacion especifica
+# Links of a specific application
 np-api fetch-api "/link?nrn=organization%3D<org_id>%3Aaccount%3D<acc_id>%3Anamespace%3D<ns_id>%3Aapplication%3D<app_id>"
 ```
 
-### Notas
-- Sin filtro de NRN a nivel de aplicacion, devuelve links de toda la plataforma (miles)
-- El campo `service_id` permite correlacionar con `/service/{id}` para saber que servicio esta linkeado
-- El campo `attributes` contiene los parametros exportados (credenciales, URLs, etc.)
-- Los parametros de tipo `linked_service` en `/parameter` son generados automaticamente por los links
+### Notes
+- Without application-level NRN filter, returns links from the entire platform (thousands)
+- The `service_id` field allows correlating with `/service/{id}` to know which service is linked
+- The `attributes` field contains exported parameters (credentials, URLs, etc.)
+- Parameters of type `linked_service` in `/parameter` are automatically generated by links
 
 ---
 
 ## @endpoint /link/{id}
 
-Obtiene detalle de un link especifico.
+Gets detail of a specific link.
 
-### Parámetros
-- `id` (path, required): UUID del link
+### Parameters
+- `id` (path, required): Link UUID
 
-### Respuesta
-- `id`: UUID del link
-- `name`: Nombre del link
-- `slug`: Identificador URL-friendly
+### Response
+- `id`: Link UUID
+- `name`: Link name
+- `slug`: URL-friendly identifier
 - `status`: active | pending | creating | failed
-- `service_id`: UUID del service linkeado
-- `entity_nrn`: NRN de la aplicacion
-- `dimensions`: Dimensions del link
-- `specification_id`: UUID de la link specification
-- `attributes`: Parametros exportados (credenciales, URLs, etc.)
-- `selectors`: Categoria, provider, sub_category, imported
-- `messages[]`: Eventos del link
+- `service_id`: Linked service UUID
+- `entity_nrn`: Application NRN
+- `dimensions`: Link dimensions
+- `specification_id`: Link specification UUID
+- `attributes`: Exported parameters (credentials, URLs, etc.)
+- `selectors`: Category, provider, sub_category, imported
+- `messages[]`: Link events
 
-### Navegación
+### Navigation
 - **→ link actions**: `/link/{id}/action`
 - **→ service**: `service_id` → `/service/{service_id}`
 
-### Ejemplo
+### Example
 ```bash
 np-api fetch-api "/link/9ba2dfe6-b5db-484a-9804-01718199575a"
 ```
 
-### Notas
-- Si `status: failed`, revisar `/link/{id}/action` para diagnosticar
-- `attributes` puede contener credenciales sensibles
+### Notes
+- If `status: failed`, review `/link/{id}/action` to diagnose
+- `attributes` may contain sensitive credentials
 
 ---
 
 ## @endpoint /link/{id}/action
 
-Lista acciones ejecutadas en un link (create, update, delete).
+Lists actions executed on a link (create, update, delete).
 
-### Parámetros
-- `id` (path, required): UUID del link
+### Parameters
+- `id` (path, required): Link UUID
 
-### Respuesta
+### Response
 ```json
 {
   "paging": {"offset": 0, "limit": 30},
@@ -479,7 +479,7 @@ Lista acciones ejecutadas en un link (create, update, delete).
       "name": "create-lnk-xxx",
       "slug": "create-lnk-xxx",
       "status": "success | failed | pending | in_progress",
-      "link_id": "uuid-del-link",
+      "link_id": "uuid-of-the-link",
       "parameters": {"permisions": {"read": true, "write": true, "admin": false}},
       "results": {"username": "usr...", "password": null, "permisions": {...}},
       "created_at": "...",
@@ -489,89 +489,89 @@ Lista acciones ejecutadas en un link (create, update, delete).
 }
 ```
 
-### Navegación
+### Navigation
 - **← link**: `/link/{id}`
 
-### Ejemplo
+### Example
 ```bash
 np-api fetch-api "/link/9ba2dfe6-b5db-484a-9804-01718199575a/action"
 ```
 
-### POST (crear action) - via np-developer-actions
+### POST (create action) - via np-developer-actions
 
-Para crear una action en un link (ej: provisioning al crear, deprovisioning al eliminar):
+To create an action on a link (e.g., provisioning on create, deprovisioning on delete):
 
 ```json
 POST /link/{id}/action
 {
-  "name": "delete-<slug-del-link>",
+  "name": "delete-<link-slug>",
   "specification_id": "<delete_action_specification_id>",
   "parameters": { ... }
 }
 ```
 
-- `name`: Convencion: `<action_type>-<link_slug>` (ej: "delete-lnk-prices-prod")
-- `specification_id`: ID de la action specification del tipo delete (obtenido de `/link_specification/{spec_id}/action_specification`)
-- `parameters`: Valores segun el `parameters.schema` de la delete action specification
+- `name`: Convention: `<action_type>-<link_slug>` (e.g., "delete-lnk-prices-prod")
+- `specification_id`: Delete action specification ID (obtained from `/link_specification/{spec_id}/action_specification`)
+- `parameters`: Values according to the delete action specification's `parameters.schema`
 
-**NOTA**: Este es el metodo que usa la UI para eliminar links con `use_default_actions: true`.
-Crea una delete action que un agent procesa para deprovisionar recursos (eliminar usuario DB, etc.).
+**NOTE**: This is the method the UI uses to delete links with `use_default_actions: true`.
+Creates a delete action that an agent processes to deprovision resources (delete DB user, etc.).
 
-### Notas
-- Aqui estan los errores reales de provisioning del link
-- El campo `parameters` muestra lo que se envio, `results` muestra lo que se genero (ej: credenciales)
-- Para mensajes detallados de una action fallida: `/link/{id}/action/{action_id}?include_messages=true`
-- Para **eliminar** links con `use_default_actions: true`: crear una delete action con POST (ver np-developer-actions `service-links.md`). Esto ejecuta deprovisioning.
-- La eliminacion via action es asincrona — el link pasa por status `deleting` antes de desaparecer
+### Notes
+- This is where the actual link provisioning errors are
+- The `parameters` field shows what was sent, `results` shows what was generated (e.g., credentials)
+- For detailed messages of a failed action: `/link/{id}/action/{action_id}?include_messages=true`
+- To **delete** links with `use_default_actions: true`: create a delete action with POST (see np-developer-actions `service-links.md`). This executes deprovisioning.
+- Deletion via action is asynchronous — the link goes through `deleting` status before disappearing
 
 ---
 
 ## @endpoint /application/{app_id}/service/{service_id}/link/{link_id}
 
-Obtiene un service link (conexión service → application). Endpoint alternativo anidado bajo application/service.
+Gets a service link (service → application connection). Alternative endpoint nested under application/service.
 
-### Parámetros
-- `app_id` (path): ID de la aplicación
-- `service_id` (path): UUID del service
-- `link_id` (path): ID del link
+### Parameters
+- `app_id` (path): Application ID
+- `service_id` (path): Service UUID
+- `link_id` (path): Link ID
 
-### Respuesta
-- `id`: ID del link
-- `service_id`: UUID del service
-- `application_id`: ID de la aplicación
-- `status`: Estado del link
-- `parameters`: Variables exportadas a la app
+### Response
+- `id`: Link ID
+- `service_id`: Service UUID
+- `application_id`: Application ID
+- `status`: Link status
+- `parameters`: Variables exported to the app
 
-### Navegación
+### Navigation
 - **→ link actions**: `/application/{app_id}/service/{service_id}/link/{link_id}/action`
 
-### Notas
-- Errores reales de linking están en el endpoint `/action`
+### Notes
+- Actual linking errors are in the `/action` endpoint
 
 ---
 
 ## @endpoint /application/{app_id}/service/{service_id}/link/{link_id}/action
 
-Obtiene acciones del service link.
+Gets service link actions.
 
-### Ejemplo
+### Example
 ```bash
 np-api fetch-api "/application/123/service/abc-uuid/link/789/action"
 ```
 
-### Notas
-- Aquí están los errores reales de provisioning del link
+### Notes
+- This is where the actual link provisioning errors are
 
 ---
 
 ## @endpoint /link_specification
 
-Lista las link specifications disponibles. Cada link specification define el template para crear un link de un tipo especifico de servicio.
+Lists available link specifications. Each link specification defines the template for creating a link of a specific service type.
 
-### Parametros
-- `nrn` (query, required): NRN con URL encoding (a nivel de account)
+### Parameters
+- `nrn` (query, required): URL-encoded NRN (at account level)
 
-### Respuesta
+### Response
 ```json
 {
   "paging": {"offset": 0, "limit": 30},
@@ -580,7 +580,7 @@ Lista las link specifications disponibles. Cada link specification define el tem
       "id": "uuid",
       "name": "Link SQS Queue",
       "slug": "link-sqs-queue",
-      "specification_id": "uuid-del-service-specification",
+      "specification_id": "uuid-of-service-specification",
       "use_default_actions": false,
       "attributes": {"schema": {}, "values": {}},
       "selectors": {}
@@ -589,48 +589,48 @@ Lista las link specifications disponibles. Cada link specification define el tem
 }
 ```
 
-### Relacion con service_specification
+### Relationship with service_specification
 
-El campo `specification_id` de la link_specification apunta al `service_specification` correspondiente.
-Esto permite matchear: dado un servicio con `specification_id = X`, buscar la link_specification cuyo `specification_id` tambien sea `X`.
+The link_specification's `specification_id` field points to the corresponding `service_specification`.
+This allows matching: given a service with `specification_id = X`, search for the link_specification whose `specification_id` is also `X`.
 
-### Link specifications conocidas
+### Known link specifications
 
-| Nombre | ID | Service Spec ID | use_default_actions | status en POST |
+| Name | ID | Service Spec ID | use_default_actions | status in POST |
 | --- | --- | --- | --- | --- |
 | Link SQS Queue | `99396bf5-2200-415d-b79a-d04f9a5dddad` | `529d8786-...` (SQS Queue) | false | `"active"` |
 | Link PostgreSQL | `581ef5b7-6993-47d7-b78b-36be0386cdf2` | `670da122-...` | false | `"active"` |
-| database-user | `96472045-b509-46c4-96fa-51fc654d6737` | `11063f69-...` (Postgres) | **true** | no enviar |
+| database-user | `96472045-b509-46c4-96fa-51fc654d6737` | `11063f69-...` (Postgres) | **true** | don't send |
 | Link Redis | `66919464-05e6-4d78-bb8c-902c57881ddd` | `4a4f6955-...` | false | `"active"` |
 | Link DynamoDB | `6b14b24d-ba3c-4fca-951c-472b318e278e` | `64df74c2-...` | false | `"active"` |
 | Link Pubsub Queue | `43c560d2-0aa9-4f6e-a0be-e3192b0fba90` | `b836752e-...` | false | `"active"` |
 | Link SQS Agent | `fa9f75e3-d1b9-40f0-a029-ebf78769632d` | `271c090e-...` | false | `"active"` |
 | MySQL | `32e7a096-9343-44d0-ac75-69891096365a` | `e541df6a-...` | false | `"active"` |
 | Serverless Valkey Link | `7ccfd202-9e85-49c4-a015-3acce157772a` | `5184c8ca-...` | false | `"active"` |
-| Read Access | `8dab5557-f933-43e3-827c-607ef3cf935f` | `8e778953-...` | **true** | no enviar |
-| Link cache | `968976be-bfcb-4bba-9d23-2c7fa31698c5` | `8e778953-...` | **true** | no enviar |
+| Read Access | `8dab5557-f933-43e3-827c-607ef3cf935f` | `8e778953-...` | **true** | don't send |
+| Link cache | `968976be-bfcb-4bba-9d23-2c7fa31698c5` | `8e778953-...` | **true** | don't send |
 
-### Ejemplo
+### Example
 ```bash
 np-api fetch-api "/link_specification?nrn=organization%3D1255165411%3Aaccount%3D95118862"
 ```
 
-### Notas
-- Los IDs pueden variar entre organizaciones. Siempre consultar este endpoint para obtener el ID correcto.
-- **`use_default_actions: true`**: al crear la link specification se generan action specifications (CREATE, UPDATE, DELETE). Consultar con `/link_specification/{id}/action_specification`. El cliente crea la action con `POST /link/{id}/action`, un agent la procesa y provisiona recursos (ej: crear usuario DB, generar password), transicionando el link a `active`.
-- **`use_default_actions: false`**: no existen action specifications. No hay agent que procese el link. Se debe crear con `"status": "active"` para que quede activo de inmediato. Sin este campo, el link queda en `pending` para siempre.
-- El campo `use_default_actions` es **critico** para determinar como crear un link. Ver documentacion de `POST /link` en np-developer-actions.
+### Notes
+- IDs may vary between organizations. Always query this endpoint to get the correct ID.
+- **`use_default_actions: true`**: when creating the link specification, action specifications are generated (CREATE, UPDATE, DELETE). Query with `/link_specification/{id}/action_specification`. The client creates the action with `POST /link/{id}/action`, an agent processes it and provisions resources (e.g., create DB user, generate password), transitioning the link to `active`.
+- **`use_default_actions: false`**: no action specifications exist. No agent processes the link. Must be created with `"status": "active"` to be active immediately. Without this field, the link stays in `pending` forever.
+- The `use_default_actions` field is **critical** for determining how to create a link. See `POST /link` documentation in np-developer-actions.
 
 ---
 
 ## @endpoint /link_specification/{id}/action_specification
 
-Lista las action specifications de una link specification. Solo existen para link specifications con `use_default_actions: true`.
+Lists action specifications of a link specification. Only exist for link specifications with `use_default_actions: true`.
 
-### Parametros
-- `id` (path, required): UUID de la link specification
+### Parameters
+- `id` (path, required): Link specification UUID
 
-### Respuesta
+### Response
 ```json
 {
   "results": [
@@ -647,62 +647,62 @@ Lista las action specifications de una link specification. Solo existen para lin
 }
 ```
 
-### Campos clave
-- `type`: `create` (para provisionar al linkear), `update` (para modificar), `delete` (para eliminar)
-- `parameters.schema`: JSON Schema de los parametros de entrada (ej: permisos read/write/admin)
-- `results.schema`: JSON Schema de los resultados (ej: username, password generados)
-- `parameters.schema.properties[].target`: a que `attribute` del link se mapea el resultado
+### Key fields
+- `type`: `create` (for provisioning on link), `update` (for modifying), `delete` (for deleting)
+- `parameters.schema`: JSON Schema of input parameters (e.g., read/write/admin permissions)
+- `results.schema`: JSON Schema of results (e.g., generated username, password)
+- `parameters.schema.properties[].target`: which link `attribute` the result maps to
 
-### Ejemplo
+### Example
 ```bash
 np-api fetch-api "/link_specification/96472045-b509-46c4-96fa-51fc654d6737/action_specification"
 ```
 
-### Notas
-- Solo link specifications con `use_default_actions: true` tienen action specifications
-- La de tipo `create` se necesita para el segundo request al crear un link (`POST /link/{id}/action`)
-- Estructura identica a `/service_specification/{id}/action_specification`
+### Notes
+- Only link specifications with `use_default_actions: true` have action specifications
+- The `create` type is needed for the second request when creating a link (`POST /link/{id}/action`)
+- Structure identical to `/service_specification/{id}/action_specification`
 
 ---
 
-## Services de type=scope
+## Services of type=scope
 
-Cada scope con provider UUID tiene un service asociado de `type=scope`. Este service:
-- Contiene las **capabilities del scope** en el campo `attributes`
-- Su `specification_id` es el **provider** del scope
-- Su `entity_nrn` contiene el NRN completo del scope
+Each scope with UUID provider has an associated service of `type=scope`. This service:
+- Contains the **scope's capabilities** in the `attributes` field
+- Its `specification_id` is the scope's **provider**
+- Its `entity_nrn` contains the scope's complete NRN
 
-### Relación Scope ↔ Service
+### Scope ↔ Service Relationship
 
 ```
-Scope (provider UUID)
+Scope (UUID provider)
   └── instance_id → Service (type=scope)
                       ├── specification_id = provider UUID
-                      ├── attributes = capabilities del scope
-                      └── entity_nrn = NRN del scope
+                      ├── attributes = scope capabilities
+                      └── entity_nrn = scope NRN
 ```
 
-### Uso: Listar scopes por provider
+### Usage: List scopes by provider
 
 ```bash
-# Listar todos los services type=scope de la org
+# List all type=scope services of the org
 np-api fetch-api "/service?nrn=organization%3D{org_id}:account%3D*&type=scope&limit=1500"
 
-# Filtrar por provider (specification_id)
-| jq '[.results[] | select(.specification_id == "UUID-del-provider")]'
+# Filter by provider (specification_id)
+| jq '[.results[] | select(.specification_id == "provider-UUID")]'
 ```
 
-### Uso: Comparar capabilities entre scopes
+### Usage: Compare capabilities between scopes
 
 ```bash
-# Encontrar scopes que no tienen cierta capability
+# Find scopes that don't have a certain capability
 jq '[.results[] |
   select(.specification_id == "UUID") |
   select((.attributes | has("traffic_management")) | not) |
   {name, scope_id: (.entity_nrn | split("scope=")[1])}]'
 ```
 
-### Notas
-- Solo scopes con provider UUID tienen service asociado
-- Scopes con provider legacy (`AWS:SERVERLESS:LAMBDA`, etc.) NO tienen service type=scope
-- El campo `attributes` del service es equivalente a `capabilities` del scope
+### Notes
+- Only scopes with UUID provider have an associated service
+- Scopes with legacy provider (`AWS:SERVERLESS:LAMBDA`, etc.) do NOT have a type=scope service
+- The service's `attributes` field is equivalent to the scope's `capabilities`

@@ -1,58 +1,58 @@
-# Builds, Releases y Assets
+# Builds, Releases, and Assets
 
-Pipeline de código: Build → Asset → Release → Deployment
+Code pipeline: Build → Asset → Release → Deployment
 
 ## @endpoint /build/{id}
 
-Obtiene detalles de un build.
+Gets details of a build.
 
-### Parámetros
-- `id` (path, required): ID del build
+### Parameters
+- `id` (path, required): Build ID
 
-### Respuesta
-- `id`: ID numérico
+### Response
+- `id`: Numeric ID
 - `status`: pending | running | success | failed | canceled
-- `application_id`: ID de la aplicación
-- `repository_url`: URL del repositorio Git
-- `commit_hash`: SHA del commit
-- `branch`: Nombre del branch
-- `tag`: Tag de Git (null si no es tag build)
+- `application_id`: Application ID
+- `repository_url`: Git repository URL
+- `commit_hash`: Commit SHA
+- `branch`: Branch name
+- `tag`: Git tag (null if not a tag build)
 - `created_at`, `started_at`, `finished_at`: Timestamps
-- `build_log_url`: URL de logs (puede ser null)
-- `error_message`: Mensaje de error (solo si failed)
-- `assets[]`: Artefactos generados
-  - `id`: ID del asset
+- `build_log_url`: Log URL (may be null)
+- `error_message`: Error message (only if failed)
+- `assets[]`: Generated artifacts
+  - `id`: Asset ID
   - `type`: container
-  - `uri`: URI del container image (ECR)
-- `metadata`: Propiedades adicionales (solo en GET individual)
+  - `uri`: Container image URI (ECR)
+- `metadata`: Additional properties (only in individual GET)
 
-### Navegación
+### Navigation
 - **→ application**: `application_id` → `/application/{application_id}`
 - **→ asset**: `assets[].id` → `/asset/{asset_id}`
 - **← application**: `/build?application_id={application_id}`
 
-### Ejemplo
+### Example
 ```bash
 np-api fetch-api "/build/1524929544"
 ```
 
-### Notas
-- Builds failed no crean assets
-- `tag` solo se popula en builds triggereados por tags
-- `metadata` solo disponible en GET individual, NO en listas
+### Notes
+- Failed builds don't create assets
+- `tag` is only populated in tag-triggered builds
+- `metadata` only available in individual GET, NOT in lists
 
 ---
 
 ## @endpoint /build
 
-Lista builds de una aplicación.
+Lists builds of an application.
 
-### Parámetros
-- `application_id` (query, required): ID de la aplicación
-- `status` (query): Filtra por status
-- `limit` (query): Máximo de resultados
+### Parameters
+- `application_id` (query, required): Application ID
+- `status` (query): Filter by status
+- `limit` (query): Maximum results
 
-### Respuesta
+### Response
 ```json
 {
   "paging": {...},
@@ -60,7 +60,7 @@ Lista builds de una aplicación.
 }
 ```
 
-### Ejemplo
+### Example
 ```bash
 np-api fetch-api "/build?application_id=489238271&limit=50"
 np-api fetch-api "/build?application_id=489238271&status=failed&limit=50"
@@ -70,29 +70,29 @@ np-api fetch-api "/build?application_id=489238271&status=failed&limit=50"
 
 ## @endpoint /release/{id}
 
-Obtiene detalles de un release.
+Gets details of a release.
 
-### Parámetros
-- `id` (path, required): ID del release
+### Parameters
+- `id` (path, required): Release ID
 
-### Respuesta
-- `id`: ID numérico
-- `application_id`: ID de la aplicación
-- `build_id`: ID del build asociado
+### Response
+- `id`: Numeric ID
+- `application_id`: Application ID
+- `build_id`: Associated build ID
 - `status`: active
-- `version`: Versión del release
+- `version`: Release version
 - `specification`:
-  - `replicas`: Número de réplicas
+  - `replicas`: Number of replicas
   - `resources`: memory, cpu
-  - `environment_variables`: Variables de entorno
+  - `environment_variables`: Environment variables
 
-### Navegación
+### Navigation
 - **→ application**: `application_id` → `/application/{application_id}`
 - **→ build**: `build_id` → `/build/{build_id}`
 - **← application**: `/release?application_id={application_id}`
 - **← deployment**: `deployment.release_id`
 
-### Ejemplo
+### Example
 ```bash
 np-api fetch-api "/release/258479089"
 ```
@@ -101,13 +101,13 @@ np-api fetch-api "/release/258479089"
 
 ## @endpoint /release
 
-Lista releases de una aplicación.
+Lists releases of an application.
 
-### Parámetros
-- `application_id` (query, required): ID de la aplicación
-- `limit` (query): Máximo de resultados
+### Parameters
+- `application_id` (query, required): Application ID
+- `limit` (query): Maximum results
 
-### Ejemplo
+### Example
 ```bash
 np-api fetch-api "/release?application_id=489238271&limit=50"
 ```
@@ -116,23 +116,23 @@ np-api fetch-api "/release?application_id=489238271&limit=50"
 
 ## @endpoint /asset/{id}
 
-Obtiene detalles de un asset (container image).
+Gets details of an asset (container image).
 
-### Parámetros
-- `id` (path, required): ID del asset
+### Parameters
+- `id` (path, required): Asset ID
 
-### Respuesta
-- `id`: ID numérico
+### Response
+- `id`: Numeric ID
 - `type`: container
-- `uri`: URI completo del container (ECR URL)
-- `build_id`: ID del build que lo creó
-- `size`: Tamaño en bytes
-- `digest`: Hash del container
+- `uri`: Full container URI (ECR URL)
+- `build_id`: ID of the build that created it
+- `size`: Size in bytes
+- `digest`: Container hash
 
-### Navegación
+### Navigation
 - **→ build**: `build_id` → `/build/{build_id}`
 
-### Ejemplo
+### Example
 ```bash
 np-api fetch-api "/asset/668494956"
 ```
@@ -141,12 +141,12 @@ np-api fetch-api "/asset/668494956"
 
 ## @endpoint /asset
 
-Lista assets de un build.
+Lists assets of a build.
 
-### Parámetros
-- `build_id` (query): Filtra por build
+### Parameters
+- `build_id` (query): Filter by build
 
-### Ejemplo
+### Example
 ```bash
 np-api fetch-api "/asset?build_id=1524929544"
 ```

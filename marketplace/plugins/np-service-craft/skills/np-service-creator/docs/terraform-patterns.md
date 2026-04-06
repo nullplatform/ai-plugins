@@ -2,27 +2,27 @@
 
 ## Source of Truth
 
-Siempre clonar y leer los modulos antes de generar terraform:
+Always clone and read the modules before generating terraform:
 
 ```bash
 git clone https://github.com/nullplatform/tofu-modules /tmp/tofu-modules-ref 2>/dev/null \
   || (cd /tmp/tofu-modules-ref && git pull)
 ```
 
-Archivos a leer:
-- `nullplatform/service_definition/variables.tf` — variables del modulo (las sin default son mandatorias)
-- `nullplatform/service_definition/main.tf` — como crea los recursos
-- `nullplatform/service_definition/locals.tf` — como resuelve los specs (HTTP vs file segun git_provider)
-- `nullplatform/service_definition/data.tf` — data sources HTTP (desactivados cuando git_provider = "local")
-- `nullplatform/service_definition_agent_association/variables.tf` — variables del binding
-- `nullplatform/service_definition_agent_association/main.tf` — como construye el cmdline y el channel
+Files to read:
+- `nullplatform/service_definition/variables.tf` — module variables (those without default are mandatory)
+- `nullplatform/service_definition/main.tf` — how resources are created
+- `nullplatform/service_definition/locals.tf` — how specs are resolved (HTTP vs file depending on git_provider)
+- `nullplatform/service_definition/data.tf` — HTTP data sources (disabled when git_provider = "local")
+- `nullplatform/service_definition_agent_association/variables.tf` — binding variables
+- `nullplatform/service_definition_agent_association/main.tf` — how the cmdline and channel are built
 
-No copiar ejemplos de este archivo como template — generar el terraform leyendo las variables del modulo y adaptando al servicio concreto.
+Do not copy examples from this file as a template — generate the terraform by reading the module variables and adapting to the specific service.
 
 ## Local vs Remote
 
-- **Local** (`git_provider = "local"`): usa `file()` para leer specs del filesystem. No requiere push.
-- **Remote** (`git_provider = "github"` o `"gitlab"`): usa `data "http"` para leer specs del repo. Requiere push.
+- **Local** (`git_provider = "local"`): uses `file()` to read specs from the filesystem. Does not require push.
+- **Remote** (`git_provider = "github"` or `"gitlab"`): uses `data "http"` to read specs from the repo. Requires push.
 
 ## Apply Order
 

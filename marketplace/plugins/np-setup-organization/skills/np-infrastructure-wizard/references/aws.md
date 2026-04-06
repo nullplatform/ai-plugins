@@ -1,151 +1,151 @@
-# Arbol de Decision - AWS Infrastructure
+# Decision Tree - AWS Infrastructure
 
-> Invocado desde el paso 4 del wizard principal (`SKILL.md`).
-> **Input global**: `infrastructure/aws/` con archivos .tf originales
-> **Output global**: Archivos .tf customizados, `existing-resources.properties` (si aplica), variables nuevas en `terraform.tfvars`
+> Invoked from step 4 of the main wizard (`SKILL.md`).
+> **Global input**: `infrastructure/aws/` with original .tf files
+> **Global output**: Customized .tf files, `existing-resources.properties` (if applicable), new variables in `terraform.tfvars`
 
-> Para patrones generales de OpenTofu (source de modulos, Helm v3, agent_api_key) ver [tofu-modules-patterns.md](tofu-modules-patterns.md).
+> For general OpenTofu patterns (module source, Helm v3, agent_api_key) see [tofu-modules-patterns.md](tofu-modules-patterns.md).
 
-## Contenido
+## Contents
 
-0. [Decision de Networking Schema](#paso-0-decision-de-networking-schema)
-1. [Clasificacion de Modulos](#paso-1-clasificacion-de-modulos)
-2. [Preguntar por componentes Cloud](#paso-2-preguntar-por-cada-componente-cloud)
-3. [Resolver dependencias de excluidos](#paso-3-resolver-dependencias-de-modulos-excluidos)
-4. [Preguntar por componentes Commons](#paso-4-preguntar-por-componentes-commons)
-5. [Aplicar cambios a .tf](#paso-5-aplicar-cambios-a-los-archivos-tf)
-6. [Validar archivos .tf](#paso-6-validar-archivos-tf)
-7. [Variables AWS](#variables-aws)
+0. [Networking Schema Decision](#step-0-networking-schema-decision)
+1. [Module Classification](#step-1-module-classification)
+2. [Ask about Cloud components](#step-2-ask-about-each-cloud-component)
+3. [Resolve excluded dependencies](#step-3-resolve-excluded-module-dependencies)
+4. [Ask about Commons components](#step-4-ask-about-commons-components)
+5. [Apply changes to .tf](#step-5-apply-changes-to-tf-files)
+6. [Validate .tf files](#step-6-validate-tf-files)
+7. [AWS Variables](#aws-variables)
 8. [Provider Configuration](#provider-configuration)
-9. [Referencia de Modulos AWS](#referencia-de-modulos-aws)
-10. [Patrones Criticos AWS](#patrones-criticos-aws)
+9. [AWS Module Reference](#aws-module-reference)
+10. [Critical AWS Patterns](#critical-aws-patterns)
 11. [Troubleshooting](#troubleshooting)
 
-## Paso 0: Decision de Networking Schema
+## Step 0: Networking Schema Decision
 
-> **Input**: Preferencia del usuario
-> **Output**: Schema elegido (`istio` o `acm_ingress`) que condiciona modulos disponibles
+> **Input**: User preference
+> **Output**: Chosen schema (`istio` or `acm_ingress`) that conditions available modules
 
-AWS soporta dos schemas de networking. Preguntar **antes** de clasificar modulos:
+AWS supports two networking schemas. Ask **before** classifying modules:
 
-**"Que schema de networking queres usar?"**
+**"Which networking schema do you want to use?"**
 
-| Aspecto | Istio (recomendado) | ACM/Ingress |
-|---------|---------------------|-------------|
+| Aspect | Istio (recommended) | ACM/Ingress |
+|--------|---------------------|-------------|
 | Load Balancer | ALB Controller | ALB Controller |
 | Ingress | Istio Gateways (Gateway API) | AWS Ingress Controller |
-| Certificados | cert-manager + Let's Encrypt | ACM (nativo AWS) |
+| Certificates | cert-manager + Let's Encrypt | ACM (AWS native) |
 | DNS sync | External DNS | External DNS |
-| `dns_type` del agent | `"external_dns"` | `"route53"` |
-| Complejidad | Mayor (mas componentes) | Menor |
-| Flexibilidad | Mayor (multi-cloud compatible) | Menor (AWS-only) |
+| Agent `dns_type` | `"external_dns"` | `"route53"` |
+| Complexity | Higher (more components) | Lower |
+| Flexibility | Higher (multi-cloud compatible) | Lower (AWS-only) |
 
-> Si el usuario no tiene preferencia, recomendar **Istio** (es el default en todos los clouds).
+> If the user has no preference, recommend **Istio** (it's the default across all clouds).
 
-## Paso 1: Clasificacion de Modulos
+## Step 1: Module Classification
 
-> **Input**: `infrastructure/aws/main.tf`, schema elegido en paso 0
-> **Output**: Modulos clasificados por categoria
+> **Input**: `infrastructure/aws/main.tf`, schema chosen in step 0
+> **Output**: Modules classified by category
 
-Leer `main.tf` dinamicamente y clasificar:
+Read `main.tf` dynamically and classify:
 
-### Cloud (preguntables)
+### Cloud (askable)
 
-| Modulo | Pregunta |
+| Module | Question |
 |--------|----------|
-| `vpc` | Ya tenes una VPC? |
-| `eks` | Ya tenes un cluster EKS? |
-| `route53` | Ya tenes zonas DNS en Route53? |
-| `security` | Ya tenes Security Groups para los gateways? |
-| `alb_controller` | Ya tenes AWS Load Balancer Controller? |
+| `vpc` | Do you already have a VPC? |
+| `eks` | Do you already have an EKS cluster? |
+| `route53` | Do you already have DNS zones in Route53? |
+| `security` | Do you already have Security Groups for the gateways? |
+| `alb_controller` | Do you already have AWS Load Balancer Controller? |
 
-**Si schema=ACM/Ingress**, agregar:
+**If schema=ACM/Ingress**, add:
 
-| Modulo | Pregunta |
+| Module | Question |
 |--------|----------|
-| `acm` | Ya tenes un certificado ACM? |
-| `ingress` | Ya tenes el Ingress Controller configurado? |
+| `acm` | Do you already have an ACM certificate? |
+| `ingress` | Do you already have the Ingress Controller configured? |
 
-**IAM modules** (preguntables, dependen de EKS OIDC):
+**IAM modules** (askable, depend on EKS OIDC):
 
-| Modulo | Pregunta |
+| Module | Question |
 |--------|----------|
-| `iam_external_dns` | Ya tenes el IAM role para external-dns? |
-| `iam_cert_manager` | Ya tenes el IAM role para cert-manager? |
-| `iam_agent` | Ya tenes el IAM role para el agente? |
+| `iam_external_dns` | Do you already have the IAM role for external-dns? |
+| `iam_cert_manager` | Do you already have the IAM role for cert-manager? |
+| `iam_agent` | Do you already have the IAM role for the agent? |
 
-### Nullplatform (siempre incluidos, no preguntar)
+### Nullplatform (always included, don't ask)
 
 - `agent_api_key`, `agent`, `base`
 
-Eliminar siempre: `scope_notification_api_key`, `service_notification_api_key`
+Always remove: `scope_notification_api_key`, `service_notification_api_key`
 
-### Commons (preguntables)
+### Commons (askable)
 
-| Modulo | Pregunta |
+| Module | Question |
 |--------|----------|
-| `cert_manager` | Ya tenes cert-manager instalado? |
-| `external_dns` | Ya tenes external-dns configurado? |
-| `prometheus` | Ya tenes Prometheus instalado? |
+| `cert_manager` | Do you already have cert-manager installed? |
+| `external_dns` | Do you already have external-dns configured? |
+| `prometheus` | Do you already have Prometheus installed? |
 
-**Si schema=Istio**, agregar:
+**If schema=Istio**, add:
 
-| Modulo | Pregunta |
+| Module | Question |
 |--------|----------|
-| `istio` | Ya tenes Istio instalado? |
+| `istio` | Do you already have Istio installed? |
 
-> Nota: AWS tiene dos instancias de external-dns (public y private). Se tratan como un solo modulo para la pregunta pero el `main.tf` puede tener dos bloques (`external_dns_public` y `external_dns_private`).
+> Note: AWS has two external-dns instances (public and private). They are treated as a single module for the question but the `main.tf` may have two blocks (`external_dns_public` and `external_dns_private`).
 
-## Paso 2: Preguntar por cada componente Cloud
+## Step 2: Ask about each Cloud component
 
-> **Input**: Lista de modulos Cloud
-> **Output**: Lista de modulos a mantener vs excluir
+> **Input**: List of Cloud modules
+> **Output**: List of modules to keep vs exclude
 
-Para cada modulo Cloud, preguntar: **"Ya tenes un {recurso} o necesitas que lo cree?"**
+For each Cloud module, ask: **"Do you already have a {resource} or do you need it created?"**
 
-- **Crear nuevo** -> Mantener el bloque module
-- **Ya tengo uno** -> Agregar a lista de excluidos, resolver dependencias en paso 3
+- **Create new** -> Keep the module block
+- **I already have one** -> Add to excluded list, resolve dependencies in step 3
 
-### Orden de preguntas (respetar dependencias)
+### Question order (respect dependencies)
 
-1. `vpc` (base de todo)
-2. `eks` (depende de vpc)
-3. `route53` (depende de vpc para zona privada)
-4. `alb_controller` (depende de eks OIDC)
-5. `security` (depende de eks para derivar VPC CIDR)
-6. Si schema=ACM/Ingress:
-   - `acm` (depende de route53)
-   - `ingress` (depende de acm)
+1. `vpc` (base of everything)
+2. `eks` (depends on vpc)
+3. `route53` (depends on vpc for private zone)
+4. `alb_controller` (depends on eks OIDC)
+5. `security` (depends on eks to derive VPC CIDR)
+6. If schema=ACM/Ingress:
+   - `acm` (depends on route53)
+   - `ingress` (depends on acm)
 7. IAM modules:
-   - `iam_external_dns` (depende de eks OIDC + route53)
-   - `iam_cert_manager` (depende de eks OIDC + route53)
-   - `iam_agent` (depende de eks OIDC + route53)
+   - `iam_external_dns` (depends on eks OIDC + route53)
+   - `iam_cert_manager` (depends on eks OIDC + route53)
+   - `iam_agent` (depends on eks OIDC + route53)
 
-> Si el usuario crea `vpc`, no preguntar por sus dependencias en otros modulos.
-> Si el usuario crea `eks`, los modulos IAM pueden usar su OIDC provider directamente.
+> If the user creates `vpc`, don't ask about its dependencies in other modules.
+> If the user creates `eks`, IAM modules can use its OIDC provider directly.
 
-## Paso 3: Resolver dependencias de modulos excluidos
+## Step 3: Resolve excluded module dependencies
 
-> **Input**: Lista de modulos excluidos, `main.tf`
-> **Output**: Valores de reemplazo para cada output referenciado
+> **Input**: List of excluded modules, `main.tf`
+> **Output**: Replacement values for each referenced output
 
-Cuando el usuario dice "ya tengo" un recurso:
+When the user says "I already have" a resource:
 
-1. Buscar todas las referencias `module.{modulo_excluido}.{output}` en modulos que se mantienen
-2. Pedir al usuario el valor real de cada referencia encontrada
-3. Guardar los valores (se usan en paso 5)
+1. Find all `module.{excluded_module}.{output}` references in maintained modules
+2. Ask the user for the real value of each found reference
+3. Save the values (used in step 5)
 
-### Deteccion dinamica
+### Dynamic detection
 
 ```bash
-grep -oP 'module\.{modulo_excluido}\.\w+' infrastructure/aws/main.tf | sort -u
+grep -oP 'module\.{excluded_module}\.\w+' infrastructure/aws/main.tf | sort -u
 ```
 
-### Data sources para recursos existentes
+### Data sources for existing resources
 
-Cuando un recurso es existente, usar data sources en vez de variables redundantes:
+When a resource already exists, use data sources instead of redundant variables:
 
-**VPC existente**:
+**Existing VPC**:
 ```hcl
 variable "vpc_id" { type = string }
 
@@ -161,7 +161,7 @@ data "aws_subnets" "private" {
 }
 ```
 
-**EKS existente**:
+**Existing EKS**:
 ```hcl
 variable "cluster_name" { type = string }
 
@@ -176,7 +176,7 @@ data "aws_iam_openid_connect_provider" "existing" {
 }
 ```
 
-**DNS zones existentes**:
+**Existing DNS zones**:
 ```hcl
 variable "public_zone_id" { type = string }
 variable "private_zone_id" { type = string }
@@ -189,63 +189,63 @@ data "aws_route53_zone" "private" {
 }
 ```
 
-## Paso 4: Preguntar por componentes Commons
+## Step 4: Ask about Commons components
 
-> **Input**: Lista de modulos Commons
-> **Output**: Lista de modulos Commons a mantener vs excluir
+> **Input**: List of Commons modules
+> **Output**: List of Commons modules to keep vs exclude
 
-Para cada modulo Commons: **"Ya tenes {componente} instalado o lo instalamos?"**
+For each Commons module: **"Do you already have {component} installed or should we install it?"**
 
-- **Instalar** -> Mantener el bloque module
-- **Ya tengo** -> Eliminar (generalmente sin outputs referenciados por otros modulos)
+- **Install** -> Keep the module block
+- **I already have it** -> Remove (generally no outputs referenced by other modules)
 
-## Paso 5: Aplicar cambios a los archivos .tf
+## Step 5: Apply changes to .tf files
 
-> **Input**: Modulos a excluir (pasos 2+4), valores de reemplazo (paso 3), todos los `.tf`
-> **Output**: Archivos `.tf` limpios, `terraform.tfvars` actualizado, `existing-resources.properties`
+> **Input**: Modules to exclude (steps 2+4), replacement values (step 3), all `.tf` files
+> **Output**: Clean `.tf` files, updated `terraform.tfvars`, `existing-resources.properties`
 
-Limpiar **todos** los archivos `.tf`, no solo `main.tf`:
+Clean **all** `.tf` files, not just `main.tf`:
 
 ### 5.1 main.tf
-- Eliminar bloques `module` de recursos excluidos
-- Eliminar siempre `scope_notification_api_key` y `service_notification_api_key`
-- Eliminar `depends_on` que referencien modulos eliminados
-- Reemplazar `module.{excluido}.{output}` con `var.existing_{output}` o data sources
-- Si schema=Istio: eliminar modulos `acm` e `ingress` (si existen)
-- Si schema=ACM/Ingress: eliminar modulo `istio` (si existe)
+- Remove `module` blocks for excluded resources
+- Always remove `scope_notification_api_key` and `service_notification_api_key`
+- Remove `depends_on` referencing deleted modules
+- Replace `module.{excluded}.{output}` with `var.existing_{output}` or data sources
+- If schema=Istio: remove `acm` and `ingress` modules (if they exist)
+- If schema=ACM/Ingress: remove `istio` module (if it exists)
 
 ### 5.2 providers.tf
-- Si `eks` fue excluido: reemplazar providers `kubernetes` y `helm` para que usen data sources en vez de `module.eks.*` (ver [Provider Configuration](#provider-configuration) seccion "Cluster existente")
-- Agregar data sources `aws_eks_cluster` y `aws_eks_cluster_auth` con `var.existing_cluster_name`
+- If `eks` was excluded: replace `kubernetes` and `helm` providers to use data sources instead of `module.eks.*` (see [Provider Configuration](#provider-configuration) "Existing cluster" section)
+- Add `aws_eks_cluster` and `aws_eks_cluster_auth` data sources with `var.existing_cluster_name`
 
 ### 5.3 variables.tf
-- Eliminar variables huerfanas (buscar `var.{nombre}` en todos los `.tf`, si no aparece -> eliminar)
-- Agregar variables nuevas para recursos existentes (`var.existing_*`)
+- Remove orphaned variables (search `var.{name}` in all `.tf`, if not found -> remove)
+- Add new variables for existing resources (`var.existing_*`)
 
 ### 5.4 locals.tf
-- Eliminar locals huerfanos (buscar `local.{nombre}` en todos los `.tf`, si no aparece -> eliminar)
+- Remove orphaned locals (search `local.{name}` in all `.tf`, if not found -> remove)
 
 ### 5.5 outputs.tf
-- Eliminar outputs que referencian modulos eliminados
+- Remove outputs referencing deleted modules
 
 ### 5.6 data blocks
-- Eliminar bloques `data` huerfanos en cualquier `.tf`
+- Remove orphaned `data` blocks in any `.tf`
 
 ### 5.7 terraform.tfvars
-- Agregar valores de recursos existentes: `existing_vpc_id = "vpc-xxx"`
-- Configurar `dns_type` segun schema elegido:
+- Add existing resource values: `existing_vpc_id = "vpc-xxx"`
+- Configure `dns_type` based on chosen schema:
   - Istio: `dns_type = "external_dns"`
   - ACM/Ingress: `dns_type = "route53"`
 
 ### 5.8 existing-resources.properties
-- Guardar como documentacion: `vpc_id=vpc-xxx`
+- Save as documentation: `vpc_id=vpc-xxx`
 
-> `existing-resources.properties` es documentacion. Los valores reales van en `terraform.tfvars`.
+> `existing-resources.properties` is documentation. Real values go in `terraform.tfvars`.
 
-## Paso 6: Validar archivos .tf
+## Step 6: Validate .tf files
 
-> **Input**: Archivos `.tf` modificados, `terraform.tfvars`
-> **Output**: Archivos validados, listos para `tofu plan`/`tofu apply`
+> **Input**: Modified `.tf` files, `terraform.tfvars`
+> **Output**: Validated files, ready for `tofu plan`/`tofu apply`
 
 ```bash
 cd infrastructure/aws
@@ -254,52 +254,52 @@ tofu init -backend=false
 tofu validate
 ```
 
-Usar `tofu init -backend=false` para validar sin necesitar credenciales del backend. Ver [tofu-modules-patterns.md](tofu-modules-patterns.md#flujo-de-lectura-de-modulos) para inspeccionar variables de modulos descargados.
+Use `tofu init -backend=false` to validate without needing backend credentials. See [tofu-modules-patterns.md](tofu-modules-patterns.md#module-reading-flow) for inspecting downloaded module variables.
 
-- **Si pasa** -> Continuar con paso 5 de SKILL.md (DNS)
-- **Si falla** -> Leer error, corregir, repetir. Causas comunes:
-  - Referencia a modulo eliminado sin reemplazo
-  - Variable sin definir o sin valor en tfvars
-  - `depends_on` apuntando a modulo eliminado
-  - Output referenciando modulo eliminado
-  - Local huerfano
+- **If it passes** -> Continue with step 5 of SKILL.md (DNS)
+- **If it fails** -> Read error, fix, repeat. Common causes:
+  - Reference to deleted module without replacement
+  - Undefined variable or missing value in tfvars
+  - `depends_on` pointing to deleted module
+  - Output referencing deleted module
+  - Orphaned local
 
-## Variables AWS
+## AWS Variables
 
-Ademas de las variables generales documentadas en [variables.md](variables.md), AWS requiere:
+In addition to the general variables documented in [variables.md](variables.md), AWS requires:
 
-| Variable | Descripcion | Origen |
+| Variable | Description | Source |
 | -------- | ----------- | ------ |
-| `aws_region` | Region AWS (ej: `us-east-1`) | terraform.tfvars |
-| `aws_profile` | Perfil AWS CLI para autenticacion (default: null, opcional) | terraform.tfvars |
-| `dns_type` | `"external_dns"` (Istio) o `"route53"` (ACM/Ingress) | terraform.tfvars |
-| `agent_image_tag` | Siempre `"aws"` para AWS (otros clouds usan `"latest"`) | terraform.tfvars |
+| `aws_region` | AWS region (e.g., `us-east-1`) | terraform.tfvars |
+| `aws_profile` | AWS CLI profile for authentication (default: null, optional) | terraform.tfvars |
+| `dns_type` | `"external_dns"` (Istio) or `"route53"` (ACM/Ingress) | terraform.tfvars |
+| `agent_image_tag` | Always `"aws"` for AWS (other clouds use `"latest"`) | terraform.tfvars |
 
-### Variables adicionales segun schema
+### Additional variables by schema
 
-**Si schema=Istio** (`dns_type = "external_dns"`), el modulo agent requiere variables adicionales que se incluyen en el template con placeholders (no preguntar, el usuario las completa al deployar):
+**If schema=Istio** (`dns_type = "external_dns"`), the agent module requires additional variables that are included in the template with placeholders (don't ask, the user fills them when deploying):
 
-| Variable | Descripcion |
+| Variable | Description |
 |----------|-------------|
-| `agent_use_account_slug` | Flag para usar account slug en nombres |
-| `agent_image_pull_secrets` | Image pull secrets (vacio si no aplica) |
-| `agent_service_template` | Path al template de servicio Istio |
-| `agent_initial_ingress_path` | Path al template de ingress inicial |
-| `agent_blue_green_ingress_path` | Path al template de ingress blue-green |
+| `agent_use_account_slug` | Flag to use account slug in names |
+| `agent_image_pull_secrets` | Image pull secrets (empty if not applicable) |
+| `agent_service_template` | Path to Istio service template |
+| `agent_initial_ingress_path` | Path to initial ingress template |
+| `agent_blue_green_ingress_path` | Path to blue-green ingress template |
 
-**Si schema=ACM/Ingress** (`dns_type = "route53"`): no se requieren variables adicionales del agent.
+**If schema=ACM/Ingress** (`dns_type = "route53"`): no additional agent variables are required.
 
 ## Provider Configuration
 
-### Provider AWS
+### AWS Provider
 
 ```hcl
 aws = { source = "hashicorp/aws", version = "~> 6.0" }
 ```
 
-Para providers genericos (kubernetes, helm, nullplatform) ver [tofu-modules-patterns.md](tofu-modules-patterns.md#provider-versions-genericas).
+For generic providers (kubernetes, helm, nullplatform) see [tofu-modules-patterns.md](tofu-modules-patterns.md#generic-provider-versions).
 
-### Cluster nuevo (creado por tofu)
+### New cluster (created by tofu)
 
 ```hcl
 provider "aws" {
@@ -338,11 +338,11 @@ provider "helm" {
 }
 ```
 
-> Outputs EKS correctos: `eks_cluster_endpoint`, `eks_cluster_ca`, `eks_cluster_name`.
-> Helm v3: ver [tofu-modules-patterns.md](tofu-modules-patterns.md#helm-v3-syntax).
-> aws_profile: condicional para no pasar `--profile null`.
+> Correct EKS outputs: `eks_cluster_endpoint`, `eks_cluster_ca`, `eks_cluster_name`.
+> Helm v3: see [tofu-modules-patterns.md](tofu-modules-patterns.md#helm-v3-syntax).
+> aws_profile: conditional to avoid passing `--profile null`.
 
-### Cluster existente (data sources)
+### Existing cluster (data sources)
 
 ```hcl
 data "aws_eks_cluster" "existing" {
@@ -368,11 +368,11 @@ provider "helm" {
 }
 ```
 
-## Referencia de Modulos AWS
+## AWS Module Reference
 
-Para formato de source y versionado ver [tofu-modules-patterns.md](tofu-modules-patterns.md#source-de-modulos-git-ref). Para `agent_api_key` ver [tofu-modules-patterns.md](tofu-modules-patterns.md#modulo-agent-api-key).
+For source format and versioning see [tofu-modules-patterns.md](tofu-modules-patterns.md#git-ref-module-source). For `agent_api_key` see [tofu-modules-patterns.md](tofu-modules-patterns.md#agent-api-key-module).
 
-### Modulos IAM (inputs y outputs)
+### IAM Modules (inputs and outputs)
 
 **external_dns_iam** (`infrastructure/aws/iam/external_dns`):
 - Inputs: `cluster_name`, `aws_iam_openid_connect_provider_arn`, `hosted_zone_public_id`, `hosted_zone_private_id`
@@ -386,7 +386,7 @@ Para formato de source y versionado ver [tofu-modules-patterns.md](tofu-modules-
 - Inputs: `cluster_name`, `aws_iam_openid_connect_provider_arn`, `agent_namespace`
 - Output: `nullplatform_agent_role_arn`
 
-### External DNS (variables correctas)
+### External DNS (correct variables)
 
 ```hcl
 module "external_dns_public" {
@@ -415,10 +415,10 @@ module "external_dns_private" {
 }
 ```
 
-> `type` controla el nombre del Helm release (`external-dns-{type}`). `zone_type` filtra zonas AWS.
-> El privado usa `create_namespace = false` para evitar conflicto de namespace con el publico.
+> `type` controls the Helm release name (`external-dns-{type}`). `zone_type` filters AWS zones.
+> The private one uses `create_namespace = false` to avoid namespace conflict with the public one.
 
-### Cert Manager (variables correctas)
+### Cert Manager (correct variables)
 
 ```hcl
 module "cert_manager" {
@@ -433,7 +433,7 @@ module "cert_manager" {
 }
 ```
 
-### Base (defaults para AWS)
+### Base (AWS defaults)
 
 ```hcl
 module "base" {
@@ -458,37 +458,37 @@ module "base" {
 }
 ```
 
-> `metrics_server_enabled = true` instala Kubernetes metrics-server (necesario para HPA y `kubectl top`).
-> `gateway_*_aws_security_group_id` vienen del modulo `security` y se usan para anotar los NLB con los SG correctos.
-> `gateway_security_enabled` es `false` por defecto. Solo si se habilita se necesitan provider stubs de Azure/GCP.
+> `metrics_server_enabled = true` installs Kubernetes metrics-server (needed for HPA and `kubectl top`).
+> `gateway_*_aws_security_group_id` come from the `security` module and are used to annotate NLBs with the correct SGs.
+> `gateway_security_enabled` is `false` by default. Only if enabled are Azure/GCP provider stubs needed.
 
-## Patrones Criticos AWS
+## Critical AWS Patterns
 
 ### ALB Controller Webhook
 
-Los modulos Helm posteriores deben depender de `module.alb_controller` para asegurar que el webhook este registrado.
+Subsequent Helm modules must depend on `module.alb_controller` to ensure the webhook is registered.
 
-Todos los modulos Helm posteriores (`cert_manager`, `external_dns`, `istio`, `ingress`, `base`) deben incluir:
+All subsequent Helm modules (`cert_manager`, `external_dns`, `istio`, `ingress`, `base`) must include:
 
 ```hcl
 depends_on = [module.alb_controller]
 ```
 
-El modulo `agent` hereda la dependencia transitivamente via `depends_on = [module.base]`.
+The `agent` module inherits the dependency transitively via `depends_on = [module.base]`.
 
 ### IRSA (IAM Roles for Service Accounts)
 
-Todos los modulos IAM (`iam_external_dns`, `iam_cert_manager`, `iam_agent`) usan el patron IRSA:
+All IAM modules (`iam_external_dns`, `iam_cert_manager`, `iam_agent`) use the IRSA pattern:
 
-1. Obtienen el OIDC provider del cluster EKS
-2. Crean un IAM role con trust policy federada
-3. El trust policy permite `sts:AssumeRoleWithWebIdentity` desde el service account especifico
+1. They get the OIDC provider from the EKS cluster
+2. They create an IAM role with a federated trust policy
+3. The trust policy allows `sts:AssumeRoleWithWebIdentity` from the specific service account
 
-Dependencias tipicas: EKS OIDC provider ARN + Route53 zone ID.
+Typical dependencies: EKS OIDC provider ARN + Route53 zone ID.
 
-### Backend S3
+### S3 Backend
 
-El backend S3 requiere `profile` en `backend.tf`:
+The S3 backend requires `profile` in `backend.tf`:
 
 ```hcl
 terraform {
@@ -502,21 +502,21 @@ terraform {
 }
 ```
 
-> Sin `profile`, tofu usa credenciales default que pueden no coincidir con el entorno deseado.
-> El modulo `infrastructure/aws/backend` de tofu-modules crea bucket S3 con versioning, encryption y object lock COMPLIANCE.
+> Without `profile`, tofu uses default credentials which may not match the desired environment.
+> The `infrastructure/aws/backend` module from tofu-modules creates an S3 bucket with versioning, encryption, and COMPLIANCE object lock.
 
-### dns_type del Agent
+### Agent dns_type
 
-El modulo `agent` recibe `dns_type` que determina como gestiona DNS:
+The `agent` module receives `dns_type` which determines how it manages DNS:
 
-- **Istio schema**: `dns_type = "external_dns"` (external-dns sincroniza records)
-- **ACM/Ingress schema**: `dns_type = "route53"` (el agente gestiona Route53 directamente)
+- **Istio schema**: `dns_type = "external_dns"` (external-dns syncs records)
+- **ACM/Ingress schema**: `dns_type = "route53"` (the agent manages Route53 directly)
 
-No mezclar esquemas. Si usas Istio, `dns_type` DEBE ser `external_dns`. Si usas ACM/Ingress, DEBE ser `route53`.
+Do not mix schemas. If you use Istio, `dns_type` MUST be `external_dns`. If you use ACM/Ingress, it MUST be `route53`.
 
 ### Agent HTTPRoute Templates (Istio schema)
 
-Cuando se usa Istio con Gateway API, el agent debe crear HTTPRoute (no ALB Ingress). Por defecto el agent usa templates ALB Ingress. Para que use HTTPRoute, pasar estas variables al modulo `agent`:
+When using Istio with Gateway API, the agent must create HTTPRoute (not ALB Ingress). By default the agent uses ALB Ingress templates. To make it use HTTPRoute, pass these variables to the `agent` module:
 
 ```hcl
 module "agent" {
@@ -527,7 +527,7 @@ module "agent" {
 }
 ```
 
-Defaults recomendados en `variables.tf`:
+Recommended defaults in `variables.tf`:
 
 | Variable | Default |
 |----------|---------|
@@ -535,11 +535,11 @@ Defaults recomendados en `variables.tf`:
 | `initial_ingress_path` | `/root/.np/nullplatform/scopes/k8s/deployment/templates/istio/initial-httproute.yaml.tpl` |
 | `blue_green_ingress_path` | `/root/.np/nullplatform/scopes/k8s/deployment/templates/istio/blue-green-httproute.yaml.tpl` |
 
-Sin estas variables, el agent crea Ingress con `ingressClassName: alb` que no es compatible con Gateway API. Resultado: no se crea HTTPRoute, el DNS no resuelve.
+Without these variables, the agent creates Ingress with `ingressClassName: alb` which is not compatible with Gateway API. Result: no HTTPRoute is created, DNS doesn't resolve.
 
-### Security Module y Cluster SG
+### Security Module and Cluster SG
 
-El modulo `security` crea SGs para los gateways (NLB) y opcionalmente agrega reglas de ingreso al SG del cluster EKS. Pasar `cluster_security_group_id` con el **primary SG** (EKS-managed):
+The `security` module creates SGs for the gateways (NLB) and optionally adds ingress rules to the EKS cluster SG. Pass `cluster_security_group_id` with the **primary SG** (EKS-managed):
 
 ```hcl
 module "security" {
@@ -549,11 +549,11 @@ module "security" {
 }
 ```
 
-**IMPORTANTE**: Usar `eks_cluster_primary_security_group_id` (el SG creado y gestionado por EKS, adjunto a todos los nodos). NO usar `eks_cluster_security_group_id` (additional SG creado por el modulo Terraform, no adjunto a nodos por defecto).
+**IMPORTANT**: Use `eks_cluster_primary_security_group_id` (the SG created and managed by EKS, attached to all nodes). DO NOT use `eks_cluster_security_group_id` (additional SG created by the Terraform module, not attached to nodes by default).
 
-Sin estas reglas, el NLB no puede alcanzar los pods de Istio gateway → targets unhealthy → timeout en el endpoint.
+Without these rules, the NLB cannot reach Istio gateway pods → unhealthy targets → endpoint timeout.
 
 ## Troubleshooting
 
-Para problemas AWS-especificos (ALB webhook, IRSA, EKS endpoint, S3 backend) ver [aws-troubleshooting.md](aws-troubleshooting.md).
-Para problemas genericos ver [troubleshooting.md](troubleshooting.md).
+For AWS-specific problems (ALB webhook, IRSA, EKS endpoint, S3 backend) see [aws-troubleshooting.md](aws-troubleshooting.md).
+For generic problems see [troubleshooting.md](troubleshooting.md).

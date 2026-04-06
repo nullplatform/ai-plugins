@@ -14,7 +14,7 @@ description: This skill should be used when the user asks to "create an organiza
 
 ### np-setup-orchestrator
 
-description: Orquesta la configuracion completa de una organizacion de Nullplatform. Usar cuando se necesite inicializar un proyecto, verificar estado de infraestructura/cloud/K8s/API, diagnosticar problemas, o ejecutar checks de herramientas, cloud, Kubernetes, Nullplatform API, telemetria y servicios.
+description: Orchestrates the complete configuration of a Nullplatform organization. Use when you need to initialize a project, verify infrastructure/cloud/K8s/API status, diagnose issues, or run tool, cloud, Kubernetes, Nullplatform API, telemetry, and service checks.
 
 ### np-api
 
@@ -38,7 +38,7 @@ description: This skill should be used when the user asks to "configure cloud cr
 
 ### np-infrastructure-wizard
 
-description: Crea infraestructura cloud para Nullplatform. Usar cuando se necesite configurar VPC/VNet, clusters Kubernetes (EKS/AKS/GKE/OKE/ARO), ingress (Istio/ALB), DNS zones, backend de tfstate, y desplegar el agente de Nullplatform. Soporta AWS, Azure, Azure ARO, GCP y OCI.
+description: Creates cloud infrastructure for Nullplatform. Use when you need to configure VPC/VNet, Kubernetes clusters (EKS/AKS/GKE/OKE/ARO), ingress (Istio/ALB), DNS zones, tfstate backend, and deploy the Nullplatform agent. Supports AWS, Azure, Azure ARO, GCP, and OCI.
 
 ## Installation
 

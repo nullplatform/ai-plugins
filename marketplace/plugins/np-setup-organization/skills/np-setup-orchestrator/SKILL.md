@@ -1,51 +1,51 @@
 ---
 name: np-setup-orchestrator
-description: Orquesta la configuracion completa de una organizacion de Nullplatform. Usar cuando se necesite inicializar un proyecto, verificar estado de infraestructura/cloud/K8s/API, diagnosticar problemas, o ejecutar checks de herramientas, cloud, Kubernetes, Nullplatform API, telemetria y servicios.
+description: Orchestrates the complete configuration of a Nullplatform organization. Use when you need to initialize a project, verify infrastructure/cloud/K8s/API status, diagnose issues, or run tool, cloud, Kubernetes, Nullplatform API, telemetry, and service checks.
 ---
 
 # Nullplatform Setup Orchestrator
 
-## REGLA IMPORTANTE: Uso de np-api
+## IMPORTANT RULE: Using np-api
 
-**NUNCA uses `curl` directamente para consultar la API de Nullplatform (`api.nullplatform.com`).**
+**NEVER use `curl` directly to query the Nullplatform API (`api.nullplatform.com`).**
 
-Para CUALQUIER consulta a la API de Nullplatform, DEBES usar:
+For ANY query to the Nullplatform API, you MUST use:
 
-- `/np-api fetch-api "<endpoint>"` - Para consultas a la API
-- `/np-api check-auth` - Para verificar autenticación
-- El skill `np-api` - Para operaciones programáticas (invocar via `/np-api`)
+- `/np-api fetch-api "<endpoint>"` - For API queries
+- `/np-api check-auth` - To verify authentication
+- The `np-api` skill - For programmatic operations (invoke via `/np-api`)
 
-**Excepciones permitidas (NO son la API de Nullplatform):**
+**Allowed exceptions (NOT the Nullplatform API):**
 
-- `curl` a endpoints de aplicaciones desplegadas (`*.nullapps.io`) para health checks
-- `curl` a servicios externos (AWS, Azure, GCP)
+- `curl` to deployed application endpoints (`*.nullapps.io`) for health checks
+- `curl` to external services (AWS, Azure, GCP)
 
-## Comandos Disponibles
+## Available Commands
 
-| Comando | Descripción |
+| Command | Description |
 |---------|-------------|
-| `/np-setup-orchestrator` | Verifica estado, ofrece inicializar si falta config |
-| `/np-setup-orchestrator init` | Wizard inicial paso a paso |
-| `/np-setup-orchestrator check-status` | Ejecuta TODOS los checks |
-| `/np-setup-orchestrator check-tools` | Verificar herramientas instaladas |
-| `/np-setup-orchestrator check-cloud` | Verificar acceso al cloud |
-| `/np-setup-orchestrator check-k8s` | Verificar acceso a Kubernetes |
-| `/np-setup-orchestrator check-np` | Verificar Nullplatform API |
-| `/np-setup-orchestrator check-telemetry` | Verificar telemetría (logs y métricas) |
-| `/np-setup-orchestrator check-services` | Listar servicios, ofrecer diagnosticar/modificar/crear |
-| `/np-setup-orchestrator check-tf-key` | Verificar common.tfvars (np_api_key) |
+| `/np-setup-orchestrator` | Checks status, offers to initialize if config is missing |
+| `/np-setup-orchestrator init` | Step-by-step initial wizard |
+| `/np-setup-orchestrator check-status` | Runs ALL checks |
+| `/np-setup-orchestrator check-tools` | Verify installed tools |
+| `/np-setup-orchestrator check-cloud` | Verify cloud access |
+| `/np-setup-orchestrator check-k8s` | Verify Kubernetes access |
+| `/np-setup-orchestrator check-np` | Verify Nullplatform API |
+| `/np-setup-orchestrator check-telemetry` | Verify telemetry (logs and metrics) |
+| `/np-setup-orchestrator check-services` | List services, offer to diagnose/modify/create |
+| `/np-setup-orchestrator check-tf-key` | Verify common.tfvars (np_api_key) |
 
 ---
 
-## Comando: $ARGUMENTS
+## Command: $ARGUMENTS
 
 ---
 
-## Si $ARGUMENTS está vacío → Verificar Estado e Inicialización
+## If $ARGUMENTS is empty → Check Status and Initialization
 
-### Flujo
+### Flow
 
-1. **Verificar si el proyecto está inicializado**
+1. **Check if the project is initialized**
 
 ```bash
 cat organization.properties 2>/dev/null
@@ -54,17 +54,17 @@ ls -d infrastructure/ nullplatform/ nullplatform-bindings/ 2>/dev/null
 ls common.tfvars infrastructure/*/terraform.tfvars nullplatform/terraform.tfvars nullplatform-bindings/terraform.tfvars 2>/dev/null
 ```
 
-2. **Si FALTA ALGUNO de los componentes base (checks 1-3)** → Usar AskUserQuestion: "Este repositorio no está completamente configurado para Nullplatform. ¿Querés inicializar?"
-   - **Sí, inicializar** → Ejecutar flujo de `init`
-   - **No, solo mostrar estado** → Mostrar resumen de lo que falta
+2. **If ANY of the base components are MISSING (checks 1-3)** → Use AskUserQuestion: "This repository is not fully configured for Nullplatform. Do you want to initialize?"
+   - **Yes, initialize** → Run the `init` flow
+   - **No, just show status** → Show summary of what's missing
 
-3. **Si TODO está configurado** → Ejecutar check-status automáticamente para ganar contexto situacional. El reporte incluye recomendaciones de próximos pasos.
+3. **If EVERYTHING is configured** → Automatically run check-status to gain situational context. The report includes next step recommendations.
 
 ---
 
-## Si $ARGUMENTS es "init" → Wizard Inicial Paso a Paso
+## If $ARGUMENTS is "init" → Step-by-Step Initial Wizard
 
-### Verificación Previa
+### Pre-check
 
 ```bash
 cat organization.properties 2>/dev/null
@@ -73,66 +73,66 @@ ls -d infrastructure/ nullplatform/ nullplatform-bindings/ 2>/dev/null
 ls common.tfvars 2>/dev/null
 ```
 
-**Si TODOS los componentes existen** → Mostrar que ya está inicializado y ofrecer con AskUserQuestion:
-- **Ejecutar diagnóstico completo** → `/np-setup-orchestrator check-status`
-- **Configurar infraestructura** → `/np-infrastructure-wizard`
-- **Configurar dimensions y scopes** → `/np-nullplatform-wizard`
-- **Configurar bindings** → `/np-nullplatform-bindings-wizard`
+**If ALL components exist** → Show that it's already initialized and offer with AskUserQuestion:
+- **Run full diagnostic** → `/np-setup-orchestrator check-status`
+- **Configure infrastructure** → `/np-infrastructure-wizard`
+- **Configure dimensions and scopes** → `/np-nullplatform-wizard`
+- **Configure bindings** → `/np-nullplatform-bindings-wizard`
 
-> Si en la conversación ya se ejecutó `check-status`, la primera opción debe decir "Volver a ejecutar diagnóstico completo".
+> If `check-status` was already run in the conversation, the first option should say "Re-run full diagnostic".
 
-**Si FALTA algún componente** → Continuar con el wizard.
+**If ANY component is MISSING** → Continue with the wizard.
 
 ---
 
-### Paso 1: Crear organización
+### Step 1: Create organization
 
-Verificar con `cat organization.properties`. Si no existe, usar AskUserQuestion:
-- **Crear una organización nueva** → Invocar `/np-organization-create`. Genera `organization.properties` automáticamente.
-- **Ya tengo una organización** → Solicitar organization_id y crear: `echo "organization_id={ORG_ID}" > organization.properties`
+Check with `cat organization.properties`. If it doesn't exist, use AskUserQuestion:
+- **Create a new organization** → Invoke `/np-organization-create`. Generates `organization.properties` automatically.
+- **I already have an organization** → Request organization_id and create: `echo "organization_id={ORG_ID}" > organization.properties`
 
-### Paso 2: Configurar autenticación para skills
+### Step 2: Configure authentication for skills
 
-Verificar con `ls np-api-skill.key np-api-skill.token`. Si no existe, guiar:
+Check with `ls np-api-skill.key np-api-skill.token`. If it doesn't exist, guide:
 
-Se usa **una única API Key** para todo (skills + Terraform). Se guarda en `np-api-skill.key` y se referencia desde `common.tfvars`.
+A **single API Key** is used for everything (skills + Terraform). It's saved in `np-api-skill.key` and referenced from `common.tfvars`.
 
-**IMPORTANTE:** No usar API Keys root ni de otras organizaciones. La key debe pertenecer a esta organización.
+**IMPORTANT:** Do not use root API Keys or keys from other organizations. The key must belong to this organization.
 
 1. Nullplatform UI → Settings → API Keys
-2. Crear con:
-   - **Scope:** Preferentemente a nivel **Account** (más restrictivo). También puede ser a nivel Organization.
-   - **Roles:** Asignar **TODOS** los roles: Admin, Agent, Developer, Ops, SecOps, Secrets Reader
-3. `echo 'TU_API_KEY' > np-api-skill.key`
+2. Create with:
+   - **Scope:** Preferably at the **Account** level (more restrictive). Can also be at the Organization level.
+   - **Roles:** Assign **ALL** roles: Admin, Agent, Developer, Ops, SecOps, Secrets Reader
+3. `echo 'YOUR_API_KEY' > np-api-skill.key`
 
-Una vez creada, generar automáticamente `common.tfvars` con la key (si aplica).
+Once created, automatically generate `common.tfvars` with the key (if applicable).
 
-Verificar que `np-api-skill.key` está en .gitignore. Si no, agregarlo.
+Verify that `np-api-skill.key` is in .gitignore. If not, add it.
 
-### Paso 3: Crear estructura de archivos
+### Step 3: Create file structure
 
-Verificar con `ls -d infrastructure/ nullplatform/ nullplatform-bindings/`. Si faltan, crear la estructura directamente.
+Check with `ls -d infrastructure/ nullplatform/ nullplatform-bindings/`. If missing, create the structure directly.
 
-Usar AskUserQuestion para cloud provider: AWS, Azure (luego AKS o ARO), GCP, OCI.
+Use AskUserQuestion for cloud provider: AWS, Azure (then AKS or ARO), GCP, OCI.
 
-Crear la siguiente estructura de carpetas y archivos. La fuente de verdad para el contenido de cada archivo es el repositorio `nullplatform/tofu-modules` (branch `main`):
+Create the following folder and file structure. The source of truth for each file's content is the `nullplatform/tofu-modules` repository (branch `main`):
 
 ```
 {output}/
-├── infrastructure/{cloud}/     # Infraestructura del cloud (VPC, K8s, DNS, etc.)
+├── infrastructure/{cloud}/     # Cloud infrastructure (VPC, K8s, DNS, etc.)
 │   ├── variables.tf
 │   ├── provider.tf
 │   ├── backend.tf
 │   ├── locals.tf
 │   ├── outputs.tf
 │   └── terraform.tfvars.example
-├── nullplatform/               # Configuracion central de Nullplatform
+├── nullplatform/               # Central Nullplatform configuration
 │   ├── variables.tf
 │   ├── provider.tf
 │   ├── backend.tf
 │   ├── outputs.tf
 │   └── terraform.tfvars.example
-├── nullplatform-bindings/      # Conecta Nullplatform con cloud + code repo
+├── nullplatform-bindings/      # Connects Nullplatform with cloud + code repo
 │   ├── variables.tf
 │   ├── provider.tf
 │   ├── backend.tf
@@ -143,110 +143,110 @@ Crear la siguiente estructura de carpetas y archivos. La fuente de verdad para e
 └── .gitignore
 ```
 
-Los `main.tf` NO se crean en este paso. Se generan dinamicamente en:
+The `main.tf` files are NOT created in this step. They are dynamically generated in:
 - `infrastructure/{cloud}/main.tf` → `/np-infrastructure-wizard`
 - `nullplatform/main.tf` → `/np-nullplatform-wizard`
 - `nullplatform-bindings/main.tf` → `/np-nullplatform-bindings-wizard`
 
-### Paso 4: Configurar variables comunes
+### Step 4: Configure common variables
 
-Si `common.tfvars` no existe, crearlo con valores por defecto y luego dejar al usuario modificar lo que necesite.
+If `common.tfvars` doesn't exist, create it with default values and then let the user modify what they need.
 
-**Procedimiento:**
+**Procedure:**
 
-1. Leer el contenido plano de `np-api-skill.key` (usar Read, no variables de shell)
-2. Generar `common.tfvars` con estos defaults:
+1. Read the plain content of `np-api-skill.key` (use Read, not shell variables)
+2. Generate `common.tfvars` with these defaults:
 
 ```hcl
 nrn               = ""
-np_api_key        = "<valor plano leido de np-api-skill.key>"
+np_api_key        = "<plain value read from np-api-skill.key>"
 organization_slug = ""
 tags_selectors = {
   "environment" = "development"
 }
 ```
 
-3. Mostrar al usuario el archivo generado y preguntar con AskUserQuestion:
+3. Show the user the generated file and ask with AskUserQuestion:
 
-> Generé `common.tfvars` con los valores por defecto. Necesito que completes:
-> - `nrn`: NRN del recurso (ej: `organization=123:account=456`)
-> - `organization_slug`: Slug de la organización
+> I generated `common.tfvars` with default values. I need you to complete:
+> - `nrn`: Resource NRN (e.g., `organization=123:account=456`)
+> - `organization_slug`: Organization slug
 
-4. Actualizar el archivo con los valores que el usuario proporcione
+4. Update the file with the values the user provides
 
-| Variable | Default | Notas |
+| Variable | Default | Notes |
 |----------|---------|-------|
-| `np_api_key` | Leido de `np-api-skill.key` | Se autocompleta, no pedir al usuario |
-| `nrn` | Vacio | El usuario debe proporcionarlo |
-| `organization_slug` | Vacio | El usuario debe proporcionarlo |
-| `tags_selectors` | `{ "environment" = "development" }` | Default razonable, el usuario puede cambiarlo |
+| `np_api_key` | Read from `np-api-skill.key` | Auto-completed, do not ask the user |
+| `nrn` | Empty | The user must provide it |
+| `organization_slug` | Empty | The user must provide it |
+| `tags_selectors` | `{ "environment" = "development" }` | Reasonable default, user can change it |
 
-> El `nrn` completo puede no estar disponible aún si es org nueva. Completar parcialmente y actualizar después.
+> The full `nrn` may not be available yet if it's a new org. Fill in partially and update later.
 
-### Paso 5: Configurar infraestructura cloud
+### Step 5: Configure cloud infrastructure
 
-Invocar `/np-infrastructure-wizard` para configurar la infraestructura completa (VPC, K8s, DNS, agent). NO crear terraform.tfvars manualmente.
+Invoke `/np-infrastructure-wizard` to configure the complete infrastructure (VPC, K8s, DNS, agent). Do NOT create terraform.tfvars manually.
 
-### Paso 6: Configurar dimensions y scopes
+### Step 6: Configure dimensions and scopes
 
-Invocar `/np-nullplatform-wizard` para configurar dimensions y scopes. NO crear terraform.tfvars manualmente.
+Invoke `/np-nullplatform-wizard` to configure dimensions and scopes. Do NOT create terraform.tfvars manually.
 
-### Paso 7: Configurar bindings
+### Step 7: Configure bindings
 
-Invocar `/np-nullplatform-bindings-wizard` para configurar bindings. NO crear terraform.tfvars manualmente.
+Invoke `/np-nullplatform-bindings-wizard` to configure bindings. Do NOT create terraform.tfvars manually.
 
-### Paso 8: Resumen
+### Step 8: Summary
 
-Mostrar tabla con estado de todos los componentes y sugerir `/np-setup-orchestrator check-status`.
+Show a table with the status of all components and suggest `/np-setup-orchestrator check-status`.
 
 ---
 
-## Si $ARGUMENTS es "check-status" → Diagnóstico Completo
+## If $ARGUMENTS is "check-status" → Full Diagnostic
 
-Ejecuta TODOS los checks en secuencia y genera reporte consolidado.
+Runs ALL checks in sequence and generates a consolidated report.
 
-### Secuencia
+### Sequence
 
 1. check-tools
 2. check-tf-key
-3. check-cloud → ver [references/check-cloud.md](references/check-cloud.md)
-4. check-k8s → ver [references/check-k8s.md](references/check-k8s.md)
-5. check-np → ver [references/check-np.md](references/check-np.md)
-6. check-telemetry → ver [references/check-telemetry.md](references/check-telemetry.md)
-7. check-services → ver [references/check-services.md](references/check-services.md)
-8. Generar reporte consolidado con resumen y siguiente paso sugerido
+3. check-cloud → see [references/check-cloud.md](references/check-cloud.md)
+4. check-k8s → see [references/check-k8s.md](references/check-k8s.md)
+5. check-np → see [references/check-np.md](references/check-np.md)
+6. check-telemetry → see [references/check-telemetry.md](references/check-telemetry.md)
+7. check-services → see [references/check-services.md](references/check-services.md)
+8. Generate consolidated report with summary and suggested next step
 
-### Lógica de Recomendaciones
+### Recommendation Logic
 
-| Condición | Recomendación |
-|-----------|---------------|
-| No hay organization.properties | `/np-organization-create` o `/np-setup-orchestrator init` |
-| Token expirado | Renovar token y volver a ejecutar |
-| No hay infraestructura cloud | `/np-infrastructure-wizard` |
-| Faltan dimensions/scopes | `/np-nullplatform-wizard` |
-| Faltan bindings | `/np-nullplatform-bindings-wizard` |
-| Última app/scope/deploy falló | `/np-setup-troubleshooting {tipo} {id}` (el más reciente) |
-| Sin actividad reciente | Crear aplicación desde UI de Nullplatform |
-| Métricas de sistema vacías | Verificar configuración de telemetría del agente |
-| Hay servicios sin registrar | `/np-service-craft register <name>` |
-| Hay servicios sin binding | `/np-service-craft register <name>` (revisar bindings) |
-| No hay servicios definidos | `/np-service-craft create` para crear uno nuevo |
-| Todo funcionando | El flujo completo funciona correctamente |
+| Condition | Recommendation |
+|-----------|----------------|
+| No organization.properties | `/np-organization-create` or `/np-setup-orchestrator init` |
+| Expired token | Renew token and re-run |
+| No cloud infrastructure | `/np-infrastructure-wizard` |
+| Missing dimensions/scopes | `/np-nullplatform-wizard` |
+| Missing bindings | `/np-nullplatform-bindings-wizard` |
+| Last app/scope/deploy failed | `/np-setup-troubleshooting {type} {id}` (most recent) |
+| No recent activity | Create application from Nullplatform UI |
+| Empty system metrics | Verify agent telemetry configuration |
+| Unregistered services | `/np-service-craft register <name>` |
+| Services without binding | `/np-service-craft register <name>` (review bindings) |
+| No services defined | `/np-service-craft create` to create a new one |
+| Everything working | The complete flow is working correctly |
 
 ---
 
-## Si $ARGUMENTS es "check-tools" → Verificar Herramientas
+## If $ARGUMENTS is "check-tools" → Verify Tools
 
-### Herramientas a Verificar
+### Tools to Verify
 
-| Herramienta | Comando | Requerida |
-|-------------|---------|-----------|
-| OpenTofu | `tofu version` | Sí (o Terraform) |
-| Terraform | `terraform version` | Sí (o OpenTofu) |
-| kubectl | `kubectl version --client` | Sí |
-| jq | `jq --version` | Sí |
+| Tool | Command | Required |
+|------|---------|----------|
+| OpenTofu | `tofu version` | Yes (or Terraform) |
+| Terraform | `terraform version` | Yes (or OpenTofu) |
+| kubectl | `kubectl version --client` | Yes |
+| jq | `jq --version` | Yes |
 
-### Flujo
+### Flow
 
 ```bash
 tofu version 2>/dev/null || terraform version 2>/dev/null
@@ -254,58 +254,58 @@ kubectl version --client 2>/dev/null
 jq --version 2>/dev/null
 ```
 
-Si falta alguna herramienta, indicar cómo instalarla.
+If any tool is missing, indicate how to install it.
 
 ---
 
-## Si $ARGUMENTS es "check-tf-key" → Verificar Terraform API Key
+## If $ARGUMENTS is "check-tf-key" → Verify Terraform API Key
 
-Verificar que `common.tfvars` existe y contiene una `np_api_key` válida.
+Verify that `common.tfvars` exists and contains a valid `np_api_key`.
 
-### Flujo
+### Flow
 
-1. **Verificar que el archivo existe**: `ls common.tfvars`. Si no existe, indicar crear desde `common.tfvars.example`.
+1. **Verify the file exists**: `ls common.tfvars`. If it doesn't exist, indicate to create from `common.tfvars.example`.
 
-2. **Validar la API Key**: ejecutar `${CLAUDE_PLUGIN_ROOT}/skills/np-setup-orchestrator/scripts/check-tf-api-key.sh`. Si OK, key válida. Si ERROR, key inválida: indicar verificar/recrear en UI.
+2. **Validate the API Key**: run `${CLAUDE_PLUGIN_ROOT}/skills/np-setup-orchestrator/scripts/check-tf-api-key.sh`. If OK, key is valid. If ERROR, key is invalid: indicate to verify/recreate in UI.
 
-3. **Verificar gitignore**: `grep -q "common.tfvars" .gitignore`. Si no está, advertir (riesgo de seguridad).
+3. **Verify gitignore**: `grep -q "common.tfvars" .gitignore`. If not present, warn (security risk).
 
-### Lógica de Recomendaciones
+### Recommendation Logic
 
-| Condición | Recomendación |
-|-----------|---------------|
-| Archivo no existe | Crear desde `common.tfvars.example` |
-| Key inválida | Verificar/recrear API Key en UI |
-| Sin permisos | Crear nueva key con rol Administrator |
-| No está en gitignore | Agregar `common.tfvars` a `.gitignore` |
-| Todo OK | Terraform API Key configurada correctamente |
-
----
-
-## Si $ARGUMENTS es "check-cloud" → Verificar Cloud
-
-Ver [references/check-cloud.md](references/check-cloud.md) para el flujo completo.
+| Condition | Recommendation |
+|-----------|----------------|
+| File doesn't exist | Create from `common.tfvars.example` |
+| Invalid key | Verify/recreate API Key in UI |
+| No permissions | Create new key with Administrator role |
+| Not in gitignore | Add `common.tfvars` to `.gitignore` |
+| All OK | Terraform API Key configured correctly |
 
 ---
 
-## Si $ARGUMENTS es "check-k8s" → Verificar Kubernetes
+## If $ARGUMENTS is "check-cloud" → Verify Cloud
 
-Ver [references/check-k8s.md](references/check-k8s.md) para el flujo completo.
-
----
-
-## Si $ARGUMENTS es "check-np" → Verificar Nullplatform API
-
-Ver [references/check-np.md](references/check-np.md) para el flujo completo.
+See [references/check-cloud.md](references/check-cloud.md) for the complete flow.
 
 ---
 
-## Si $ARGUMENTS es "check-telemetry" → Verificar Telemetría
+## If $ARGUMENTS is "check-k8s" → Verify Kubernetes
 
-Ver [references/check-telemetry.md](references/check-telemetry.md) para el flujo completo.
+See [references/check-k8s.md](references/check-k8s.md) for the complete flow.
 
 ---
 
-## Si $ARGUMENTS es "check-services" → Verificar Servicios
+## If $ARGUMENTS is "check-np" → Verify Nullplatform API
 
-Ver [references/check-services.md](references/check-services.md) para el flujo completo.
+See [references/check-np.md](references/check-np.md) for the complete flow.
+
+---
+
+## If $ARGUMENTS is "check-telemetry" → Verify Telemetry
+
+See [references/check-telemetry.md](references/check-telemetry.md) for the complete flow.
+
+---
+
+## If $ARGUMENTS is "check-services" → Verify Services
+
+See [references/check-services.md](references/check-services.md) for the complete flow.

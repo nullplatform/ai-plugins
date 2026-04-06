@@ -8,17 +8,17 @@ Run `/np-agent-local-setup` first. This ensures np-agent is installed, API key c
 
 Do NOT duplicate agent installation instructions here. The agent-local-setup skill handles everything.
 
-### Application activa en nullplatform
+### Active application in nullplatform
 
-Para un test E2E completo (create service + link) se necesita una aplicacion activa en nullplatform. El servicio se crea "dentro" de una app, y el link conecta esa app al recurso cloud.
+For a complete E2E test (create service + link) an active application in nullplatform is needed. The service is created "inside" an app, and the link connects that app to the cloud resource.
 
-Preguntar al usuario con AskUserQuestion:
+Ask the user with AskUserQuestion:
 
-> Tenes una aplicacion activa en nullplatform donde crear el servicio? Necesito el nombre o NRN de la app.
+> Do you have an active application in nullplatform where to create the service? I need the app name or NRN.
 
-Sin una app activa:
-- Podes testear el **create** del servicio (crea el recurso cloud)
-- NO podes testear **links** (requieren una app a la cual conectar el servicio)
+Without an active app:
+- You can test the service **create** (creates the cloud resource)
+- You CANNOT test **links** (they require an app to connect the service to)
 
 ## Flow
 
@@ -52,21 +52,21 @@ Read binding tags from `nullplatform-bindings/main.tf` and compare with agent's 
 
 ### 5. Cloud provider credentials and permissions
 
-**ANTES de crear una instancia del servicio**, preguntar al usuario con AskUserQuestion:
+**BEFORE creating a service instance**, ask the user with AskUserQuestion:
 
-> El servicio que vas a testear va a crear recursos en la nube (ej: buckets S3, instancias RDS, IAM users, etc). Para que funcione:
+> The service you're going to test will create cloud resources (e.g., S3 buckets, RDS instances, IAM users, etc). For it to work:
 >
-> 1. Tenes una sesion activa del cloud provider? (ej: `aws sso login`, `az login`)
-> 2. El usuario/role con el que estas logueado tiene los permisos necesarios para crear los recursos que define el servicio?
+> 1. Do you have an active cloud provider session? (e.g., `aws sso login`, `az login`)
+> 2. Does the user/role you're logged in with have the necessary permissions to create the resources defined by the service?
 >
-> Revisá `deployment/main.tf` y `permissions/main.tf` del servicio para ver que recursos terraform va a crear y que permisos necesita.
+> Review `deployment/main.tf` and `permissions/main.tf` of the service to see what terraform resources will be created and what permissions are needed.
 
-Si el usuario confirma, verificar la sesion:
+If the user confirms, verify the session:
 
-**AWS**: `aws sts get-caller-identity` (debe mostrar el account/role correcto)
-**Azure**: `az account show` (debe mostrar la subscription correcta)
+**AWS**: `aws sts get-caller-identity` (must show the correct account/role)
+**Azure**: `az account show` (must show the correct subscription)
 
-Si el servicio usa un profile especifico, verificar que esta configurado en `values.yaml` (`aws_profile`, etc) y que la sesion esta activa para ese profile.
+If the service uses a specific profile, verify it's configured in `values.yaml` (`aws_profile`, etc) and that the session is active for that profile.
 
 ### 6. Step-by-step testing
 

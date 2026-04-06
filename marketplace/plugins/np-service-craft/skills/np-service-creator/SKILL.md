@@ -5,7 +5,7 @@ description: This skill should be used when the user asks to "register a service
 
 # Nullplatform Service Creator — Terraform Registration
 
-Patrones de terraform para registrar service definitions y agent bindings en nullplatform.
+Terraform patterns for registering service definitions and agent bindings in nullplatform.
 
 ## Critical Rules
 
@@ -17,7 +17,7 @@ Patrones de terraform para registrar service definitions y agent bindings en nul
 
 ## Module Source of Truth
 
-Los modulos de terraform para registrar servicios viven en `https://github.com/nullplatform/tofu-modules`:
+The terraform modules for registering services live in `https://github.com/nullplatform/tofu-modules`:
 
 | Module | Path | Purpose |
 |--------|------|---------|
@@ -26,42 +26,42 @@ Los modulos de terraform para registrar servicios viven en `https://github.com/n
 
 ## How to Determine Required Variables
 
-**ANTES de generar cualquier bloque terraform**, clonar el repo y leer los `variables.tf` de cada modulo:
+**BEFORE generating any terraform block**, clone the repo and read the `variables.tf` of each module:
 
 ```bash
 git clone https://github.com/nullplatform/tofu-modules /tmp/tofu-modules-ref 2>/dev/null \
   || (cd /tmp/tofu-modules-ref && git pull)
 ```
 
-Leer:
-- `/tmp/tofu-modules-ref/nullplatform/service_definition/variables.tf` — variables con y sin `default`. Las que no tienen default son mandatorias.
-- `/tmp/tofu-modules-ref/nullplatform/service_definition_agent_association/variables.tf` — idem.
+Read:
+- `/tmp/tofu-modules-ref/nullplatform/service_definition/variables.tf` — variables with and without `default`. Those without default are mandatory.
+- `/tmp/tofu-modules-ref/nullplatform/service_definition_agent_association/variables.tf` — same.
 
-Tambien leer `main.tf` y `locals.tf` de cada modulo para entender como se arman los recursos internamente (ej: como se construye el cmdline del agent_association).
+Also read `main.tf` and `locals.tf` of each module to understand how resources are built internally (e.g., how the agent_association cmdline is constructed).
 
-No copiar variables de este skill — inferirlas del codigo fuente cada vez.
+Do not copy variables from this skill — infer them from the source code each time.
 
 ## Two Modes
 
-### Local Mode (desarrollo)
+### Local Mode (development)
 
-Usar `git_provider = "local"` + `local_specs_path` apuntando al directorio local del servicio. Lee los specs del filesystem sin necesidad de push.
+Use `git_provider = "local"` + `local_specs_path` pointing to the local service directory. Reads specs from the filesystem without needing to push.
 
-### Remote Mode (produccion)
+### Remote Mode (production)
 
-Usar `git_provider = "github"` (default) o `"gitlab"`. El modulo lee los specs via HTTP desde el repositorio git. Requiere que los specs esten pusheados.
+Use `git_provider = "github"` (default) or `"gitlab"`. The module reads specs via HTTP from the git repository. Requires specs to be pushed.
 
 ## Agent Association: cmdline
 
-El modulo `service_definition_agent_association` construye el cmdline internamente a partir de sus variables. Leer `main.tf` del modulo para entender el patron exacto.
+The `service_definition_agent_association` module builds the cmdline internally from its variables. Read the module's `main.tf` to understand the exact pattern.
 
-Para dev local, setear `base_clone_path` al home del usuario (`pathexpand("~/.np")`) en vez del default `/root/.np`.
+For local dev, set `base_clone_path` to the user's home (`pathexpand("~/.np")`) instead of the default `/root/.np`.
 
 ## Apply Order
 
-Siempre aplicar en orden:
-1. `nullplatform/` primero (crea service_specification, genera outputs)
-2. `nullplatform-bindings/` segundo (crea notification_channel, lee outputs del paso 1)
+Always apply in order:
+1. `nullplatform/` first (creates service_specification, generates outputs)
+2. `nullplatform-bindings/` second (creates notification_channel, reads outputs from step 1)
 
 ## Pre-Registration Checklist
 

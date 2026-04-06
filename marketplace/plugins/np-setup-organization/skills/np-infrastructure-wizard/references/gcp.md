@@ -1,7 +1,7 @@
-# Arbol de Decision - GCP Infrastructure
+# Decision Tree - GCP Infrastructure
 
-> Invocado desde el paso 4 del wizard principal (`SKILL.md`).
+> Invoked from step 4 of the main wizard (`SKILL.md`).
 
-TODO: Implementar siguiendo el patron de [azure.md](azure.md).
+TODO: Implement following the pattern in [azure.md](azure.md).
 
-Modulos esperados: vpc, gke, cloud_dns, cloud_nat, cert_manager, istio, external_dns, prometheus.
+Expected modules: vpc, gke, cloud_dns, cloud_nat, cert_manager, istio, external_dns, prometheus.

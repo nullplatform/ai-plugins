@@ -1,30 +1,30 @@
-# check-k8s: Verificar Kubernetes
+# check-k8s: Verify Kubernetes
 
-## Prerequisito
+## Prerequisite
 
-El check de cloud debe haber pasado (necesita kubeconfig configurado).
+The cloud check must have passed (requires kubeconfig configured).
 
-## Flujo
+## Flow
 
 ```bash
-# 1. Verificar conexión
+# 1. Verify connection
 kubectl cluster-info
 
-# 2. Verificar namespaces
+# 2. Verify namespaces
 kubectl get namespaces
 
-# 3. Verificar componentes clave
+# 3. Verify key components
 kubectl get pods -n nullplatform-tools
 kubectl get pods -n istio-system
 kubectl get pods -n cert-manager
 kubectl get pods -n external-dns
 ```
 
-Reportar para cada componente: nombre, namespace, estado, pods running.
+Report for each component: name, namespace, status, running pods.
 
-## Si el cluster no es accesible
+## If the cluster is not accessible
 
-Actualizar kubeconfig según el cloud:
+Update kubeconfig according to the cloud:
 
 ```bash
 # AWS
@@ -37,33 +37,33 @@ az aks get-credentials --name CLUSTER_NAME --resource-group RG_NAME
 gcloud container clusters get-credentials CLUSTER_NAME --region REGION
 ```
 
-## Si hay pods en error
+## If there are pods in error
 
-Para pods en `CrashLoopBackOff` o `Error`:
+For pods in `CrashLoopBackOff` or `Error`:
 
 ```bash
 kubectl logs -n {namespace} -l app={app_label} --tail=100
 kubectl describe pod -n {namespace} {pod_name}
 ```
 
-**Causas comunes del Agent en CrashLoopBackOff:**
-- API key inválida o expirada
-- NRN incorrecto
-- Firewall bloqueando conexión a `api.nullplatform.com`
+**Common causes for Agent in CrashLoopBackOff:**
+- Invalid or expired API key
+- Incorrect NRN
+- Firewall blocking connection to `api.nullplatform.com`
 
-## Validación de dns_type
+## dns_type Validation
 
-Verificar que `DNS_TYPE` del agente sea válido para el cloud provider detectado:
+Verify that the agent's `DNS_TYPE` is valid for the detected cloud provider:
 
 ```bash
 DNS_TYPE=$(kubectl get secret -n nullplatform-tools nullplatform-agent-secret-nullplatform-agent -o jsonpath='{.data.DNS_TYPE}' | base64 -d)
 echo "DNS_TYPE: $DNS_TYPE"
 ```
 
-| Cloud | dns_type esperado |
+| Cloud | Expected dns_type |
 | ----- | ----------------- |
 | AWS   | `route53`         |
 | Azure | `azure`           |
 | GCP   | `gcp`             |
 
-**Si no coincide:** advertir y recomendar editar `infrastructure/{cloud}/terraform.tfvars` con el valor correcto, luego ejecutar `tofu apply`.
+**If it doesn't match:** warn and recommend editing `infrastructure/{cloud}/terraform.tfvars` with the correct value, then run `tofu apply`.

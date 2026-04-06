@@ -1,132 +1,132 @@
 # Workflows (Approvals, Notifications, Templates)
 
-Entidades de workflow y configuración.
+Workflow and configuration entities.
 
 ## @endpoint /approval/{id}
 
-Obtiene detalles de una aprobación.
+Gets details of an approval.
 
-### Parámetros
-- `id` (path, required): ID de la aprobación
+### Parameters
+- `id` (path, required): Approval ID
 
-### Respuesta
-- `id`: ID de la aprobación
-- `created_at`: Timestamp de creación
-- `approval_action_id`: ID de la acción de approval (referencia interna)
-- `entity_id`: ID de la entidad que requiere aprobación (ej: deployment ID como string)
-- `aggregator_entity_id`: ID del agregador (null si no aplica)
-- `entity_name`: Tipo de entidad (ej: `deployment`, `service:action`, `scope`)
-- `nrn`: NRN completo del recurso
-- `entity_action`: Acción que requiere aprobación (ej: `deployment:create`)
+### Response
+- `id`: Approval ID
+- `created_at`: Creation timestamp
+- `approval_action_id`: Approval action ID (internal reference)
+- `entity_id`: ID of the entity requiring approval (e.g., deployment ID as string)
+- `aggregator_entity_id`: Aggregator ID (null if not applicable)
+- `entity_name`: Entity type (e.g., `deployment`, `service:action`, `scope`)
+- `nrn`: Complete resource NRN
+- `entity_action`: Action requiring approval (e.g., `deployment:create`)
 - `status`: `pending` | `approved` | `auto_approved` | `auto_denied` | `denied` | `cancelled` | `expired`
-- `execution_status`: `pending` | `executing` | `success` | `failed` | `expired` - indica si la acción aprobada ya se ejecutó
-- `user_id`: ID del usuario que solicitó
-- `dimensions`: Dimensiones del contexto
+- `execution_status`: `pending` | `executing` | `success` | `failed` | `expired` - indicates if the approved action has already been executed
+- `user_id`: Requesting user ID
+- `dimensions`: Context dimensions
   - `environment`: production | staging | development | etc
   - `country`: usa | mx | ar | etc
-- `policy_context`: Contexto de evaluación de policies
-  - `policies[]`: Array de policies evaluadas
-    - `id`: ID de la policy
-    - `name`: Nombre descriptivo (ej: "[SRE] Tests coverage should be above 80%")
-    - `selector`: Pre-filtro que determina si la policy aplica al request (ej: por dimensions, entity type)
-    - `conditions`: Condiciones requeridas. Usan sintaxis MongoDB: `$gte`, `$lte`, `$eq`, `$or`, `$nor`, `$and`
-      - Ejemplo: `{"build_metadata_coverage_percent": {"$gte": 80}}`
-      - Ejemplo rango: `{"scope.capabilities.memory.memory_in_gb": {"$gte": 2, "$lte": 4}}`
-    - `evaluations[]`: Resultado de cada criterio
-      - `criteria`: Criterio evaluado
+- `policy_context`: Policy evaluation context
+  - `policies[]`: Array of evaluated policies
+    - `id`: Policy ID
+    - `name`: Descriptive name (e.g., "[SRE] Tests coverage should be above 80%")
+    - `selector`: Pre-filter that determines if the policy applies to the request (e.g., by dimensions, entity type)
+    - `conditions`: Required conditions. Use MongoDB syntax: `$gte`, `$lte`, `$eq`, `$or`, `$nor`, `$and`
+      - Example: `{"build_metadata_coverage_percent": {"$gte": 80}}`
+      - Range example: `{"scope.capabilities.memory.memory_in_gb": {"$gte": 2, "$lte": 4}}`
+    - `evaluations[]`: Result of each criterion
+      - `criteria`: Evaluated criterion
       - `result`: `met` | `not_met`
-    - `passed`: boolean - si la policy pasó
-    - `selected`: boolean - si la policy aplica a este contexto (determinado por selector)
-  - `action`: `auto` | `manual` - si se auto-aprobó o requirió intervención humana
-  - `time_to_reply`: Ventana para responder (ms). Expira si no se responde a tiempo
-  - `allowed_time_to_execute`: Ventana para ejecutar post-aprobacion (ms)
-- `context`: Snapshot completo de las entidades relacionadas al momento de la aprobación
-  - `user`: Datos del usuario que solicitó
-  - `deployment`: Estado del deployment al momento del approval
-  - `scope`: Datos del scope target
-  - `release`: Release a desplegar
-  - `build`: Build asociado al release
-  - `application`: Aplicación
-  - `namespace`, `account`, `organization`: Jerarquía organizacional
-- `updated_at`: Timestamp de última actualización
+    - `passed`: boolean - whether the policy passed
+    - `selected`: boolean - whether the policy applies to this context (determined by selector)
+  - `action`: `auto` | `manual` - whether it was auto-approved or required human intervention
+  - `time_to_reply`: Response window (ms). Expires if not answered in time
+  - `allowed_time_to_execute`: Post-approval execution window (ms)
+- `context`: Complete snapshot of related entities at approval time
+  - `user`: Requesting user data
+  - `deployment`: Deployment state at approval time
+  - `scope`: Target scope data
+  - `release`: Release to deploy
+  - `build`: Build associated with the release
+  - `application`: Application
+  - `namespace`, `account`, `organization`: Organizational hierarchy
+- `updated_at`: Last update timestamp
 
-### Navegación
-- **→ deployment**: `entity_id` → `/deployment/{entity_id}` (cuando `entity_name` es `deployment`)
+### Navigation
+- **→ deployment**: `entity_id` → `/deployment/{entity_id}` (when `entity_name` is `deployment`)
 - **→ user**: `user_id` → `/user/{user_id}`
 - **← deployment NRN**: `/approval?nrn={deployment_nrn_encoded}`
 
-### Ejemplo
+### Example
 ```bash
 np-api fetch-api "/approval/541210877"
 ```
 
-### Entity/action combinations soportadas
+### Supported entity/action combinations
 
-| Entity Name | Entity Action | Descripcion |
+| Entity Name | Entity Action | Description |
 |-------------|---------------|-------------|
-| `deployment` | `deployment:create` | Al crear un deployment |
-| `scope` | `scope:create` | Al crear un scope |
-| `scope` | `scope:recreate` | Al recrear un scope |
-| `scope` | `scope:write` | Al modificar un scope (PATCH) |
-| `scope` | `scope:delete` | Al eliminar un scope |
-| `scope` | `scope:stop` | Al detener un scope |
-| `service:action` | `service:action:create` | Al ejecutar una action de servicio |
-| `parameter` | `parameter:read-secrets` | Al solicitar acceso a secretos |
+| `deployment` | `deployment:create` | When creating a deployment |
+| `scope` | `scope:create` | When creating a scope |
+| `scope` | `scope:recreate` | When recreating a scope |
+| `scope` | `scope:write` | When modifying a scope (PATCH) |
+| `scope` | `scope:delete` | When deleting a scope |
+| `scope` | `scope:stop` | When stopping a scope |
+| `service:action` | `service:action:create` | When executing a service action |
+| `parameter` | `parameter:read-secrets` | When requesting access to secrets |
 
 ### Approval request statuses
 
-| Status | Descripcion |
+| Status | Description |
 |--------|-------------|
-| `pending` | Esperando decision humana |
-| `approved` | Aprobado manualmente |
-| `auto_approved` | Aprobado automaticamente (todas las policies pasaron) |
-| `denied` | Rechazado manualmente |
-| `auto_denied` | Rechazado automaticamente (policies fallaron + config auto-deny) |
-| `cancelled` | Cancelado por el usuario o sistema |
-| `expired` | Expiro sin respuesta (superó `time_to_reply`) |
+| `pending` | Waiting for human decision |
+| `approved` | Manually approved |
+| `auto_approved` | Automatically approved (all policies passed) |
+| `denied` | Manually rejected |
+| `auto_denied` | Automatically rejected (policies failed + auto-deny config) |
+| `cancelled` | Cancelled by user or system |
+| `expired` | Expired without response (exceeded `time_to_reply`) |
 
 ### Execution statuses
 
-| Status | Descripcion |
+| Status | Description |
 |--------|-------------|
-| `pending` | Aprobado pero no iniciado aun |
-| `executing` | Ejecucion en progreso |
-| `success` | Ejecutado exitosamente |
-| `failed` | Ejecucion fallo |
-| `expired` | Expiro sin ejecutar (superó `allowed_time_to_execute`) |
+| `pending` | Approved but not started yet |
+| `executing` | Execution in progress |
+| `success` | Successfully executed |
+| `failed` | Execution failed |
+| `expired` | Expired without executing (exceeded `allowed_time_to_execute`) |
 
 ### Secret visibility (parameter:read-secrets)
 
-Cuando `entity_action` es `parameter:read-secrets`, el approval controla el acceso temporal
-a valores secretos de parametros. Flujo:
-1. Usuario solicita ver secretos desde la UI
-2. Se crea un approval request con `entity_action: parameter:read-secrets`
-3. Si se aprueba, el usuario obtiene acceso por 24 horas
-4. El approval expira a los 3 dias si no se responde
+When `entity_action` is `parameter:read-secrets`, the approval controls temporary access
+to secret parameter values. Flow:
+1. User requests to view secrets from the UI
+2. An approval request is created with `entity_action: parameter:read-secrets`
+3. If approved, the user gets access for 24 hours
+4. The approval expires in 3 days if not answered
 
-### Notas
-- `status: approved` + `execution_status: pending` = aprobado pero esperando que se inicie el deployment ("Start deployment" en la UI)
-- `status: approved` + `execution_status: executed` = aprobado y deployment ya iniciado
-- `policy_context.action: manual` indica que las policies no pasaron y se requirió aprobación humana
-- `policy_context.action: auto` indica que las policies pasaron y se auto-aprobó
-- El `context` es un snapshot inmutable del momento del approval - útil para auditoría
-- **Policy operators**: Las conditions usan sintaxis MongoDB: `$gte`, `$lte`, `$eq`, `$or`, `$nor`, `$and`
-- **Selectors**: Actuan como pre-filtros antes de evaluar conditions. Determinan si la policy aplica al request
-- **Scopes**: Cuando `entity_name` es `scope`, el approval se genera al crear un scope que no cumple las policies de la organización (ej: memoria fuera de rango, scope_type incorrecto, scheduled_stop deshabilitado). Ver `np-developer-actions/docs/scopes.md` Paso 5 para consultar policies antes de crear scopes
+### Notes
+- `status: approved` + `execution_status: pending` = approved but waiting for deployment to start ("Start deployment" in the UI)
+- `status: approved` + `execution_status: executed` = approved and deployment already started
+- `policy_context.action: manual` indicates policies didn't pass and human approval was required
+- `policy_context.action: auto` indicates policies passed and it was auto-approved
+- The `context` is an immutable snapshot from the approval moment - useful for auditing
+- **Policy operators**: Conditions use MongoDB syntax: `$gte`, `$lte`, `$eq`, `$or`, `$nor`, `$and`
+- **Selectors**: Act as pre-filters before evaluating conditions. Determine if the policy applies to the request
+- **Scopes**: When `entity_name` is `scope`, the approval is generated when creating a scope that doesn't meet the organization's policies (e.g., memory out of range, incorrect scope_type, scheduled_stop disabled). See `np-developer-actions/docs/scopes.md` Step 5 for querying policies before creating scopes
 
 ---
 
 ## @endpoint /approval
 
-Lista aprobaciones con filtros.
+Lists approvals with filters.
 
-### Parámetros
-- `nrn` (query, required): NRN del recurso (URL-encoded). Soporta NRN a distintos niveles:
-  - **NRN de aplicación**: retorna todos los approvals de la app (scopes + deployments)
-  - **NRN de deployment**: retorna approvals de un deployment específico
-  - **NRN de scope**: retorna approvals de un scope específico
+### Parameters
+- `nrn` (query, required): Resource NRN (URL-encoded). Supports NRN at different levels:
+  - **Application NRN**: returns all app approvals (scopes + deployments)
+  - **Deployment NRN**: returns approvals for a specific deployment
+  - **Scope NRN**: returns approvals for a specific scope
 
-### Respuesta
+### Response
 ```json
 {
   "paging": {"total": 1, "offset": 0, "limit": 30},
@@ -134,86 +134,86 @@ Lista aprobaciones con filtros.
 }
 ```
 
-Cada resultado tiene la misma estructura que `/approval/{id}`.
+Each result has the same structure as `/approval/{id}`.
 
-### Ejemplo
+### Example
 ```bash
-# Buscar approvals de un deployment específico
+# Search approvals for a specific deployment
 np-api fetch-api "/approval?nrn=organization%3D<org_id>%3Aaccount%3D<acc_id>%3Anamespace%3D<ns_id>%3Aapplication%3D<app_id>%3Ascope%3D<scope_id>%3Adeployment%3D<deployment_id>"
 
-# Buscar todos los approvals de una aplicación (incluye scopes y deployments)
+# Search all approvals for an application (includes scopes and deployments)
 np-api fetch-api "/approval?nrn=organization%3D<org_id>%3Aaccount%3D<acc_id>%3Anamespace%3D<ns_id>%3Aapplication%3D<app_id>"
 ```
 
-### Notas
-- El NRN debe estar URL-encoded (reemplazar `=` con `%3D` y `:` con `%3A`)
-- Usar el NRN del deployment (no solo el ID) para filtrar approvals
-- **Para descubrir policies de scopes**: usar NRN a nivel de aplicación para obtener approvals previos y extraer `policy_context.policies[]` con las condiciones que la organización evalúa
-- El listado directo sin NRN puede dar error 403 (no autorizado)
-- Retorna el mismo nivel de detalle que el GET individual, incluyendo `policy_context` y `context`
+### Notes
+- The NRN must be URL-encoded (replace `=` with `%3D` and `:` with `%3A`)
+- Use the deployment NRN (not just the ID) to filter approvals
+- **To discover scope policies**: use application-level NRN to get previous approvals and extract `policy_context.policies[]` with the conditions the organization evaluates
+- Direct listing without NRN may return 403 (unauthorized)
+- Returns the same detail level as individual GET, including `policy_context` and `context`
 
 ---
 
 ## @endpoint /approval/{id}/execute
 
-Ejecuta un approval aprobado. Este es el endpoint que usa el boton "Start deployment" de la UI.
-Aprueba el approval y ejecuta la accion asociada en un solo paso.
+Executes an approved approval. This is the endpoint used by the "Start deployment" button in the UI.
+Approves the approval and executes the associated action in one step.
 
-### Parametros
-- `id` (path, required): ID del approval
+### Parameters
+- `id` (path, required): Approval ID
 
 ### Request
 - **Method**: POST
-- **Body**: `{}` (vacio)
+- **Body**: `{}` (empty)
 
-### Comportamiento
+### Behavior
 
-Al ejecutar, el approval:
-1. Cambia `status` a `approved` (si estaba en `pending`)
-2. Cambia `execution_status` a `executed`
-3. Ejecuta internamente la accion asociada (ej: PATCH al deployment con `{"status": "creating"}`)
-4. Popula el campo `context` con el snapshot de todas las entidades relacionadas
+When executed, the approval:
+1. Changes `status` to `approved` (if it was `pending`)
+2. Changes `execution_status` to `executed`
+3. Internally executes the associated action (e.g., PATCH to deployment with `{"status": "creating"}`)
+4. Populates the `context` field with the snapshot of all related entities
 
-### Respuesta
+### Response
 
-Retorna el approval completo actualizado (misma estructura que GET `/approval/{id}`),
-incluyendo `policy_context` con las policies evaluadas y `context` con el snapshot.
+Returns the complete updated approval (same structure as GET `/approval/{id}`),
+including `policy_context` with evaluated policies and `context` with the snapshot.
 
-### Ejemplo
+### Example
 ```bash
-# NOTA: Este es un POST, no un GET. Usar desde np-developer-actions:
+# NOTE: This is a POST, not a GET. Use from np-developer-actions:
 action-api.sh exec-api --method POST --data '{}' "/approval/<approval_id>/execute"
 ```
 
-### Notas
-- Body vacio (`{}`) - no requiere parametros adicionales
-- Solo funciona con approvals en `status: pending` o `status: approved` + `execution_status: pending`
-- Si el approval ya fue ejecutado o el deployment ya fue iniciado por otro medio, retorna `execution_status: failed`
-- **Este es el camino correcto para iniciar un deployment aprobado** (en vez de PATCH directo al deployment)
+### Notes
+- Empty body (`{}`) - no additional parameters required
+- Only works with approvals in `status: pending` or `status: approved` + `execution_status: pending`
+- If the approval was already executed or the deployment was started by other means, returns `execution_status: failed`
+- **This is the correct path to start an approved deployment** (instead of direct PATCH to deployment)
 
 ---
 
 ## @endpoint /notification/channel/{id}
 
-Obtiene detalles de un canal de notificación.
+Gets details of a notification channel.
 
-### Parámetros
-- `id` (path, required): ID del canal
+### Parameters
+- `id` (path, required): Channel ID
 
-### Respuesta
-- `id`: ID numérico
-- `name`: Nombre del canal
+### Response
+- `id`: Numeric ID
+- `name`: Channel name
 - `type`: slack | email | webhook
-- `status`: Estado
-- `nrn`: NRN del contexto
-- `configuration`: Config específica del tipo
+- `status`: Status
+- `nrn`: Context NRN
+- `configuration`: Type-specific config
 
-### Dominio
+### Domain
 ```
 https://notifications.nullplatform.com/notification/channel/{id}
 ```
 
-### Ejemplo
+### Example
 ```bash
 np-api fetch-api "https://notifications.nullplatform.com/notification/channel/456"
 ```
@@ -222,42 +222,42 @@ np-api fetch-api "https://notifications.nullplatform.com/notification/channel/45
 
 ## @endpoint /notification/channel
 
-Lista canales de notificación.
+Lists notification channels.
 
-### Parámetros
-- `nrn` (query, required): NRN base
-- `showDescendants` (query): **camelCase** - incluye canales de jerarquía inferior
-- `limit` (query): Máximo de resultados
+### Parameters
+- `nrn` (query, required): Base NRN
+- `showDescendants` (query): **camelCase** - includes channels from lower hierarchy
+- `limit` (query): Maximum results
 
-### Ejemplo
+### Example
 ```bash
 np-api fetch-api "https://notifications.nullplatform.com/notification/channel?nrn=organization%3D4&showDescendants=true&limit=500"
 ```
 
-### Notas
-- Usar `showDescendants` (**camelCase**) NO `show_descendants`
-- Inconsistente con `/provider` que usa snake_case
-- Sin `showDescendants=true` solo retorna canales a nivel del NRN especificado
+### Notes
+- Use `showDescendants` (**camelCase**) NOT `show_descendants`
+- Inconsistent with `/provider` which uses snake_case
+- Without `showDescendants=true` only returns channels at the specified NRN level
 
 ---
 
 ## @endpoint /template/{id}
 
-Obtiene detalles de un template de aplicación.
+Gets details of an application template.
 
-### Parámetros
-- `id` (path, required): ID del template (puede ser nombre con versión)
+### Parameters
+- `id` (path, required): Template ID (may be name with version)
 
-### Respuesta
-- `id`: ID/nombre del template
-- `name`: Nombre descriptivo
-- `version`: Versión
-- `runtime`: Configuración de runtime
-- `build_command`: Comando de build
-- `health_check_config`: Config de health checks
-- `resources`: Recursos default
+### Response
+- `id`: Template ID/name
+- `name`: Descriptive name
+- `version`: Version
+- `runtime`: Runtime configuration
+- `build_command`: Build command
+- `health_check_config`: Health check config
+- `resources`: Default resources
 
-### Ejemplo
+### Example
 ```bash
 np-api fetch-api "/template/react_18.2.0"
 ```
@@ -266,9 +266,9 @@ np-api fetch-api "/template/react_18.2.0"
 
 ## @endpoint /template
 
-Lista templates disponibles.
+Lists available templates.
 
-### Ejemplo
+### Example
 ```bash
 np-api fetch-api "/template"
 ```
@@ -277,14 +277,14 @@ np-api fetch-api "/template"
 
 ## @endpoint /report
 
-Lista reportes disponibles (analytics y compliance).
+Lists available reports (analytics and compliance).
 
-### Dominio
+### Domain
 ```
 https://reports.nullplatform.com/report
 ```
 
-### Ejemplo
+### Example
 ```bash
 np-api fetch-api "https://reports.nullplatform.com/report"
 ```
@@ -293,25 +293,25 @@ np-api fetch-api "https://reports.nullplatform.com/report"
 
 ## @endpoint /user/{id}
 
-Obtiene detalles de un usuario.
+Gets details of a user.
 
-### Parámetros
-- `id` (path, required): ID del usuario
+### Parameters
+- `id` (path, required): User ID
 
-### Respuesta
-- `id`: ID numérico
-- `email`: Email del usuario
-- `name`: Nombre
-- `role`: Rol
-- `status`: Estado
+### Response
+- `id`: Numeric ID
+- `email`: User email
+- `name`: Name
+- `role`: Role
+- `status`: Status
 - `created_at`, `last_login`: Timestamps
 
-### Service Accounts Comunes
-- `gabriel+scope_workflow_manager_job@nullplatform.io` - Lifecycle de scopes
-- `nullmachineusers+approvals-api@nullplatform.io` - Workflow de approvals
+### Common Service Accounts
+- `gabriel+scope_workflow_manager_job@nullplatform.io` - Scope lifecycle
+- `nullmachineusers+approvals-api@nullplatform.io` - Approvals workflow
 - `nullmachineusers+ephemeral-scopes@nullplatform.io` - Auto-stop scheduler
 
-### Ejemplo
+### Example
 ```bash
 np-api fetch-api "/user/111433570"
 ```
@@ -320,9 +320,9 @@ np-api fetch-api "/user/111433570"
 
 ## @endpoint /user
 
-Lista usuarios.
+Lists users.
 
-### Ejemplo
+### Example
 ```bash
 np-api fetch-api "/user"
 ```

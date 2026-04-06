@@ -1,52 +1,52 @@
-# Patrones Generales de OpenTofu
+# General OpenTofu Patterns
 
-> Aplica a todos los clouds. Los archivos por cloud (`aws.md`, `azure.md`, etc.) referencian este documento para patrones compartidos.
+> Applies to all clouds. Per-cloud files (`aws.md`, `azure.md`, etc.) reference this document for shared patterns.
 
-## Contenido
+## Contents
 
-1. [Como leer variables de un modulo](#como-leer-variables-de-un-modulo)
-2. [Flujo de lectura de modulos](#flujo-de-lectura-de-modulos)
-3. [Source de modulos (git ref)](#source-de-modulos-git-ref)
-4. [Provider versions genericas](#provider-versions-genericas)
+1. [How to read module variables](#how-to-read-module-variables)
+2. [Module reading flow](#module-reading-flow)
+3. [Module source (git ref)](#module-source-git-ref)
+4. [Generic provider versions](#generic-provider-versions)
 5. [Helm v3 syntax](#helm-v3-syntax)
-6. [Modulo Agent API Key](#modulo-agent-api-key)
+6. [Agent API Key module](#agent-api-key-module)
 
-## Como leer variables de un modulo
+## How to read module variables
 
-Al leer `variables.tf` de cualquier modulo:
+When reading any module's `variables.tf`:
 
-1. **Variables sin `default`**: incluirlas siempre, son requeridas
-2. **Variables con `default` que tienen bloque `validation`**: leer el `error_message` para entender en que contexto son requeridas. Si el contexto aplica, incluirlas
-3. **Variables con `default` sin `validation`**: incluirlas solo si se necesita cambiar el default
+1. **Variables without `default`**: always include them, they are required
+2. **Variables with `default` that have a `validation` block**: read the `error_message` to understand in which context they are required. If the context applies, include them
+3. **Variables with `default` without `validation`**: include only if the default needs to be changed
 
-**IMPORTANTE**: No saltear el paso 2. Las variables con `validation` condicional son la causa mas comun de errores en `tofu plan`. Siempre revisar todos los bloques `validation` antes de generar codigo.
+**IMPORTANT**: Do not skip step 2. Variables with conditional `validation` are the most common cause of errors in `tofu plan`. Always review all `validation` blocks before generating code.
 
-## Flujo de lectura de modulos
+## Module reading flow
 
-Antes de usar cualquier modulo:
-1. Leer `variables.tf` del modulo (preferir `.terraform/modules/{nombre}/variables.tf` despues de `tofu init`)
-2. Incluir todas las variables sin default
-3. Revisar los bloques `validation` de las variables con default y agregar las que apliquen al contexto
-4. Variables con default sin validation: agregar solo si se necesita cambiar el default
+Before using any module:
+1. Read the module's `variables.tf` (prefer `.terraform/modules/{name}/variables.tf` after `tofu init`)
+2. Include all variables without default
+3. Review `validation` blocks of variables with defaults and add those that apply to the context
+4. Variables with default without validation: add only if the default needs to be changed
 
-> Tip: Usar `tofu init -backend=false` para descargar modulos sin necesitar credenciales del backend, luego inspeccionar `.terraform/modules/`.
+> Tip: Use `tofu init -backend=false` to download modules without needing backend credentials, then inspect `.terraform/modules/`.
 
-## Source de modulos (git ref)
+## Module source (git ref)
 
-Todos los modulos de nullplatform se referencian con git ref:
+All nullplatform modules are referenced with git ref:
 
 ```hcl
 source = "git::https://github.com/nullplatform/tofu-modules.git//{path}?ref={version}"
 ```
 
-Obtener la ultima version:
+Get the latest version:
 ```bash
 git ls-remote --tags https://github.com/nullplatform/tofu-modules.git | sort -t/ -k3 -V | tail -1
 ```
 
-## Provider versions genericas
+## Generic provider versions
 
-Providers compartidos por todos los clouds:
+Providers shared across all clouds:
 
 ```hcl
 kubernetes = { source = "hashicorp/kubernetes",  version = "~> 2.0" }
@@ -54,21 +54,21 @@ helm       = { source = "hashicorp/helm",        version = "~> 3.0" }
 nullplatform = { source = "nullplatform/nullplatform", version = "~> 0.0.74" }
 ```
 
-Cada cloud agrega su provider especifico (ej: `aws ~> 6.0`, `azurerm ~> 4.0`).
+Each cloud adds its specific provider (e.g., `aws ~> 6.0`, `azurerm ~> 4.0`).
 
 ## Helm v3 syntax
 
-Helm provider v3 cambia la sintaxis del bloque `kubernetes`:
+Helm provider v3 changes the `kubernetes` block syntax:
 
 ```hcl
-# Correcto (Helm v3): con "="
+# Correct (Helm v3): with "="
 provider "helm" {
   kubernetes = {
     host = "..."
   }
 }
 
-# Incorrecto (Helm v2): sin "="
+# Incorrect (Helm v2): without "="
 provider "helm" {
   kubernetes {
     host = "..."
@@ -76,9 +76,9 @@ provider "helm" {
 }
 ```
 
-## Modulo Agent API Key
+## Agent API Key module
 
-El modulo `agent_api_key` genera una API key en runtime para el modulo `agent`. Se usa en todos los clouds:
+The `agent_api_key` module generates an API key at runtime for the `agent` module. Used across all clouds:
 
 ```hcl
 module "agent_api_key" {
@@ -88,4 +88,4 @@ module "agent_api_key" {
 }
 ```
 
-Luego usar `module.agent_api_key.api_key` solo en el modulo `agent` (en vez de `var.np_api_key` directo). El modulo `base` sigue usando `var.np_api_key`.
+Then use `module.agent_api_key.api_key` only in the `agent` module (instead of `var.np_api_key` directly). The `base` module still uses `var.np_api_key`.

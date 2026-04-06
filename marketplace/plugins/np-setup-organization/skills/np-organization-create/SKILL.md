@@ -5,169 +5,169 @@ description: This skill should be used when the user asks to "create an organiza
 
 # Nullplatform Organization Create
 
-Crea una nueva organizacion de Nullplatform via la onboarding API.
+Creates a new Nullplatform organization via the onboarding API.
 
-## Cuando Usar
+## When to Use
 
-- Creando una organizacion nueva de Nullplatform desde cero
-- Primer paso antes de cualquier configuracion de infraestructura
+- Creating a new Nullplatform organization from scratch
+- First step before any infrastructure configuration
 
-## REGLAS DE SEGURIDAD
+## SECURITY RULES
 
-**Crear una organizacion es una accion IRREVERSIBLE.** Se debe proceder con extrema cautela.
+**Creating an organization is an IRREVERSIBLE action.** Proceed with extreme caution.
 
-1. **SIEMPRE** mostrar el request completo al usuario antes de ejecutar
-2. **SIEMPRE** pedir confirmacion explicita antes de ejecutar el POST
-3. **SIEMPRE** preguntar si el nombre de la organizacion fue validado con los stakeholders
-4. **SIEMPRE** verificar cada email de owner con el usuario antes de enviar (se envian invitaciones reales)
-5. **NUNCA** ejecutar el POST sin todas las confirmaciones anteriores
+1. **ALWAYS** show the complete request to the user before executing
+2. **ALWAYS** ask for explicit confirmation before executing the POST
+3. **ALWAYS** ask if the organization name was validated with stakeholders
+4. **ALWAYS** verify each owner email with the user before sending (real invitations are sent)
+5. **NEVER** execute the POST without all the above confirmations
 
-## Prerequisitos
+## Prerequisites
 
-1. Archivo `organization-create-api.key` en la raiz del proyecto
-   - Contiene una API Key con grant `organization:create` en `organization=0` (root)
-   - Este archivo es **altamente sensible** y debe estar en `.gitignore`
-   - Para obtenerla: contactar al equipo de Nullplatform
-2. Verificar que `organization-create-api.key` esta en `.gitignore`
-3. Conectividad a la VPN (requerida para `*.nullapps.io`)
+1. File `organization-create-api.key` in the project root
+   - Contains an API Key with `organization:create` grant on `organization=0` (root)
+   - This file is **highly sensitive** and must be in `.gitignore`
+   - To obtain it: contact the Nullplatform team
+2. Verify that `organization-create-api.key` is in `.gitignore`
+3. VPN connectivity (required for `*.nullapps.io`)
 
 ## Endpoint
 
-| Campo | Valor |
+| Field | Value |
 |-------|-------|
 | URL | `https://onboarding-onboarding-api-production-lmhky.prod.nullapps.io/organization` |
-| Metodo | POST |
-| Auth | Bearer token generado desde `organization-create-api.key` |
+| Method | POST |
+| Auth | Bearer token generated from `organization-create-api.key` |
 | Content-Type | application/json |
 
 ## Body Schema
 
 ```json
 {
-  "organization_name": "nombre-de-la-org",
-  "account_name": "nombre-del-account",
+  "organization_name": "org-name",
+  "account_name": "account-name",
   "owners": [
     {
       "email": "user@example.com",
-      "name": "Nombre",
-      "last_name": "Apellido"
+      "name": "FirstName",
+      "last_name": "LastName"
     }
   ]
 }
 ```
 
-**IMPORTANTE**: Los campos de owners usan `snake_case` (`last_name`, NO `lastName`).
+**IMPORTANT**: Owner fields use `snake_case` (`last_name`, NOT `lastName`).
 
 ## Workflow
 
-### Paso 0: Verificar si la organizacion ya existe
+### Step 0: Check if the organization already exists
 
-Antes de iniciar el flujo de creacion, verificar si `organization.properties` ya contiene un `organization_id`.
+Before starting the creation flow, check if `organization.properties` already contains an `organization_id`.
 
-Si existe:
-1. Preguntar al usuario si la org ya fue creada o si necesita crear una nueva
-2. Si ya fue creada → **saltear directamente al siguiente paso** (`/np-setup-orchestrator`). No ejecutar verificacion post-creacion ni ningun otro paso de este skill.
-3. Si necesita crear una nueva → continuar con el Paso 1
+If it exists:
+1. Ask the user if the org was already created or if they need to create a new one
+2. If already created → **skip directly to the next step** (`/np-setup-orchestrator`). Do not execute post-creation verification or any other step of this skill.
+3. If they need to create a new one → continue with Step 1
 
-### Paso 1: Verificar prerequisitos
+### Step 1: Verify prerequisites
 
 ```bash
-# Verificar que organization-create-api.key existe
+# Verify that organization-create-api.key exists
 ls organization-create-api.key
 
-# Verificar que esta en .gitignore
-grep -q "organization-create-api.key" .gitignore && echo "OK" || echo "FALTA en .gitignore"
+# Verify it's in .gitignore
+grep -q "organization-create-api.key" .gitignore && echo "OK" || echo "MISSING from .gitignore"
 
-# Verificar conectividad a la VPN (OBLIGATORIO antes de cualquier request)
+# Verify VPN connectivity (MANDATORY before any request)
 curl -s --max-time 5 -o /dev/null -w "%{http_code}" "https://onboarding-onboarding-api-production-lmhky.prod.nullapps.io/health" || true
 ```
 
-**Si el health check falla o no responde** → DETENERSE e indicar:
+**If the health check fails or doesn't respond** → STOP and indicate:
 
-> No hay conectividad con `*.nullapps.io`. Conectate a la VPN de Nullplatform antes de continuar.
+> There is no connectivity to `*.nullapps.io`. Connect to the Nullplatform VPN before continuing.
 >
-> Una vez conectado, volve a ejecutar `/np-organization-create`.
+> Once connected, run `/np-organization-create` again.
 
-**No continuar con los pasos siguientes si la VPN no esta conectada.**
+**Do not continue with the following steps if the VPN is not connected.**
 
-Si `organization-create-api.key` no existe, indicar:
+If `organization-create-api.key` doesn't exist, indicate:
 
-> Necesitas una API Key con grant `organization:create` en `organization=0`.
+> You need an API Key with `organization:create` grant on `organization=0`.
 >
-> **Como obtenerla:**
-> 1. Contactar al equipo de Nullplatform
-> 2. Solicitar una API Key root con grant: `organization:create` en `organization=0`
-> 3. Guardar: `echo 'TU_API_KEY' > organization-create-api.key`
+> **How to obtain it:**
+> 1. Contact the Nullplatform team
+> 2. Request a root API Key with grant: `organization:create` on `organization=0`
+> 3. Save it: `echo 'YOUR_API_KEY' > organization-create-api.key`
 
-Si no esta en `.gitignore`, agregarlo antes de continuar.
+If it's not in `.gitignore`, add it before continuing.
 
-### Paso 2: Recopilar datos
+### Step 2: Gather data
 
-Preguntar al usuario usando AskUserQuestion:
+Ask the user using AskUserQuestion:
 
-1. **Nombre de la organizacion** (sera el identificador permanente)
-2. **Nombre del primer account** (ej: "playground", "production")
-3. **Owners** (email, nombre y apellido de cada uno)
+1. **Organization name** (will be the permanent identifier)
+2. **First account name** (e.g., "playground", "production")
+3. **Owners** (email, first name, and last name for each one)
 
-### Paso 3: Validacion con stakeholders
+### Step 3: Stakeholder validation
 
-**OBLIGATORIO** - Usar AskUserQuestion:
+**MANDATORY** - Use AskUserQuestion:
 
-> El nombre de la organizacion sera `{organization_name}`.
-> Este nombre es PERMANENTE y no se puede cambiar despues.
+> The organization name will be `{organization_name}`.
+> This name is PERMANENT and cannot be changed afterwards.
 >
-> Fue validado este nombre con los stakeholders?
+> Has this name been validated with stakeholders?
 
-Opciones:
-- **Si, esta validado** → Continuar
-- **No, necesito validarlo primero** → Pausar y esperar
+Options:
+- **Yes, it's validated** → Continue
+- **No, I need to validate it first** → Pause and wait
 
-### Paso 4: Verificar owners
+### Step 4: Verify owners
 
-Mostrar tabla con todos los owners y pedir confirmacion:
+Show a table with all owners and ask for confirmation:
 
 ```markdown
-## Owners que recibiran invitacion
+## Owners who will receive invitations
 
-| # | Email | Nombre | Apellido |
-|---|-------|--------|----------|
-| 1 | user@example.com | Nombre | Apellido |
+| # | Email | First Name | Last Name |
+|---|-------|------------|-----------|
+| 1 | user@example.com | FirstName | LastName |
 | ... | ... | ... | ... |
 
-ATENCION: Se enviaran invitaciones reales a estos emails.
+WARNING: Real invitations will be sent to these emails.
 ```
 
-Usar AskUserQuestion:
+Use AskUserQuestion:
 
-> Los emails y datos de los owners son correctos?
+> Are the emails and owner details correct?
 
-### Paso 5: Mostrar request y confirmar
+### Step 5: Show request and confirm
 
-Mostrar el request completo:
+Show the complete request:
 
 ```markdown
-## Request a ejecutar
+## Request to execute
 
 **POST** `https://onboarding-onboarding-api-production-lmhky.prod.nullapps.io/organization`
 
 **Body:**
-{json completo formateado}
+{formatted complete json}
 
-**Auth:** Token generado desde organization-create-api.key
+**Auth:** Token generated from organization-create-api.key
 ```
 
-Usar AskUserQuestion para confirmacion final:
+Use AskUserQuestion for final confirmation:
 
-> Confirmas la creacion de la organizacion `{organization_name}`?
-> Esta accion es IRREVERSIBLE.
+> Do you confirm the creation of organization `{organization_name}`?
+> This action is IRREVERSIBLE.
 
-Opciones:
-- **Si, crear la organizacion** → Ejecutar
-- **No, cancelar** → Abortar
+Options:
+- **Yes, create the organization** → Execute
+- **No, cancel** → Abort
 
-### Paso 6: Ejecutar
+### Step 6: Execute
 
-Usar `/np-api fetch-api` con `--key-file`:
+Use `/np-api fetch-api` with `--key-file`:
 
 ```bash
 /np-api fetch-api \
@@ -177,98 +177,98 @@ Usar `/np-api fetch-api` con `--key-file`:
   "https://onboarding-onboarding-api-production-lmhky.prod.nullapps.io/organization"
 ```
 
-### Paso 7: Procesar resultado
+### Step 7: Process result
 
-**Si es exitoso:**
+**If successful:**
 
-1. Extraer el `id` de la respuesta (campo `id`, no `organization_id`)
-2. Crear `organization.properties`:
+1. Extract the `id` from the response (`id` field, not `organization_id`)
+2. Create `organization.properties`:
    ```bash
    echo "organization_id={id}" > organization.properties
    ```
-3. Mostrar resumen:
+3. Show summary:
    ```markdown
-   ## Organizacion creada
+   ## Organization created
 
-   | Campo | Valor |
+   | Field | Value |
    |-------|-------|
    | Organization ID | {id} |
-   | Nombre | {organization_name} |
+   | Name | {organization_name} |
    | Account | {account_name} |
-   | Owners invitados | {count} |
+   | Invited owners | {count} |
 
-   Archivo `organization.properties` creado.
+   File `organization.properties` created.
 
-   **Siguiente paso:** Verificacion post-creacion (Paso 8).
+   **Next step:** Post-creation verification (Step 8).
    ```
 
-### Paso 8: Verificacion post-creacion
+### Step 8: Post-creation verification
 
-**NOTA:** Este paso se ejecuta UNICAMENTE despues de crear una organizacion nueva (Pasos 6-7). Si la org ya existia y se salteo la creacion (Paso 0), NO ejecutar esta verificacion.
+**NOTE:** This step is executed ONLY after creating a new organization (Steps 6-7). If the org already existed and creation was skipped (Step 0), DO NOT execute this verification.
 
-**IMPORTANTE:** La API key root (`organization-create-api.key` con grant `organization:create` en `organization=0`) **solo funciona contra la onboarding API** (`*.nullapps.io`). La API publica (`api.nullplatform.com`) rechaza tokens root con 403. Para verificar la org recien creada se necesita un token de la nueva organizacion.
+**IMPORTANT:** The root API key (`organization-create-api.key` with `organization:create` grant on `organization=0`) **only works against the onboarding API** (`*.nullapps.io`). The public API (`api.nullplatform.com`) rejects root tokens with 403. To verify the newly created org, a token from the new organization is needed.
 
-#### 8.1 Crear API key de la nueva organizacion
+#### 8.1 Create API key for the new organization
 
-La API key root (`organization-create-api.key`) **solo funciona contra la onboarding API** (`*.nullapps.io`). Para operar con la API publica (`api.nullplatform.com`) se necesita una API key de la nueva organizacion.
+The root API key (`organization-create-api.key`) **only works against the onboarding API** (`*.nullapps.io`). To operate with the public API (`api.nullplatform.com`), an API key from the new organization is needed.
 
-Guiar al usuario:
+Guide the user:
 
 ```markdown
-## Crear API key para la nueva organizacion
+## Create API key for the new organization
 
-**Pasos:**
-1. Un owner invitado acepta la invitacion por email e inicia sesion en https://app.nullplatform.com
-2. Ir a **Platform Settings → API Keys → Create API Key**
-3. Configurar:
-   - **Name:** Un nombre descriptivo (ej: `setup-key`)
-   - **Scope:** La organizacion recien creada
-   - **Roles:** Seleccionar **todos** estos roles:
+**Steps:**
+1. An invited owner accepts the email invitation and signs in at https://app.nullplatform.com
+2. Go to **Platform Settings → API Keys → Create API Key**
+3. Configure:
+   - **Name:** A descriptive name (e.g., `setup-key`)
+   - **Scope:** The newly created organization
+   - **Roles:** Select **all** of these roles:
      - `Admin` — Manage all the resources
      - `Agent` — Role to be used by nullplatform agents
      - `Developer` — Create builds, releases, scopes, start deployments
      - `Ops` — Modify environments and infrastructure-related resources
      - `SecOps` — Modify security ops related resources
      - `Secrets Reader` — Read secret parameters
-4. Copiar la API key generada (solo se muestra una vez)
-5. Guardarla en un archivo en la raiz del proyecto:
+4. Copy the generated API key (shown only once)
+5. Save it to a file in the project root:
    ```bash
    echo '<API_KEY>' > np-api.key
    ```
-6. Verificar que `np-api.key` esta en `.gitignore`:
+6. Verify that `np-api.key` is in `.gitignore`:
    ```bash
    grep -q "np-api.key" .gitignore && echo "OK" || echo "np-api.key" >> .gitignore
    ```
 ```
 
-Usar AskUserQuestion:
+Use AskUserQuestion:
 
-> Crea una API key con los roles listados arriba (Admin, Agent, Developer, Ops, SecOps, Secrets Reader) en la nueva organizacion.
-> Cuando la tengas guardada en `np-api.key`, avisame para continuar con la verificacion.
+> Create an API key with the roles listed above (Admin, Agent, Developer, Ops, SecOps, Secrets Reader) in the new organization.
+> When you have it saved in `np-api.key`, let me know to continue with verification.
 
-Opciones:
-- **Ya tengo la API key en np-api.key** → Continuar con verificacion
-- **Saltear verificacion** → Ir directamente al siguiente paso
+Options:
+- **I already have the API key in np-api.key** → Continue with verification
+- **Skip verification** → Go directly to the next step
 
-**IMPORTANTE:** Esta API key se reutiliza en los pasos siguientes del setup (`/np-setup-orchestrator`, infrastructure wizard, bindings, etc.). Asignar solo `Admin` no alcanza — los skills posteriores validan que la key tenga los roles especificos listados arriba.
+**IMPORTANT:** This API key is reused in the subsequent setup steps (`/np-setup-orchestrator`, infrastructure wizard, bindings, etc.). Assigning only `Admin` is not enough — subsequent skills validate that the key has the specific roles listed above.
 
-#### Roles disponibles (referencia)
+#### Available roles (reference)
 
-| Role | Descripcion | Requerido para setup |
-|------|-------------|---------------------|
-| Admin | Manage all the resources | Si |
-| Agent | Role to be used by nullplatform agents | Si |
+| Role | Description | Required for setup |
+|------|-------------|-------------------|
+| Admin | Manage all the resources | Yes |
+| Agent | Role to be used by nullplatform agents | Yes |
 | CI | Machine user that performs continuous integration | No |
-| Developer | Create builds, releases, scopes, start deployments | Si |
+| Developer | Create builds, releases, scopes, start deployments | Yes |
 | Member | Read access to resource information | No |
-| Ops | Modify environments and infrastructure-related resources | Si |
-| SecOps | Modify security ops related resources | Si |
-| Secrets Reader | Read secret parameters | Si |
+| Ops | Modify environments and infrastructure-related resources | Yes |
+| SecOps | Modify security ops related resources | Yes |
+| Secrets Reader | Read secret parameters | Yes |
 | Troubleshooting | Inspect and gather information to diagnose issues |
 
-Para el setup inicial se recomienda **Admin**. Para uso posterior, crear keys con el minimo de permisos necesarios.
+For the initial setup, **Admin** is recommended. For later use, create keys with the minimum required permissions.
 
-#### 8.2 Verificar que la organizacion existe
+#### 8.2 Verify the organization exists
 
 ```bash
 /np-api fetch-api \
@@ -276,15 +276,15 @@ Para el setup inicial se recomienda **Admin**. Para uso posterior, crear keys co
   "/organization/{id}"
 ```
 
-Verificar que la respuesta contiene:
-- `id` coincide con el retornado en la creacion
-- `name` coincide con `organization_name`
-- `status` es `active`
+Verify that the response contains:
+- `id` matches the one returned during creation
+- `name` matches `organization_name`
+- `status` is `active`
 
-#### 8.3 Verificar que el account se creo (solo si se paso `account_name`)
+#### 8.3 Verify the account was created (only if `account_name` was provided)
 
-**Este paso se ejecuta UNICAMENTE si el usuario paso `account_name` en el body de creacion.**
-Si no se paso `account_name`, saltear este paso.
+**This step is executed ONLY if the user provided `account_name` in the creation body.**
+If `account_name` was not provided, skip this step.
 
 ```bash
 /np-api fetch-api \
@@ -292,9 +292,9 @@ Si no se paso `account_name`, saltear este paso.
   "/account?organization_id={id}"
 ```
 
-Verificar que la respuesta contiene al menos un account con el nombre esperado.
+Verify that the response contains at least one account with the expected name.
 
-#### 8.4 Verificar que los usuarios/owners se crearon
+#### 8.4 Verify users/owners were created
 
 ```bash
 /np-api fetch-api \
@@ -302,86 +302,86 @@ Verificar que la respuesta contiene al menos un account con el nombre esperado.
   "/user?organization_id={id}"
 ```
 
-Comparar los emails retornados con los owners enviados en el body de creacion.
+Compare the returned emails with the owners sent in the creation body.
 
-#### 8.5 Mostrar resultado de verificacion
-
-```markdown
-## Verificacion post-creacion
-
-| Check | Estado | Detalle |
-|-------|--------|---------|
-| Organizacion existe | OK/ERROR | ID: {id}, Name: {name}, Status: {status} |
-| Account creado | OK/ERROR/N/A | ID: {id}, Name: {name} |
-| Usuarios creados | OK/ERROR | {count}/{total} owners encontrados |
-```
-
-Si todo esta OK:
+#### 8.5 Show verification result
 
 ```markdown
-Organizacion verificada correctamente.
+## Post-creation verification
 
-**Siguiente paso:** `/np-setup-orchestrator` para continuar con la configuracion.
+| Check | Status | Detail |
+|-------|--------|--------|
+| Organization exists | OK/ERROR | ID: {id}, Name: {name}, Status: {status} |
+| Account created | OK/ERROR/N/A | ID: {id}, Name: {name} |
+| Users created | OK/ERROR | {count}/{total} owners found |
 ```
 
-Si algo falla, indicar que contacte al equipo de Nullplatform con el `id` de la organizacion.
+If everything is OK:
 
-**Si falla:**
+```markdown
+Organization verified successfully.
 
-Mostrar el error y posibles causas:
+**Next step:** `/np-setup-orchestrator` to continue with the configuration.
+```
 
-| Error | Causa probable |
+If something fails, indicate to contact the Nullplatform team with the organization `id`.
+
+**If it fails:**
+
+Show the error and possible causes:
+
+| Error | Probable cause |
 |-------|---------------|
-| 401 Invalid token | El personal access token expiro o es invalido |
-| 403 Forbidden | El token no pertenece a la organizacion recien creada |
-| 400 Schema error | Campos mal formateados (verificar snake_case) |
-| 404 Not found | La organizacion aun no termino de provisionarse, esperar unos minutos |
+| 401 Invalid token | The personal access token expired or is invalid |
+| 403 Forbidden | The token doesn't belong to the newly created organization |
+| 400 Schema error | Malformatted fields (verify snake_case) |
+| 404 Not found | The organization hasn't finished provisioning yet, wait a few minutes |
 
 ## Troubleshooting
 
-### Creacion de la organizacion
+### Organization creation
 
 #### "Invalid token provided"
 
-- Verificar que `organization-create-api.key` contiene una API key valida
-- Verificar que la API key tiene grant `organization:create` en `organization=0`
+- Verify that `organization-create-api.key` contains a valid API key
+- Verify that the API key has `organization:create` grant on `organization=0`
 
-#### "Forbidden" / 403 en el POST de creacion
+#### "Forbidden" / 403 on creation POST
 
-- La API key no es de nivel root
-- Contactar al equipo de Nullplatform para verificar permisos
+- The API key is not root level
+- Contact the Nullplatform team to verify permissions
 
 #### Connection refused / DNS error
 
-- Verificar que estas conectado a la VPN
-- Los endpoints `*.nullapps.io` requieren VPN
+- Verify you are connected to the VPN
+- Endpoints `*.nullapps.io` require VPN
 
 #### "must have required property 'last_name'"
 
-- El body usa `snake_case`: `last_name`, NO `lastName`
+- The body uses `snake_case`: `last_name`, NOT `lastName`
 
-### Verificacion post-creacion
+### Post-creation verification
 
-#### 403 en verificacion (api.nullplatform.com)
+#### 403 on verification (api.nullplatform.com)
 
-- **Causa:** Se esta usando la API key root (`organization-create-api.key`) contra `api.nullplatform.com`. Esta key solo funciona contra la onboarding API (`*.nullapps.io`).
-- **Solucion:** Crear una API key con role Admin en la nueva organizacion (ver Paso 8.1) y guardarla en `np-api.key`.
+- **Cause:** The root API key (`organization-create-api.key`) is being used against `api.nullplatform.com`. This key only works against the onboarding API (`*.nullapps.io`).
+- **Solution:** Create an API key with Admin role in the new organization (see Step 8.1) and save it in `np-api.key`.
 
-#### Owner no recibio invitacion
+#### Owner didn't receive invitation
 
-- Verificar que el email es correcto
-- Revisar carpeta de spam
-- Contactar al equipo de Nullplatform si el email no llega despues de 15 minutos
+- Verify the email is correct
+- Check the spam folder
+- Contact the Nullplatform team if the email doesn't arrive after 15 minutes
 
-#### API key de la nueva org da 401
+#### New org API key returns 401
 
-- Verificar que `np-api.key` contiene la key correcta (no la root)
-- Verificar que el scope de la key es la organizacion nueva (no `organization=0`)
+- Verify that `np-api.key` contains the correct key (not the root one)
+- Verify that the key scope is the new organization (not `organization=0`)
 
-## Siguiente Paso
+## Next Step
 
-Una vez creada la organizacion, continuar con la configuracion completa:
+Once the organization is created, continue with the full configuration:
 
-**Decile a Claude**: "Configuremos la organizacion"
+**Tell Claude**: "Let's configure the organization"
 
-O invoca directamente: `/np-setup-orchestrator`
+Or invoke directly: `/np-setup-orchestrator`

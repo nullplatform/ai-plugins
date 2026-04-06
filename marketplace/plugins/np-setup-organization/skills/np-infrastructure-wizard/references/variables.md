@@ -1,23 +1,23 @@
-# Variables Requeridas
+# Required Variables
 
-Las variables se leen de `organization.properties`, `common.tfvars` y `infrastructure/{cloud}/terraform.tfvars`:
+Variables are read from `organization.properties`, `common.tfvars`, and `infrastructure/{cloud}/terraform.tfvars`:
 
-| Variable | Descripcion | Origen |
+| Variable | Description | Source |
 | -------- | ----------- | ------ |
-| `organization_id` | ID de la organizacion | organization.properties |
-| `account_id` | ID del account en Nullplatform | Seleccionado via wizard (paso 1) |
+| `organization_id` | Organization ID | organization.properties |
+| `account_id` | Nullplatform account ID | Selected via wizard (step 1) |
 | `nrn` | Nullplatform Resource Name | common.tfvars |
-| `np_api_key` | API key de Nullplatform | common.tfvars |
-| `organization_slug` | Slug de la organizacion | common.tfvars |
-| `tags_selectors` | Tags para matching de agente | common.tfvars |
+| `np_api_key` | Nullplatform API key | common.tfvars |
+| `organization_slug` | Organization slug | common.tfvars |
+| `tags_selectors` | Tags for agent matching | common.tfvars |
 
-El `nrn` es critico para los modulos de Nullplatform (base, agent). Sin un account valido, el plan de Terraform fallara.
+The `nrn` is critical for Nullplatform modules (base, agent). Without a valid account, the Terraform plan will fail.
 
-## Verificacion de credenciales por cloud
+## Credential verification by cloud
 
-| Cloud | Comando | Que verificar |
-|-------|---------|---------------|
-| AWS | `aws sts get-caller-identity` | Account ID coincide con tfvars |
-| Azure / Azure ARO | `az account show` | Subscription ID coincide con tfvars |
-| GCP | `gcloud config list account` | Project coincide con tfvars |
-| OCI | `oci iam region list` | Tenancy/compartment coincide con tfvars |
+| Cloud | Command | What to verify |
+|-------|---------|----------------|
+| AWS | `aws sts get-caller-identity` | Account ID matches tfvars |
+| Azure / Azure ARO | `az account show` | Subscription ID matches tfvars |
+| GCP | `gcloud config list account` | Project matches tfvars |
+| OCI | `oci iam region list` | Tenancy/compartment matches tfvars |

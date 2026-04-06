@@ -5,152 +5,152 @@ description: This skill should be used when the user asks to "connect GitHub", "
 
 # Nullplatform Bindings Wizard
 
-Conecta Nullplatform con servicios externos: GitHub, container registry, cloud provider.
+Connects Nullplatform with external services: GitHub, container registry, cloud provider.
 
-## Cuando Usar
+## When to Use
 
-- Configurando integracion con GitHub
-- Conectando container registry (ECR/ACR/Artifact Registry)
-- Configurando cloud provider en Nullplatform
-- Creando channel associations para routear a agentes
+- Configuring GitHub integration
+- Connecting container registry (ECR/ACR/Artifact Registry)
+- Configuring cloud provider in Nullplatform
+- Creating channel associations to route to agents
 
-## Prerequisitos
+## Prerequisites
 
-> **IMPORTANTE**: Este wizard REQUIERE que `/np-nullplatform-wizard` se haya ejecutado primero.
-> Los channel associations dependen de los scopes y dimensions creados en ese paso.
+> **IMPORTANT**: This wizard REQUIRES that `/np-nullplatform-wizard` has been run first.
+> Channel associations depend on the scopes and dimensions created in that step.
 
-1. Verificar que `organization.properties` existe y tiene el organization_id
-2. Invocar `/np-api check-auth` para verificar autenticacion
-3. Invocar `/np-api` para verificar que existen scopes (si no hay, ejecutar `/np-nullplatform-wizard` primero):
-   - Consultar service_specifications de la organization
+1. Verify that `organization.properties` exists and has the organization_id
+2. Invoke `/np-api check-auth` to verify authentication
+3. Invoke `/np-api` to verify scopes exist (if there are none, run `/np-nullplatform-wizard` first):
+   - Query service_specifications of the organization
 
-## Templates de Referencia
+## Reference Templates
 
-Los templates estan en `nullplatform-bindings/example/` - **NO SE APLICAN DIRECTAMENTE**.
+Templates are in `nullplatform-bindings/example/` - **NOT APPLIED DIRECTLY**.
 
 ```text
 nullplatform-bindings/
-├── example/                    # Templates de referencia
+├── example/                    # Reference templates
 │   ├── main.tf
 │   ├── data.tf
 │   ├── locals.tf
 │   └── variables.tf
-└── *.tf                        # Tu implementacion real (cuando se cree)
+└── *.tf                        # Your actual implementation (when created)
 ```
 
-## Que Se Crea
+## What Gets Created
 
 ### Code Repository
 
-Conexion con GitHub para source code:
+Connection with GitHub for source code:
 
-| Configuracion | Descripcion |
+| Configuration | Description |
 | ------------- | ----------- |
 | `git_provider` | `github` |
-| `github_organization` | Nombre de tu org en GitHub |
-| `github_installation_id` | ID de la GitHub App instalada |
+| `github_organization` | Your GitHub org name |
+| `github_installation_id` | Installed GitHub App ID |
 
 ### Asset Repository (ECR/ACR/Artifact Registry)
 
-Storage de imagenes Docker. El modulo `asset_repository` crea:
+Docker image storage. The `asset_repository` module creates:
 
-**En AWS (ECR):**
+**On AWS (ECR):**
 
-| Recurso AWS | Nombre | Proposito |
-| ----------- | ------ | --------- |
-| IAM Role | `nullplatform-{cluster}-application-role` | Permite a Nullplatform asumir rol para crear repos |
-| IAM Policy | `nullplatform-{cluster}-ecr-manager-policy` | Permisos ECR: create/delete repo, push/pull images |
-| IAM User | `nullplatform-{cluster}-build-workflow-user` | Usuario para CI/CD pipelines |
-| IAM Access Key | (generada) | Credenciales para el usuario de build |
+| AWS Resource | Name | Purpose |
+| ------------ | ---- | ------- |
+| IAM Role | `nullplatform-{cluster}-application-role` | Allows Nullplatform to assume role for creating repos |
+| IAM Policy | `nullplatform-{cluster}-ecr-manager-policy` | ECR permissions: create/delete repo, push/pull images |
+| IAM User | `nullplatform-{cluster}-build-workflow-user` | User for CI/CD pipelines |
+| IAM Access Key | (generated) | Credentials for the build user |
 
-**En Nullplatform:**
+**On Nullplatform:**
 
-| Recurso | Tipo | Proposito |
-| ------- | ---- | --------- |
-| Provider Config | `ecr` | Registra credenciales AWS para crear repos automaticamente |
+| Resource | Type | Purpose |
+| -------- | ---- | ------- |
+| Provider Config | `ecr` | Registers AWS credentials for automatic repo creation |
 
-**Resumen por cloud:**
+**Summary by cloud:**
 
 | Cloud | Registry | Variables |
 | ----- | -------- | --------- |
-| AWS | ECR | Automatico via IAM |
+| AWS | ECR | Automatic via IAM |
 | Azure | ACR | `login_server`, `username`, `password` |
 | GCP | Artifact Registry | `login_server`, `username`, `password` |
 
 ### Cloud Provider Binding
 
-Vincula Nullplatform con tu cloud. El modulo `cloud_provider` crea:
+Links Nullplatform with your cloud. The `cloud_provider` module creates:
 
-**En Nullplatform:**
+**On Nullplatform:**
 
-| Recurso | Tipo | Proposito |
-| ------- | ---- | --------- |
-| Provider Config | `aws-configuration` / `azure-configuration` / `gcp-configuration` | Configura dominio, DNS zones, region |
+| Resource | Type | Purpose |
+| -------- | ---- | ------- |
+| Provider Config | `aws-configuration` / `azure-configuration` / `gcp-configuration` | Configures domain, DNS zones, region |
 
-**Configuracion:**
+**Configuration:**
 
-| Configuracion | Descripcion |
+| Configuration | Description |
 | ------------- | ----------- |
-| `domain_name` | Dominio para las aplicaciones |
-| `hosted_public_zone_id` | Zone ID de Route53 publica (AWS) |
-| `hosted_private_zone_id` | Zone ID de Route53 privada (AWS) |
+| `domain_name` | Domain for applications |
+| `hosted_public_zone_id` | Public Route53 Zone ID (AWS) |
+| `hosted_private_zone_id` | Private Route53 Zone ID (AWS) |
 | `resource_group` | Resource group (Azure) |
-| `dimensions` | Mapeo de dimensions |
+| `dimensions` | Dimension mapping |
 
 ### Channel Associations
 
-Routea deployments al cluster correcto:
+Routes deployments to the correct cluster:
 
-| Association | Descripcion |
+| Association | Description |
 | ----------- | ----------- |
-| K8s Containers | Asocia scope k8s con agente |
-| Scheduled Tasks | Asocia scheduled tasks con agente |
-| Endpoint Exposer | Asocia endpoint exposer con agente |
+| K8s Containers | Associates k8s scope with agent |
+| Scheduled Tasks | Associates scheduled tasks with agent |
+| Endpoint Exposer | Associates endpoint exposer with agent |
 
 ### Metrics
 
-Conexion con Prometheus para metricas:
+Connection with Prometheus for metrics:
 
-| Configuracion | Descripcion |
+| Configuration | Description |
 | ------------- | ----------- |
-| `prometheus_url` | URL del Prometheus server |
-| `dimensions` | Dimensions para metricas |
+| `prometheus_url` | Prometheus server URL |
+| `dimensions` | Dimensions for metrics |
 
-## Workflow del Wizard
+## Wizard Workflow
 
-### 1. Verificar que no existe configuracion
+### 1. Verify no configuration exists
 
 ```bash
-ls nullplatform-bindings/*.tf 2>/dev/null || echo "No hay configuracion - proceder"
+ls nullplatform-bindings/*.tf 2>/dev/null || echo "No configuration exists - proceed"
 ```
 
-### 2. Copiar templates (excepto main.tf)
+### 2. Copy templates (except main.tf)
 
 ```bash
-# Copiar todos los templates EXCEPTO main.tf (se genera dinamicamente)
+# Copy all templates EXCEPT main.tf (generated dynamically)
 for f in nullplatform-bindings/example/*.tf; do
   [ "$(basename "$f")" = "main.tf" ] && continue
   cp "$f" nullplatform-bindings/
 done
 ```
 
-### 2b. Generar o customizar main.tf
+### 2b. Generate or customize main.tf
 
-El `main.tf` de nullplatform-bindings se genera dinamicamente siguiendo [references/bindings-generation.md](references/bindings-generation.md).
+The nullplatform-bindings `main.tf` is generated dynamically following [references/bindings-generation.md](references/bindings-generation.md).
 
-1. **Verificar si existe `nullplatform-bindings/main.tf`**
+1. **Check if `nullplatform-bindings/main.tf` exists**
 
    ```bash
    ls nullplatform-bindings/main.tf 2>/dev/null
    ```
 
-   - **Si NO existe** -> Leer [references/bindings-generation.md](references/bindings-generation.md) y seguir su flujo completo (preguntas al usuario, patrones de modulos, validacion). Esta capa no tiene outputs obligatorios ya que no hay capas downstream que la consuman.
-   - **Si existe** -> Preguntar con AskUserQuestion:
-     - **Regenerar desde cero** -> Eliminar el actual, leer [references/bindings-generation.md](references/bindings-generation.md) y seguir su flujo
-     - **Customizar el existente** -> Leer el main.tf actual y preguntar que cambios hacer
-     - **Dejarlo como esta** -> Ir al paso 3
+   - **If it does NOT exist** -> Read [references/bindings-generation.md](references/bindings-generation.md) and follow its complete flow (user questions, module patterns, validation). This layer has no mandatory outputs since there are no downstream layers that consume it.
+   - **If it exists** -> Ask with AskUserQuestion:
+     - **Regenerate from scratch** -> Delete the current one, read [references/bindings-generation.md](references/bindings-generation.md) and follow its flow
+     - **Customize the existing one** -> Read the current main.tf and ask what changes to make
+     - **Leave it as is** -> Go to step 3
 
-2. Despues de generar/modificar, validar:
+2. After generating/modifying, validate:
 
    ```bash
    cd nullplatform-bindings
@@ -158,26 +158,26 @@ El `main.tf` de nullplatform-bindings se genera dinamicamente siguiendo [referen
    tofu validate
    ```
 
-3. Si `tofu validate` falla, corregir ANTES de continuar con el paso 3.
+3. If `tofu validate` fails, fix BEFORE continuing with step 3.
 
-### 3. Configurar Code Repository
+### 3. Configure Code Repository
 
-Segun el code repository elegido en el paso 2b (flujo del bindings-generation):
+Based on the code repository chosen in step 2b (bindings-generation flow):
 
 **GitHub:**
-1. Instalar la GitHub App: **https://github.com/apps/nullplatform-github-integration**
-2. Seleccionar la organizacion y repositorios
-3. Obtener el Installation ID desde: `https://github.com/organizations/TU-ORG/settings/installations/XXXXX`
+1. Install the GitHub App: **https://github.com/apps/nullplatform-github-integration**
+2. Select the organization and repositories
+3. Get the Installation ID from: `https://github.com/organizations/YOUR-ORG/settings/installations/XXXXX`
 
 **GitLab:**
-1. Obtener un access token con permisos de API
-2. Configurar group path, installation URL, collaborators, repository prefix y slug
+1. Obtain an access token with API permissions
+2. Configure group path, installation URL, collaborators, repository prefix, and slug
 
 **Azure DevOps:**
-1. Obtener un personal access token
-2. Configurar project name y agent pool
+1. Obtain a personal access token
+2. Configure project name and agent pool
 
-### 4. Aplicar
+### 4. Apply
 
 ```bash
 cd nullplatform-bindings
@@ -185,127 +185,127 @@ tofu init
 tofu apply
 ```
 
-### 5. Validación Post-Apply (REQUERIDO)
+### 5. Post-Apply Validation (REQUIRED)
 
-Después de `tofu apply`, verificar que los bindings funcionan correctamente.
+After `tofu apply`, verify that bindings work correctly.
 
-#### 5.1 Verificar Providers
+#### 5.1 Verify Providers
 
 ```bash
-# Obtener organization_id de organization.properties
+# Get organization_id from organization.properties
 ORG_ID=$(grep organization_id organization.properties | cut -d= -f2)
 
-# Verificar provider de código (GitHub)
+# Verify code provider (GitHub)
 /np-api fetch-api "/provider?nrn=organization%3D${ORG_ID}&specification_slug=code_repository"
 
-# Verificar provider de registry (ECR)
+# Verify registry provider (ECR)
 /np-api fetch-api "/provider?nrn=organization%3D${ORG_ID}&specification_slug=ecr"
 ```
 
-#### 5.2 Verificar Notification Channels
+#### 5.2 Verify Notification Channels
 
 ```bash
-# Listar canales creados
+# List created channels
 /np-api fetch-api "/notification/channel?nrn=organization%3D${ORG_ID}&showDescendants=true"
 ```
 
-#### 5.3 Verificar API Keys de Canales
+#### 5.3 Verify Channel API Keys
 
-Para cada canal de tipo `agent`, verificar que la API key tiene los roles correctos:
+For each `agent` type channel, verify the API key has the correct roles:
 
 ```bash
-# 1. Obtener detalles del canal
+# 1. Get channel details
 /np-api fetch-api "https://notifications.nullplatform.com/notification/channel/{channel_id}"
 
-# 2. Buscar la API key por nombre (ej: SCOPE_DEFINITION_AGENT_ASSOCIATION)
+# 2. Search the API key by name (e.g., SCOPE_DEFINITION_AGENT_ASSOCIATION)
 /np-api fetch-api "/api-key?name=SCOPE_DEFINITION_AGENT_ASSOCIATION"
 
-# 3. Ver los grants de la API key
+# 3. View the API key grants
 /np-api fetch-api "/api-key/{api_key_id}"
 ```
 
-**Roles requeridos para notification channels:**
+**Required roles for notification channels:**
 
-| Rol | Propósito |
-|-----|-----------|
-| `controlplane:agent` | Comunicación con control plane |
-| `ops` | Ejecutar comandos en el agente |
+| Role | Purpose |
+|------|---------|
+| `controlplane:agent` | Communication with control plane |
+| `ops` | Execute commands on the agent |
 
-#### 5.4 Checklist de Validación
+#### 5.4 Validation Checklist
 
-| Check | Comando | Esperado |
+| Check | Command | Expected |
 |-------|---------|----------|
-| Provider GitHub existe | `/provider?specification_slug=code_repository` | 1+ resultado |
-| Provider ECR existe | `/provider?specification_slug=ecr` | 1+ resultado |
-| Channel existe | `/notification/channel?nrn=...` | 1+ resultado |
-| API key tiene `controlplane:agent` | `/api-key/{id}` → grants | Presente |
-| API key tiene `ops` | `/api-key/{id}` → grants | Presente |
+| GitHub provider exists | `/provider?specification_slug=code_repository` | 1+ result |
+| ECR provider exists | `/provider?specification_slug=ecr` | 1+ result |
+| Channel exists | `/notification/channel?nrn=...` | 1+ result |
+| API key has `controlplane:agent` | `/api-key/{id}` → grants | Present |
+| API key has `ops` | `/api-key/{id}` → grants | Present |
 
-## Variables Requeridas
+## Required Variables
 
-| Variable | Descripcion | Origen |
+| Variable | Description | Source |
 | -------- | ----------- | ------ |
-| `organization_id` | ID de la organizacion | organization.properties |
-| `np_api_key` | API key de Nullplatform | NP_API_KEY/np-api-skill.key (recomendado) |
-| Variables del code repo | Dependen del provider elegido (github_*, gitlab_*, azure_*) | terraform.tfvars |
+| `organization_id` | Organization ID | organization.properties |
+| `np_api_key` | Nullplatform API key | NP_API_KEY/np-api-skill.key (recommended) |
+| Code repo variables | Depend on chosen provider (github_*, gitlab_*, azure_*) | terraform.tfvars |
 
-## Validacion
+## Validation
 
 ```bash
-# Leer organization_id
-Invocar `/np-api` para consultar:
+# Read organization_id
+Invoke `/np-api` to query:
 
-| Informacion requerida | Entidad a consultar |
-|-----------------------|---------------------|
-| Providers de GitHub | providers de tipo `code_repository` de la organization |
-| Providers de Registry | providers de tipo `docker_server` de la organization |
-| Notification channels | notification channels de la organization |
+| Required information | Entity to query |
+|---------------------|-----------------|
+| GitHub providers | `code_repository` type providers of the organization |
+| Registry providers | `docker_server` type providers of the organization |
+| Notification channels | notification channels of the organization |
 
 ## Troubleshooting
 
 ### GitHub Connection Fails
 
-- Verificar que la GitHub App esta instalada en la org
-- Verificar installation_id es correcto
-- Verificar que la App tiene permisos en los repos
+- Verify that the GitHub App is installed in the org
+- Verify installation_id is correct
+- Verify the App has permissions on the repos
 
 ### Registry Auth Fails
 
-- Verificar credenciales no expiraron
-- Para Azure: regenerar password si es necesario
-- Para GCP: verificar service account tiene permisos
+- Verify credentials haven't expired
+- For Azure: regenerate password if needed
+- For GCP: verify service account has permissions
 
-### Agent No Recibe Notificaciones
+### Agent Doesn't Receive Notifications
 
-- Verificar `tags_selectors` coinciden entre channel y agent
-- Verificar agent esta corriendo: `kubectl get pods -n nullplatform-tools`
-- Revisar logs del agent
+- Verify `tags_selectors` match between channel and agent
+- Verify agent is running: `kubectl get pods -n nullplatform-tools`
+- Review agent logs
 
-### Aplicacion Falla con "Error creating ECR repository"
+### Application Fails with "Error creating ECR repository"
 
-Este error ocurre cuando una aplicacion se crea **ANTES** de que el binding de container registry este configurado.
+This error occurs when an application is created **BEFORE** the container registry binding is configured.
 
-> **IMPORTANTE**: Las aplicaciones fallidas por este motivo **NO se recuperan automaticamente**
-> cuando se agregan los bindings despues. Hay que eliminarlas y recrearlas.
+> **IMPORTANT**: Applications that fail for this reason **do NOT recover automatically**
+> when bindings are added afterwards. They must be deleted and recreated.
 
-**Para resolver:**
+**To resolve:**
 
-1. Verificar que `module "asset_repository"` esta habilitado en `nullplatform-bindings/main.tf`
-2. Ejecutar `tofu apply` en `nullplatform-bindings/`
-3. Verificar que el provider ECR existe via API:
+1. Verify that `module "asset_repository"` is enabled in `nullplatform-bindings/main.tf`
+2. Run `tofu apply` in `nullplatform-bindings/`
+3. Verify the ECR provider exists via API:
 
    ```bash
    np-api fetch "/provider?nrn=organization=XXX:account=YYY&show_descendants=true"
    ```
 
-4. **ELIMINAR** la aplicacion fallida desde la UI de Nullplatform
-5. **Recrear** la aplicacion - ahora funcionara correctamente
+4. **DELETE** the failed application from the Nullplatform UI
+5. **Recreate** the application - it will now work correctly
 
-## Siguiente Paso
+## Next Step
 
-Con los bindings configurados, tu cuenta Nullplatform esta lista para deployar aplicaciones.
+With bindings configured, your Nullplatform account is ready to deploy applications.
 
-**Opciones:**
+**Options:**
 
-1. Crear tu primera aplicacion en la UI de Nullplatform
-2. Debuggear o explorar: `/np-api`
+1. Create your first application in the Nullplatform UI
+2. Debug or explore: `/np-api`

@@ -1,82 +1,82 @@
 # Scopes
 
-Scopes representan ambientes/targets para deployments (qa, staging, prod).
+Scopes represent environments/targets for deployments (qa, staging, prod).
 
 ## @endpoint /scope/{id}
 
-Obtiene detalles de un scope.
+Gets details of a scope.
 
-### Parámetros
-- `id` (path, required): ID del scope
+### Parameters
+- `id` (path, required): Scope ID
 
-### Respuesta
-- `id`: ID numérico
-- `name`: Nombre del scope (cambia a `deleted-{timestamp}-{name}` cuando se elimina)
+### Response
+- `id`: Numeric ID
+- `name`: Scope name (changes to `deleted-{timestamp}-{name}` when deleted)
 - `status`: active | unhealthy | deleted | failed | updating | stopped | stopping | creating | pending
-- `application_id`: ID de la aplicación
-- `asset_name`: Nombre del asset asociado (ej: `docker-image-asset`, `lambda-asset`). **CRITICO para deployments**: si es `null`, los deployments fallan con error confuso. Debe setearse antes de desplegar
-- `instance_id`: ID del service asociado (**importante para obtener deployment actions**)
-- `active_deployment`: ID del deployment activo (**SOLO en GET individual, NO en listados**)
-- `current_active_deployment`: ID del deployment activo (igual que active_deployment)
+- `application_id`: Application ID
+- `asset_name`: Associated asset name (e.g., `docker-image-asset`, `lambda-asset`). **CRITICAL for deployments**: if `null`, deployments fail with a confusing error. Must be set before deploying
+- `instance_id`: Associated service ID (**important for getting deployment actions**)
+- `active_deployment`: Active deployment ID (**ONLY in individual GET, NOT in listings**)
+- `current_active_deployment`: Active deployment ID (same as active_deployment)
 - `nrn`: organization=X:account=Y:namespace=Z
-- `provider`: Identificador del tipo de scope. Puede ser:
-  - **Legacy (string fijo)**: `AWS:SERVERLESS:LAMBDA`, `AWS:WEB_POOL:EKS`, `AWS:WEB_POOL:EC2INSTANCES`
-  - **Nuevo (UUID)**: referencia a un `service_specification` que define el schema de capabilities
-- `dimensions`: Clasificación del scope
+- `provider`: Scope type identifier. Can be:
+  - **Legacy (fixed string)**: `AWS:SERVERLESS:LAMBDA`, `AWS:WEB_POOL:EKS`, `AWS:WEB_POOL:EC2INSTANCES`
+  - **New (UUID)**: reference to a `service_specification` that defines the capabilities schema
+- `dimensions`: Scope classification
   - `environment`: dev | qa | staging | prod
   - `country`: us | mx | ar | br
   - `compliance`: banxico | pci | hipaa
-- `capabilities`: **depende del provider** - cada service_specification define su propio schema. Ejemplo típico para K8s:
-  - `scheduled_stop`: auto-stop config (enabled, timer en segundos)
+- `capabilities`: **depends on provider** - each service_specification defines its own schema. Typical K8s example:
+  - `scheduled_stop`: auto-stop config (enabled, timer in seconds)
   - `auto_scaling`: HPA config (min_amount, max_amount, cpu, memory)
-  - `health_check`: config de probes
-  - `logs`: provider y throttling
-  - Schema completo K8s: [nullplatform/scopes](https://github.com/nullplatform/scopes/blob/main/k8s/specs/service-spec.json.tpl)
-- `specification.replicas`: Réplicas default
+  - `health_check`: probe config
+  - `logs`: provider and throttling
+  - Full K8s schema: [nullplatform/scopes](https://github.com/nullplatform/scopes/blob/main/k8s/specs/service-spec.json.tpl)
+- `specification.replicas`: Default replicas
 - `specification.resources`: memory, cpu
-- `stops_at`: Timestamp de próximo auto-stop (si scheduled_stop habilitado)
+- `stops_at`: Next auto-stop timestamp (if scheduled_stop enabled)
 
-### Navegación
+### Navigation
 - **→ application**: `application_id` → `/application/{application_id}`
 - **→ deployments**: `/deployment?scope_id={id}`
 - **→ deployment actions**: `instance_id` → `/service/{instance_id}/action`
 - **→ instances**: `/telemetry/instance?application_id={app_id}&scope_id={id}`
-- **→ namespace**: del NRN extraer namespace_id
+- **→ namespace**: extract namespace_id from NRN
 - **← application**: `/scope?application_id={application_id}`
 
-### Ejemplo
+### Example
 ```bash
 np-api fetch-api "/scope/415005828"
 
-# Con mensajes de error (útil para diagnosticar fallos de delete o creación)
+# With error messages (useful for diagnosing delete or creation failures)
 np-api fetch-api "/scope/415005828?include_messages=true"
 ```
 
-### Notas
-- **`include_messages=true`**: Incluye el array `messages[]` con errores y eventos del scope. Sin este param, `messages` viene vacío. Útil para diagnosticar scopes en status `failed` (ej: errores de deprovisionamiento como "Error deleting ingress...")
-- `instance_id` es clave para obtener deployment actions via `/service/{instance_id}/action`
-- Cuando scope es deleted, el name cambia a `deleted-{timestamp}-{original-name}`
-- `status: active` NO cambia cuando scope auto-stops - solo métricas muestran 0
-- Scopes eliminados no se pueden recuperar - hay que recrear
-- **IMPORTANTE**: `active_deployment` y `current_active_deployment` SOLO aparecen en GET individual (`/scope/{id}`), NO en listados (`/scope?application_id=X`)
-- **IMPORTANTE**: `asset_name` debe estar seteado para que los deployments funcionen. Si es `null`, `POST /deployment` falla con `"The scope and the release belongs to different applications"`. Setear con `PATCH /scope/{id}` enviando `{"asset_name": "docker-image-asset"}`
+### Notes
+- **`include_messages=true`**: Includes the `messages[]` array with scope errors and events. Without this param, `messages` comes empty. Useful for diagnosing scopes in `failed` status (e.g., deprovisioning errors like "Error deleting ingress...")
+- `instance_id` is key for getting deployment actions via `/service/{instance_id}/action`
+- When scope is deleted, name changes to `deleted-{timestamp}-{original-name}`
+- `status: active` does NOT change when scope auto-stops - only metrics show 0
+- Deleted scopes cannot be recovered - must be recreated
+- **IMPORTANT**: `active_deployment` and `current_active_deployment` ONLY appear in individual GET (`/scope/{id}`), NOT in listings (`/scope?application_id=X`)
+- **IMPORTANT**: `asset_name` must be set for deployments to work. If `null`, `POST /deployment` fails with `"The scope and the release belongs to different applications"`. Set with `PATCH /scope/{id}` sending `{"asset_name": "docker-image-asset"}`
 
 ---
 
 ## @endpoint /scope
 
-Lista scopes de una aplicación.
+Lists scopes of an application.
 
-### Parámetros
+### Parameters
 
-- `application_id` (query, required): ID de la aplicación
-- `status` (query): Filtra por status (active, deleted, etc.)
-- `limit` (query): Máximo de resultados
-- `offset` (query): Para paginación
+- `application_id` (query, required): Application ID
+- `status` (query): Filter by status (active, deleted, etc.)
+- `limit` (query): Maximum results
+- `offset` (query): For pagination
 
-### Respuesta
+### Response
 
-Objeto paginado:
+Paginated object:
 
 ```json
 {
@@ -87,58 +87,58 @@ Objeto paginado:
 }
 ```
 
-### Ejemplo
+### Example
 
 ```bash
 np-api fetch-api "/scope?application_id=489238271"
 
-# Solo scopes activos
+# Only active scopes
 np-api fetch-api "/scope?application_id=489238271&status=active"
 ```
 
-### Notas
+### Notes
 
-- Retorna objeto con `paging` y `results` (como otros endpoints)
-- Scopes eliminados pueden NO aparecer en la lista por defecto
-- **IMPORTANTE**: El listado NO incluye `active_deployment` - usar GET individual para obtenerlo
+- Returns object with `paging` and `results` (like other endpoints)
+- Deleted scopes may NOT appear in the list by default
+- **IMPORTANT**: The listing does NOT include `active_deployment` - use individual GET to obtain it
 
 ---
 
-## Listar scopes por provider
+## Listing scopes by provider
 
-El endpoint `/scope` no soporta filtro por provider. Para listar scopes de toda la organización por provider:
+The `/scope` endpoint does not support provider filter. To list all organization scopes by provider:
 
-### Método: via /service (type=scope)
+### Method: via /service (type=scope)
 
-Cada scope con provider UUID tiene un service asociado donde `specification_id` = provider.
+Each scope with UUID provider has an associated service where `specification_id` = provider.
 
 ```bash
-# 1. Listar todos los services type=scope de la org
+# 1. List all type=scope services of the org
 np-api fetch-api "/service?nrn=organization%3D{org_id}:account%3D*&type=scope&limit=1500"
 
-# 2. Filtrar por specification_id (provider UUID)
+# 2. Filter by specification_id (provider UUID)
 | jq '[.results[] | select(.specification_id == "480c7522-...") | {name, status, scope_id: (.entity_nrn | split("scope=")[1])}]'
 ```
 
-### Campos útiles del service (type=scope)
+### Useful service (type=scope) fields
 
-- `specification_id`: UUID del provider (service_specification)
-- `entity_nrn`: contiene el NRN completo del scope
-- `attributes`: equivalente a `capabilities` del scope
+- `specification_id`: Provider UUID (service_specification)
+- `entity_nrn`: contains the scope's complete NRN
+- `attributes`: equivalent to scope's `capabilities`
 - `status`: active | failed | creating | etc
 
-### Ejemplo: encontrar scopes sin ciertas capabilities
+### Example: find scopes without certain capabilities
 
 ```bash
-# Comparar attributes de services contra un scope de referencia
+# Compare service attributes against a reference scope
 jq '[.results[] | select(.specification_id == "UUID") |
   select((.attributes | has("traffic_management")) | not) |
   {name, scope_id: (.entity_nrn | split("scope=")[1])}]'
 ```
 
-### URL de UI
+### UI URL
 
-Para armar la URL de un scope en la UI:
+To build a scope's UI URL:
 ```
 https://{organization_slug}.app.nullplatform.io/{entity_nrn}
 ```
@@ -147,18 +147,18 @@ https://{organization_slug}.app.nullplatform.io/{entity_nrn}
 
 ## @endpoint /scope_type
 
-Lista los tipos de scope disponibles para una aplicación. Este endpoint reemplaza
-el uso de `/service_specification` para descubrir tipos de scope.
+Lists available scope types for an application. This endpoint replaces
+the use of `/service_specification` for discovering scope types.
 
-### Parámetros
+### Parameters
 
-- `nrn` (query, required): NRN URL-encoded de la aplicación (ej: `organization%3D123%3Aaccount%3D456%3Anamespace%3D789%3Aapplication%3D101`)
-- `status` (query): Filtrar por status (ej: `active`)
-- `include` (query): Campos adicionales a incluir (ej: `capabilities,wildcard,available`)
+- `nrn` (query, required): URL-encoded application NRN (e.g., `organization%3D123%3Aaccount%3D456%3Anamespace%3D789%3Aapplication%3D101`)
+- `status` (query): Filter by status (e.g., `active`)
+- `include` (query): Additional fields to include (e.g., `capabilities,wildcard,available`)
 
-### Respuesta
+### Response
 
-Array de scope types:
+Array of scope types:
 
 ```json
 [
@@ -175,53 +175,53 @@ Array de scope types:
 ]
 ```
 
-### Campos clave
+### Key fields
 
-- `id`: ID numérico del tipo
-- `type`: Tipo técnico — `web_pool`, `web_pool_k8s`, `serverless`, `custom`
-- `name`: Nombre amigable (ej: "Kubernetes", "Scheduled Task", "Server instances")
-- `description`: Descripción del tipo
-- `provider_type`: `null_native` (tipos built-in) o `service` (tipos custom via service_specification)
-- `provider_id`: ID del provider para el POST /scope — puede ser string fijo (`AWS:WEB_POOL:EKS`) o UUID
-- `available`: Boolean — indica si el tipo está disponible para la aplicación/account actual
-- `parameters.schema`: JSON schema de capabilities (principalmente para tipo `custom`)
+- `id`: Numeric type ID
+- `type`: Technical type — `web_pool`, `web_pool_k8s`, `serverless`, `custom`
+- `name`: Friendly name (e.g., "Kubernetes", "Scheduled Task", "Server instances")
+- `description`: Type description
+- `provider_type`: `null_native` (built-in types) or `service` (custom types via service_specification)
+- `provider_id`: Provider ID for POST /scope — can be fixed string (`AWS:WEB_POOL:EKS`) or UUID
+- `available`: Boolean — indicates if the type is available for the current application/account
+- `parameters.schema`: Capabilities JSON schema (mainly for `custom` type)
 
-### Navegación
+### Navigation
 
-- **→ scope creation**: `type` y `provider_id` se usan en POST `/scope`
-- **→ capabilities**: `/capability?nrn={nrn}&target=scope` para tipos nativos
-- **← application**: filtrar por NRN de la aplicación
+- **→ scope creation**: `type` and `provider_id` are used in POST `/scope`
+- **→ capabilities**: `/capability?nrn={nrn}&target=scope` for native types
+- **← application**: filter by application NRN
 
-### Ejemplo
+### Example
 
 ```bash
-# Listar scope types disponibles para una aplicación
+# List available scope types for an application
 np-api fetch-api "/scope_type?nrn=organization%3D1255165411%3Aaccount%3D95118862%3Anamespace%3D463208973%3Aapplication%3D1914258629&status=active&include=capabilities,wildcard,available"
 ```
 
-### Notas
+### Notes
 
-- **Solo mostrar tipos con `available: true`** al usuario — los demás no están habilitados
-- Los tipos varían entre organizaciones/accounts — nunca asumir que existen tipos específicos
-- Para tipo `custom`, el `provider_id` es un UUID que referencia un `service_specification`
-- Para tipos nativos (`web_pool_k8s`, `serverless`), el `provider_id` es un string fijo
-- El campo `type` del scope_type se usa directamente como `type` en el POST `/scope`
+- **Only show types with `available: true`** to the user — the rest are not enabled
+- Types vary between organizations/accounts — never assume specific types exist
+- For `custom` type, `provider_id` is a UUID referencing a `service_specification`
+- For native types (`web_pool_k8s`, `serverless`), `provider_id` is a fixed string
+- The scope_type's `type` field is used directly as `type` in POST `/scope`
 
 ---
 
 ## @endpoint /capability
 
-Lista las capabilities configurables para un target (scope, deployment, etc.).
-Usado para descubrir qué se puede configurar al crear un scope de tipo nativo.
+Lists configurable capabilities for a target (scope, deployment, etc.).
+Used to discover what can be configured when creating a native scope type.
 
-### Parámetros
+### Parameters
 
-- `nrn` (query, required): NRN URL-encoded de la aplicación
-- `target` (query, required): Target de las capabilities (ej: `scope`)
+- `nrn` (query, required): URL-encoded application NRN
+- `target` (query, required): Capabilities target (e.g., `scope`)
 
-### Respuesta
+### Response
 
-Array de capabilities:
+Array of capabilities:
 
 ```json
 [
@@ -248,44 +248,44 @@ Array de capabilities:
 ]
 ```
 
-### Campos clave
+### Key fields
 
-- `id`: ID numérico de la capability
-- `slug`: Identificador usado como **key en el objeto capabilities** del POST /scope
-- `name`: Nombre amigable
-- `target`: Target al que aplica (ej: `scope`)
-- `definition`: JSON schema que define la estructura del valor de la capability
+- `id`: Numeric capability ID
+- `slug`: Identifier used as **key in the capabilities object** of POST /scope
+- `name`: Friendly name
+- `target`: Target it applies to (e.g., `scope`)
+- `definition`: JSON schema defining the capability value structure
 
-### Capabilities comunes para scopes K8s
+### Common capabilities for K8s scopes
 
-| Slug | Nombre | Descripción |
-|------|--------|-------------|
-| `visibility` | Visibility | Visibilidad pública/privada (solo al crear) |
-| `listener_protocol` | Listener Protocol | Protocolo HTTP/gRPC |
-| `memory` | Memory | Memoria en GB |
-| `kubernetes_processor` | Kubernetes Processor | CPU en millicores |
-| `auto_scaling` | Auto Scaling | HPA: instancias, CPU%, memoria% |
-| `health_check` | Health Check | Probes de salud (path, timeout, interval) |
-| `logs` | Logs | Provider de logs y throttling |
-| `metrics` | Metrics | Providers de métricas |
-| `continuous_delivery` | Continuous Delivery | Deploy automático desde branches |
-| `scheduled_stop` | Scheduled Stop | Auto-stop después de inactividad |
+| Slug | Name | Description |
+|------|------|-------------|
+| `visibility` | Visibility | Public/private visibility (create only) |
+| `listener_protocol` | Listener Protocol | HTTP/gRPC protocol |
+| `memory` | Memory | Memory in GB |
+| `kubernetes_processor` | Kubernetes Processor | CPU in millicores |
+| `auto_scaling` | Auto Scaling | HPA: instances, CPU%, memory% |
+| `health_check` | Health Check | Health probes (path, timeout, interval) |
+| `logs` | Logs | Log provider and throttling |
+| `metrics` | Metrics | Metrics providers |
+| `continuous_delivery` | Continuous Delivery | Auto-deploy from branches |
+| `scheduled_stop` | Scheduled Stop | Auto-stop after inactivity |
 
-### Navegación
+### Navigation
 
-- **→ scope creation**: `slug` se usa como key en `capabilities` del POST `/scope`
-- **→ scope_type**: tipos nativos usan capabilities de este endpoint; tipos `custom` usan `parameters.schema`
+- **→ scope creation**: `slug` is used as key in `capabilities` of POST `/scope`
+- **→ scope_type**: native types use capabilities from this endpoint; `custom` types use `parameters.schema`
 
-### Ejemplo
+### Example
 
 ```bash
-# Obtener capabilities para scopes de una aplicación
+# Get scope capabilities for an application
 np-api fetch-api "/capability?nrn=organization%3D1255165411%3Aaccount%3D95118862%3Anamespace%3D463208973%3Aapplication%3D1914258629&target=scope"
 ```
 
-### Notas
+### Notes
 
-- Las capabilities aplican a tipos **nativos** (`web_pool_k8s`, `serverless`, `web_pool`)
-- Para tipos `custom`, las capabilities se definen en `scope_type.parameters.schema`
-- El `slug` de cada capability se usa como key en el objeto `capabilities` del POST `/scope`
-- Cada capability tiene su propio JSON schema en `definition` que describe la estructura esperada
+- Capabilities apply to **native** types (`web_pool_k8s`, `serverless`, `web_pool`)
+- For `custom` types, capabilities are defined in `scope_type.parameters.schema`
+- Each capability's `slug` is used as key in the `capabilities` object of POST `/scope`
+- Each capability has its own JSON schema in `definition` describing the expected structure

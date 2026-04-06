@@ -5,118 +5,118 @@ description: This skill should be used when the user asks to "configure nullplat
 
 # Nullplatform Config Wizard
 
-Configura los recursos de Nullplatform: scopes, dimensions y service definitions.
+Configures Nullplatform resources: scopes, dimensions, and service definitions.
 
-## Cuando Usar
+## When to Use
 
-- Configurando scope definitions (deployment targets)
-- Creando dimensions de ambiente (dev/staging/prod)
-- Registrando service definitions
-- Configurando metadata schemas y policies
+- Configuring scope definitions (deployment targets)
+- Creating environment dimensions (dev/staging/prod)
+- Registering service definitions
+- Configuring metadata schemas and policies
 
-## Prerequisitos
+## Prerequisites
 
-1. Verificar que `organization.properties` existe y tiene el organization_id
-2. Invocar `/np-api check-auth` para verificar autenticacion
+1. Verify that `organization.properties` exists and has the organization_id
+2. Invoke `/np-api check-auth` to verify authentication
 
-## Templates de Referencia
+## Reference Templates
 
-Los templates estan en `nullplatform/example/` - **NO SE APLICAN DIRECTAMENTE**.
+Templates are in `nullplatform/example/` - **NOT APPLIED DIRECTLY**.
 
 ```text
 nullplatform/
-├── example/                    # Templates de referencia
+├── example/                    # Reference templates
 │   ├── main.tf
 │   ├── variables.tf
 │   └── outputs.tf
-└── *.tf                        # Tu implementacion real (cuando se cree)
+└── *.tf                        # Your actual implementation (when created)
 ```
 
-## Que Se Crea
+## What Gets Created
 
 ### Scope Definitions
 
-Define como las aplicaciones se despliegan en Kubernetes:
+Defines how applications are deployed on Kubernetes:
 
-| Scope | Descripcion | Acciones |
-| ----- | ----------- | -------- |
-| **K8s Containers** | Containers standard | create, delete, deploy, rollback |
-| **Scheduled Tasks** | Jobs periodicos | create, delete, deploy, trigger |
+| Scope | Description | Actions |
+| ----- | ----------- | ------- |
+| **K8s Containers** | Standard containers | create, delete, deploy, rollback |
+| **Scheduled Tasks** | Periodic jobs | create, delete, deploy, trigger |
 
 ### Dimensions
 
-Clasificacion de ambientes para scopes:
+Environment classification for scopes:
 
-| Dimension | Descripcion |
+| Dimension | Description |
 | --------- | ----------- |
-| `development` | Ambientes de desarrollo |
-| `staging` | Pre-produccion |
-| `production` | Trafico real |
+| `development` | Development environments |
+| `staging` | Pre-production |
+| `production` | Real traffic |
 
 ### Service Definitions
 
-Templates para crear servicios cloud:
+Templates for creating cloud services:
 
-| Servicio | Tipo | Descripcion |
-| -------- | ---- | ----------- |
-| Endpoint Exposer | dependency | Expone endpoints de aplicaciones |
-| (Custom services) | dependency | Se pueden agregar mas en segunda iteracion |
+| Service | Type | Description |
+| ------- | ---- | ----------- |
+| Endpoint Exposer | dependency | Exposes application endpoints |
+| (Custom services) | dependency | Can be added in second iteration |
 
-### Metadata Schemas (Opcional)
+### Metadata Schemas (Optional)
 
-Schemas para trackear atributos de aplicaciones:
+Schemas for tracking application attributes:
 
 - Code coverage
 - Security vulnerabilities
 - FinOps costs
 - Custom metadata
 
-## Workflow del Wizard
+## Wizard Workflow
 
-### 1. Verificar que no existe configuracion
+### 1. Verify no configuration exists
 
 ```bash
-ls nullplatform/*.tf 2>/dev/null || echo "No hay configuracion - proceder"
+ls nullplatform/*.tf 2>/dev/null || echo "No configuration exists - proceed"
 ```
 
-### 2. Copiar templates (excepto main.tf)
+### 2. Copy templates (except main.tf)
 
 ```bash
-# Copiar todos los templates EXCEPTO main.tf (se genera dinamicamente)
+# Copy all templates EXCEPT main.tf (generated dynamically)
 for f in nullplatform/example/*.tf; do
   [ "$(basename "$f")" = "main.tf" ] && continue
   cp "$f" nullplatform/
 done
 ```
 
-> **Nota**: Los templates incluyen archivos opcionales:
-> - `metadata.tf` - Schemas de metadata (requiere `nrn_namespace`)
-> - `policies.tf` - Approval policies (requiere `nrn_namespace`)
+> **Note**: Templates include optional files:
+> - `metadata.tf` - Metadata schemas (requires `nrn_namespace`)
+> - `policies.tf` - Approval policies (requires `nrn_namespace`)
 >
-> Estos archivos son **opcionales** y requieren un NRN de namespace (no account).
-> Si no los necesitas o dan error, renombralos a `.tf.disabled`:
+> These files are **optional** and require a namespace NRN (not account).
+> If you don't need them or they cause errors, rename them to `.tf.disabled`:
 > ```bash
 > mv nullplatform/metadata.tf nullplatform/metadata.tf.disabled
 > mv nullplatform/policies.tf nullplatform/policies.tf.disabled
 > ```
 
-### 3. Generar o customizar main.tf
+### 3. Generate or customize main.tf
 
-El `main.tf` de nullplatform se genera dinamicamente siguiendo [references/nullplatform-generation.md](references/nullplatform-generation.md).
+The nullplatform `main.tf` is generated dynamically following [references/nullplatform-generation.md](references/nullplatform-generation.md).
 
-1. **Verificar si existe `nullplatform/main.tf`**
+1. **Check if `nullplatform/main.tf` exists**
 
    ```bash
    ls nullplatform/main.tf 2>/dev/null
    ```
 
-   - **Si NO existe** -> Leer [references/nullplatform-generation.md](references/nullplatform-generation.md) y seguir su flujo completo (preguntas al usuario, patrones de modulos, outputs mapping, validacion)
-   - **Si existe** -> Preguntar con AskUserQuestion:
-     - **Regenerar desde cero** -> Eliminar el actual, leer [references/nullplatform-generation.md](references/nullplatform-generation.md) y seguir su flujo
-     - **Customizar el existente** -> Leer el main.tf actual y preguntar que cambios hacer
-     - **Dejarlo como esta** -> Ir al paso 4
+   - **If it does NOT exist** -> Read [references/nullplatform-generation.md](references/nullplatform-generation.md) and follow its complete flow (user questions, module patterns, outputs mapping, validation)
+   - **If it exists** -> Ask with AskUserQuestion:
+     - **Regenerate from scratch** -> Delete the current one, read [references/nullplatform-generation.md](references/nullplatform-generation.md) and follow its flow
+     - **Customize the existing one** -> Read the current main.tf and ask what changes to make
+     - **Leave it as is** -> Go to step 4
 
-2. Despues de generar/modificar, validar:
+2. After generating/modifying, validate:
 
    ```bash
    cd nullplatform
@@ -124,17 +124,17 @@ El `main.tf` de nullplatform se genera dinamicamente siguiendo [references/nullp
    tofu validate
    ```
 
-3. Si `tofu validate` falla, corregir ANTES de continuar con el paso 4.
+3. If `tofu validate` fails, fix BEFORE continuing with step 4.
 
-### 4. Personalizar variables
+### 4. Customize variables
 
-El wizard te ayuda a configurar:
+The wizard helps you configure:
 
-- `organization_id` (desde organization.properties)
-- `environments` (lista de dimensions)
-- `tags_selectors` (para matching)
+- `organization_id` (from organization.properties)
+- `environments` (list of dimensions)
+- `tags_selectors` (for matching)
 
-### 5. Aplicar
+### 5. Apply
 
 ```bash
 cd nullplatform
@@ -142,25 +142,25 @@ tofu init
 tofu apply
 ```
 
-## Variables Requeridas
+## Required Variables
 
-| Variable | Descripcion | Origen |
+| Variable | Description | Source |
 | -------- | ----------- | ------ |
-| `organization_id` | ID de la organizacion | organization.properties |
-| `np_api_key` | API key de Nullplatform | NP_API_KEY/np-api-skill.key (recomendado) |
-| `environments` | Lista de dimensions | terraform.tfvars |
-| `tags_selectors` | Tags para matching | terraform.tfvars |
+| `organization_id` | Organization ID | organization.properties |
+| `np_api_key` | Nullplatform API key | NP_API_KEY/np-api-skill.key (recommended) |
+| `environments` | List of dimensions | terraform.tfvars |
+| `tags_selectors` | Tags for matching | terraform.tfvars |
 
 ## Outputs
 
-Despues de aplicar, estos valores se exportan para usar en bindings:
+After applying, these values are exported for use in bindings:
 
 ```hcl
-# Scope K8s
-service_specification_id           # ID del service spec
-service_slug                       # Slug del service spec
+# K8s Scope
+service_specification_id           # Service spec ID
+service_slug                       # Service spec slug
 
-# Scope Scheduled Task
+# Scheduled Task Scope
 service_specification_id_scheduled_task
 service_slug_scheduled_task
 
@@ -169,33 +169,33 @@ service_specification_slug_endpoint_exposer
 service_specification_id_endpoint_exposer
 ```
 
-## Validacion
+## Validation
 
-Verificar que los recursos se crearon:
+Verify that resources were created:
 
-Invocar `/np-api` para consultar:
+Invoke `/np-api` to query:
 
-| Informacion requerida | Entidad a consultar |
-|-----------------------|---------------------|
-| Service specifications | service_specifications de la organization |
-| Dimensions configuradas | dimensions de la organization |
+| Required information | Entity to query |
+|---------------------|-----------------|
+| Service specifications | service_specifications of the organization |
+| Configured dimensions | dimensions of the organization |
 
 ## Troubleshooting
 
-### Service Spec no aparece
+### Service Spec doesn't appear
 
-- Verificar `organization_id` en organization.properties
-- Verificar autenticacion con check_auth.sh
+- Verify `organization_id` in organization.properties
+- Verify authentication with check_auth.sh
 
-### Dimension no se crea
+### Dimension doesn't get created
 
-- Verificar que no existe una dimension con el mismo nombre
-- Revisar logs de terraform
+- Verify that a dimension with the same name doesn't already exist
+- Review terraform logs
 
-## Siguiente Paso
+## Next Step
 
-Una vez configurado Nullplatform, conectar con servicios externos:
+Once Nullplatform is configured, connect with external services:
 
-**Decile a Claude**: "Configuremos los bindings"
+**Tell Claude**: "Let's configure the bindings"
 
-O invoca directamente: `/np-nullplatform-bindings-wizard`
+Or invoke directly: `/np-nullplatform-bindings-wizard`

@@ -14,7 +14,7 @@ Use the reference repository defined in `np-service-guide` (Reference Repository
    find /tmp/np-services-reference -name "service-spec.json.tpl" -not -path "*/.git/*" | \
      xargs -I{} sh -c 'echo "---"; dirname {} | sed "s|/tmp/np-services-reference/||"; jq "{name, slug, selectors}" {}'
    ```
-3. **AskUserQuestion**: offer found examples + "Otro (crear servicio nuevo)"
+3. **AskUserQuestion**: offer found examples + "Other (create new service)"
 4. **Copy structure** from reference to local repo:
    ```bash
    cp -r /tmp/np-services-reference/<path-to-example>/ services/<new-slug>/
@@ -29,7 +29,7 @@ Use the reference repository defined in `np-service-guide` (Reference Repository
 
 ## Path B: New Service (Research-First Guided Discovery)
 
-El flujo investiga primero y propone defaults inteligentes. El usuario confirma o ajusta en vez de diseñar desde cero.
+The flow investigates first and proposes smart defaults. The user confirms or adjusts instead of designing from scratch.
 
 ### Phase 1: What is the service?
 
@@ -37,48 +37,48 @@ AskUserQuestion: "Describe what service you want to create" (free text)
 
 ### Phase 2: Research
 
-**ANTES de hacer mas preguntas**, investigar:
+**BEFORE asking more questions**, investigate:
 
-1. **Clonar repo de referencia** (ver np-service-guide, Reference Repository) y buscar un servicio similar al que el usuario describió. Leer su spec, deployment, y workflows para entender el patrón.
+1. **Clone reference repo** (see np-service-guide, Reference Repository) and search for a service similar to what the user described. Read its spec, deployment, and workflows to understand the pattern.
 
-2. **Buscar documentación del terraform provider** relevante (via web si es necesario) para entender qué recursos existen, qué parámetros tienen, y cuáles son los defaults razonables.
+2. **Search for relevant terraform provider documentation** (via web if necessary) to understand what resources exist, what parameters they have, and what are reasonable defaults.
 
-3. **Armar una propuesta** con:
-   - Slug y nombre sugeridos
-   - Provider y categoria inferidos
-   - Lista de campos para el spec con tipos, defaults, y si son requeridos
-   - Qué campos son output (post-provisioning) vs input (usuario elige)
-   - Si tiene links, qué niveles de acceso y qué credenciales expone
-   - Qué recursos terraform va a crear
+3. **Build a proposal** with:
+   - Suggested slug and name
+   - Inferred provider and category
+   - List of spec fields with types, defaults, and whether they're required
+   - Which fields are output (post-provisioning) vs input (user chooses)
+   - If it has links, what access levels and what credentials it exposes
+   - What terraform resources it will create
 
 ### Phase 3: Propose and Confirm
 
-Presentar la propuesta completa al usuario con AskUserQuestion. Cada pregunta debe tener un **default pre-investigado**. Ejemplo:
+Present the complete proposal to the user with AskUserQuestion. Each question should have a **pre-researched default**. Example:
 
-> Basándome en la documentación de AWS S3 y el servicio de referencia `azure-cosmos-db`, propongo:
+> Based on AWS S3 documentation and the reference service `azure-cosmos-db`, I propose:
 >
-> **Nombre**: AWS S3 Bucket | **Slug**: `aws-s3-bucket` | **Provider**: AWS | **Category**: Storage
+> **Name**: AWS S3 Bucket | **Slug**: `aws-s3-bucket` | **Provider**: AWS | **Category**: Storage
 >
-> **Campos del spec (lo que el usuario ve al crear)**:
-> - `bucket_name` (string, requerido) - Nombre del bucket
+> **Spec fields (what the user sees when creating)**:
+> - `bucket_name` (string, required) - Bucket name
 > - `region` (enum: us-east-1, us-west-2, eu-west-1, default: us-east-1)
 > - `versioning` (boolean, default: true)
 > - `encryption` (boolean, default: true)
 >
-> **Campos output (auto-populated post-creación)**:
+> **Output fields (auto-populated post-creation)**:
 > - `bucket_arn` (export: true)
 > - `bucket_region` (export: true)
 >
 > **Link (connect)**: access levels read / write / read-write
-> - Credenciales: `access_key_id` (export), `secret_access_key` (export secret)
+> - Credentials: `access_key_id` (export), `secret_access_key` (export secret)
 >
-> Querés ajustar algo?
+> Do you want to adjust anything?
 
-El usuario solo dice "si" o tweakea lo que necesite. No tiene que diseñar nada desde cero.
+The user only says "yes" or tweaks what they need. They don't have to design anything from scratch.
 
 ### Phase 4: Generate Files
 
-Con la propuesta confirmada, generar todos los archivos usando `np-service-specs` y `np-service-workflows` para las convenciones. Usar el servicio de referencia como base de los templates (workflows, scripts, entrypoint) adaptando al provider y recursos específicos.
+With the confirmed proposal, generate all files using `np-service-specs` and `np-service-workflows` for conventions. Use the reference service as a base for templates (workflows, scripts, entrypoint) adapting to the specific provider and resources.
 
 ### Phase 7: Validate
 

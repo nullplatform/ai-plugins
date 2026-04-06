@@ -5,7 +5,7 @@ description: Use when writing or modifying nullplatform service workflows and sc
 
 # Nullplatform Service Scripts
 
-Convenciones para workflows YAML, scripts de build_context/do_tofu, y entrypoints de servicios.
+Conventions for YAML workflows, build_context/do_tofu scripts, and service entrypoints.
 
 ## Critical Rules
 

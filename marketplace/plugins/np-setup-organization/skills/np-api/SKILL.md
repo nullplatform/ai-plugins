@@ -6,226 +6,226 @@ allowed-tools: Bash(${CLAUDE_PLUGIN_ROOT}/skills/np-api/scripts/*.sh)
 
 # np-api
 
-Skill para explorar y consultar la API de Nullplatform.
+Skill to explore and query the Nullplatform API.
 
-## Comando: $ARGUMENTS
+## Command: $ARGUMENTS
 
-## Comandos Disponibles
+## Available Commands
 
-| Comando | Proposito |
-|---------|-----------|
-| `/np-api` | Mapa de entidades y relaciones |
-| `/np-api check-auth` | Verificar autenticacion con Nullplatform |
-| `/np-api search-endpoint <term>` | Buscar endpoints por termino |
-| `/np-api describe-endpoint <endpoint>` | Documentacion completa del endpoint |
-| `/np-api fetch-api <url>` | Ejecutar request a la API |
+| Command | Purpose |
+|---------|---------|
+| `/np-api` | Entity map and relationships |
+| `/np-api check-auth` | Verify authentication with Nullplatform |
+| `/np-api search-endpoint <term>` | Search endpoints by term |
+| `/np-api describe-endpoint <endpoint>` | Complete endpoint documentation |
+| `/np-api fetch-api <url>` | Execute API request |
 
 ---
 
-## Si $ARGUMENTS es "check-auth" → Verificar Autenticacion
+## If $ARGUMENTS is "check-auth" → Verify Authentication
 
-Ejecutar el script de verificacion:
+Run the verification script:
 
 ```bash
 ${CLAUDE_PLUGIN_ROOT}/skills/np-api/scripts/check_auth.sh
 ```
 
-Mostrar el resultado al usuario. Si falla, indicar las opciones:
+Show the result to the user. If it fails, indicate the options:
 
-**RECOMENDADO: NP_API_KEY (no expira, token cacheado en ~/.claude/)**
+**RECOMMENDED: NP_API_KEY (doesn't expire, token cached in ~/.claude/)**
 
 ```bash
-export NP_API_KEY='tu-api-key'
+export NP_API_KEY='your-api-key'
 ```
 
-1. Ir a Nullplatform UI -> Settings -> API Keys
-2. Crear nueva API Key para la organización
-3. Agregar `export NP_API_KEY='...'` a `~/.zshrc` o `~/.bashrc`
+1. Go to Nullplatform UI -> Settings -> API Keys
+2. Create new API Key for the organization
+3. Add `export NP_API_KEY='...'` to `~/.zshrc` or `~/.bashrc`
 
-**Alternativa: NP_TOKEN (expira en ~24h)**
+**Alternative: NP_TOKEN (expires in ~24h)**
 
 ```bash
 export NP_TOKEN='eyJ...'
 ```
 
-1. Ir a la UI de Nullplatform
-2. Click en tu perfil (esquina superior derecha)
-3. Click en "Copy personal access token"
+1. Go to the Nullplatform UI
+2. Click on your profile (top right corner)
+3. Click on "Copy personal access token"
 
 ---
 
-## Si $ARGUMENTS comienza con "search-endpoint" → Buscar Endpoints
+## If $ARGUMENTS starts with "search-endpoint" → Search Endpoints
 
-Ejecutar:
+Run:
 
 ```bash
 ${CLAUDE_PLUGIN_ROOT}/skills/np-api/scripts/np-api.sh search-endpoint <term>
 ```
 
-Muestra lista de endpoints que contienen el termino buscado.
+Shows a list of endpoints containing the searched term.
 
 ---
 
-## Si $ARGUMENTS comienza con "describe-endpoint" → Documentacion de Endpoint
+## If $ARGUMENTS starts with "describe-endpoint" → Endpoint Documentation
 
-Ejecutar:
+Run:
 
 ```bash
 ${CLAUDE_PLUGIN_ROOT}/skills/np-api/scripts/np-api.sh describe-endpoint <endpoint>
 ```
 
-Muestra documentacion completa del endpoint: parametros, respuesta, navegacion, ejemplos.
+Shows complete endpoint documentation: parameters, response, navigation, examples.
 
 ---
 
-## Si $ARGUMENTS comienza con "fetch-api" → Request a la API
+## If $ARGUMENTS starts with "fetch-api" → API Request
 
-Ejecutar:
+Run:
 
 ```bash
 ${CLAUDE_PLUGIN_ROOT}/skills/np-api/scripts/np-api.sh fetch-api <url>
 ```
 
-Retorna el JSON de la respuesta de la API.
+Returns the JSON response from the API.
 
 ---
 
-## Si $ARGUMENTS comienza con "resend-notification" → Redirigir
+## If $ARGUMENTS starts with "resend-notification" → Redirect
 
-> **Movido**: El comando resend-notification se movio a `/np-service-craft resend-notification <id> [channel_id]`
-> porque requiere la API key admin (de `secrets.tfvars`), no la key de troubleshooting de np-api.
+> **Moved**: The resend-notification command was moved to `/np-service-craft resend-notification <id> [channel_id]`
+> because it requires the admin API key (from `secrets.tfvars`), not the troubleshooting key from np-api.
 
-Informar al usuario que use `/np-service-craft resend-notification <id> [channel_id]` en su lugar.
+Inform the user to use `/np-service-craft resend-notification <id> [channel_id]` instead.
 
-Para **buscar** notificaciones y **ver resultados** (lectura, no requiere admin):
+For **searching** notifications and **viewing results** (read-only, doesn't require admin):
 
 ```bash
-# Buscar notificaciones
+# Search notifications
 ${CLAUDE_PLUGIN_ROOT}/skills/np-api/scripts/np-api.sh fetch-api "/notification?nrn=<nrn_encoded>&source=service"
 
-# Ver resultado de entrega por canal
+# View delivery result per channel
 ${CLAUDE_PLUGIN_ROOT}/skills/np-api/scripts/np-api.sh fetch-api "/notification/<id>/result"
 ```
 
 ---
 
-## Si $ARGUMENTS esta vacio → Mostrar Mapa de Entidades
+## If $ARGUMENTS is empty → Show Entity Map
 
-Ejecutar:
+Run:
 
 ```bash
 ${CLAUDE_PLUGIN_ROOT}/skills/np-api/scripts/np-api.sh
 ```
 
-Muestra el mapa de entidades y jerarquia de Nullplatform.
+Shows the Nullplatform entity map and hierarchy.
 
 ---
 
-## Flujo Recomendado
+## Recommended Flow
 
-Para explorar la API de forma segura:
+To explore the API safely:
 
-1. **Primero**: `/np-api` para ver el mapa de entidades
-2. **Segundo**: `/np-api search-endpoint <term>` para encontrar el endpoint
-3. **Tercero**: `/np-api describe-endpoint <endpoint>` para ver la documentacion
-4. **Cuarto**: `/np-api fetch-api <url>` para ejecutar el request
+1. **First**: `/np-api` to see the entity map
+2. **Second**: `/np-api search-endpoint <term>` to find the endpoint
+3. **Third**: `/np-api describe-endpoint <endpoint>` to see the documentation
+4. **Fourth**: `/np-api fetch-api <url>` to execute the request
 
-### Checklist antes de fetch-api
+### Checklist before fetch-api
 
-- [ ] ¿Hice `search-endpoint` para confirmar que el endpoint existe?
-- [ ] ¿Hice `describe-endpoint` para conocer los parametros validos?
-- [ ] ¿Estoy usando parametros documentados, no inferidos?
-
----
-
-## Anti-patrones (NO hacer)
-
-| Mal | Por que | Bien |
-|-----|---------|------|
-| `fetch-api "/scope/123"` directo | Asumis que el endpoint existe | Primero `search-endpoint scope` |
-| `fetch-api "/scope?application_id=X"` | Asumis query params | Primero `describe-endpoint /scope` |
-| Inferir endpoints de respuestas JSON | La API puede no seguir convenciones REST | Siempre verificar con `search-endpoint` o `describe-endpoint` |
+- [ ] Did I run `search-endpoint` to confirm the endpoint exists?
+- [ ] Did I run `describe-endpoint` to know the valid parameters?
+- [ ] Am I using documented parameters, not inferred ones?
 
 ---
 
-## Scripts Adicionales
+## Anti-patterns (DO NOT do)
 
-| Script | Proposito |
-|--------|-----------|
-| `${CLAUDE_PLUGIN_ROOT}/skills/np-api/scripts/fetch_np_api_url.sh <url>` | Fetch directo de API |
-| `${CLAUDE_PLUGIN_ROOT}/skills/np-api/scripts/deploy-agent-dump.sh <deployment_id>` | Dump K8s de deployment |
-| `${CLAUDE_PLUGIN_ROOT}/skills/np-api/scripts/scope-agent-dump.sh <scope_id>` | Dump K8s de scope |
+| Bad | Why | Good |
+|-----|-----|------|
+| `fetch-api "/scope/123"` directly | You're assuming the endpoint exists | First `search-endpoint scope` |
+| `fetch-api "/scope?application_id=X"` | You're assuming query params | First `describe-endpoint /scope` |
+| Inferring endpoints from JSON responses | The API may not follow REST conventions | Always verify with `search-endpoint` or `describe-endpoint` |
 
 ---
 
-## Documentar Nuevos Endpoints
+## Additional Scripts
 
-Cuando descubras un endpoint nuevo o el usuario pida documentarlo:
+| Script | Purpose |
+|--------|---------|
+| `${CLAUDE_PLUGIN_ROOT}/skills/np-api/scripts/fetch_np_api_url.sh <url>` | Direct API fetch |
+| `${CLAUDE_PLUGIN_ROOT}/skills/np-api/scripts/deploy-agent-dump.sh <deployment_id>` | K8s dump of deployment |
+| `${CLAUDE_PLUGIN_ROOT}/skills/np-api/scripts/scope-agent-dump.sh <scope_id>` | K8s dump of scope |
 
-1. Editar el archivo `.md` correspondiente en `docs/` (o crear uno nuevo)
-2. Agregar una seccion con este formato:
+---
+
+## Document New Endpoints
+
+When you discover a new endpoint or the user asks to document it:
+
+1. Edit the corresponding `.md` file in `docs/` (or create a new one)
+2. Add a section with this format:
 
 ```markdown
-## @endpoint /ruta/del/endpoint
+## @endpoint /path/to/endpoint
 
-Descripcion breve de que hace.
+Brief description of what it does.
 
-### Parametros
-- `param1` (path|query, required|optional): Descripcion
+### Parameters
+- `param1` (path|query, required|optional): Description
 
-### Respuesta
-- `campo1`: Descripcion
-- `campo2`: Descripcion
+### Response
+- `field1`: Description
+- `field2`: Description
 
-### Navegacion
-- **→ entidad**: `campo` → `/otro/endpoint`
-- **← desde**: `/endpoint?filtro={id}`
+### Navigation
+- **→ entity**: `field` → `/other/endpoint`
+- **← from**: `/endpoint?filter={id}`
 
-### Ejemplo
+### Example
 \```bash
-np-api fetch-api "/ruta/del/endpoint/123"
+np-api fetch-api "/path/to/endpoint/123"
 \```
 
-### Notas
-- Comportamientos no obvios
-- Errores comunes
+### Notes
+- Non-obvious behaviors
+- Common errors
 ```
 
-El CLI detecta `## @endpoint` como marcador y extrae la documentacion automaticamente.
+The CLI detects `## @endpoint` as a marker and extracts the documentation automatically.
 
 ---
 
-## Generar Reporte de Sesion
+## Generate Session Report
 
-Cuando el usuario pida "genera un reporte de np-api" o "np-api report":
+When the user asks "generate an np-api report" or "np-api report":
 
-### Paso 1: Extraer actividad de la conversacion
+### Step 1: Extract conversation activity
 
-Revisar toda la conversacion y extraer:
+Review the entire conversation and extract:
 
-- Prompts del usuario (resumidos)
-- Llamadas a `/np-api` (comando completo)
-- Resultados de cada llamada (exito/fallo)
-- Decisiones tomadas basadas en los resultados
+- User prompts (summarized)
+- `/np-api` calls (complete command)
+- Results of each call (success/failure)
+- Decisions made based on results
 
-### Paso 2: Generar tabla de actividad
+### Step 2: Generate activity table
 
-| Segs | Accion | Contenido | Exitosa |
-|-----|--------|-----------|---------|
-| 0 | prompt | Resumen del prompt del usuario | - |
-| N | np-api | Comando ejecutado | ✓ / ✗ |
+| Secs | Action | Content | Successful |
+|------|--------|---------|------------|
+| 0 | prompt | User prompt summary | - |
+| N | np-api | Executed command | ✓ / ✗ |
 
-### Paso 3: Analizar errores
+### Step 3: Analyze errors
 
-Para cada llamada fallida:
+For each failed call:
 
-- **Comando**: Que se ejecuto
-- **Resultado**: Que devolvio
-- **Causa**: Por que fallo (error de usuario vs error de documentacion)
-- **Fix sugerido**: Si es error de documentacion, indicar archivo, linea, y cambio especifico
+- **Command**: What was executed
+- **Result**: What it returned
+- **Cause**: Why it failed (user error vs documentation error)
+- **Suggested fix**: If documentation error, indicate file, line, and specific change
 
-### Paso 4: Generar sugerencias de mejora
+### Step 4: Generate improvement suggestions
 
-Lista de cambios a docs/*.md con formato:
+List of changes to docs/*.md with format:
 
-- [ ] archivo.md:linea - Descripcion del cambio
+- [ ] file.md:line - Description of change

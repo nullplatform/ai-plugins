@@ -1,18 +1,18 @@
 # Azure Gotchas
 
-## Credentials para Testing Local
+## Credentials for Local Testing
 
-Antes de correr el agente localmente con servicios Azure:
+Before running the agent locally with Azure services:
 
 ```bash
 az login
 az account set --subscription <subscription-id>
 ```
 
-El subscription ID se configura en `values.yaml` y `build_context` lo exporta como `ARM_SUBSCRIPTION_ID`.
+The subscription ID is configured in `values.yaml` and `build_context` exports it as `ARM_SUBSCRIPTION_ID`.
 
 ## Cosmos DB
 
-- El throughput mode (provisioned vs serverless) no se puede cambiar despues de crear la cuenta
-- Los containers se crean dentro de databases, no directamente en la cuenta
-- Para serverless, no especificar `throughput` en el container
+- The throughput mode (provisioned vs serverless) cannot be changed after creating the account
+- Containers are created inside databases, not directly in the account
+- For serverless, do not specify `throughput` on the container

@@ -59,9 +59,9 @@ Consolidated troubleshooting for service development and testing.
 
 | Problem | Cause | Solution |
 |---------|-------|----------|
-| "config profile (X) could not be found" | El agente hereda `AWS_PROFILE` (u otra env var) del shell donde se inicio, y ese profile no existe o no es el correcto | Configurar el profile correcto en `values.yaml`. El `build_context` debe overridear siempre (sin `[ -z ]` check). Ver `np-service-workflows` docs/build-context-patterns.md |
-| Cloud credentials error running tofu | No active cloud session para el profile configurado | `aws sso login --profile <name>` o `az login` antes de arrancar el agente |
-| Scripts crean recursos auxiliares que fallan | El build_context puede crear recursos (ej: bucket de tfstate) que no estan en deployment/main.tf y requieren permisos extra | Revisar los scripts ademas del terraform para entender todos los permisos necesarios |
+| "config profile (X) could not be found" | The agent inherits `AWS_PROFILE` (or other env var) from the shell where it was started, and that profile doesn't exist or isn't correct | Configure the correct profile in `values.yaml`. The `build_context` must always override (without `[ -z ]` check). See `np-service-workflows` docs/build-context-patterns.md |
+| Cloud credentials error running tofu | No active cloud session for the configured profile | `aws sso login --profile <name>` or `az login` before starting the agent |
+| Scripts create auxiliary resources that fail | The build_context may create resources (e.g., tfstate bucket) that aren't in deployment/main.tf and require extra permissions | Review scripts in addition to terraform to understand all required permissions |
 | AWS lifecycle rule "missing filter" | AWS provider requires explicit `filter {}` | Add `filter {}` even when applying to all objects |
 
 ## Terraform Issues

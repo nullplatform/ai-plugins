@@ -1,8 +1,8 @@
-# Arbol de Decision - Azure ARO Infrastructure
+# Decision Tree - Azure ARO Infrastructure
 
-> Invocado desde el paso 4 del wizard principal (`SKILL.md`).
-> ARO usa OpenShift en lugar de AKS.
+> Invoked from step 4 of the main wizard (`SKILL.md`).
+> ARO uses OpenShift instead of AKS.
 
-TODO: Implementar siguiendo el patron de [azure.md](azure.md).
+TODO: Implement following the pattern in [azure.md](azure.md).
 
-Modulos esperados: resource_group, vnet, aro, dns, private_dns, base_security, cert_manager, istio, external_dns, prometheus.
+Expected modules: resource_group, vnet, aro, dns, private_dns, base_security, cert_manager, istio, external_dns, prometheus.

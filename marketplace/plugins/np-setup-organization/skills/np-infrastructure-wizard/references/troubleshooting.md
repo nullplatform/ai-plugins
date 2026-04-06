@@ -1,46 +1,46 @@
 # Troubleshooting
 
-Para problemas especificos de cada cloud ver: [aws-troubleshooting.md](aws-troubleshooting.md).
+For cloud-specific problems see: [aws-troubleshooting.md](aws-troubleshooting.md).
 
-## Certificado en PENDING_VALIDATION
+## Certificate in PENDING_VALIDATION
 
-**Causa**: La subzona DNS no esta delegada desde `nullapps.io`.
+**Cause**: The DNS subzone is not delegated from `nullapps.io`.
 
-**Solucion**:
-1. Verificar delegacion: `dig NS {slug}.nullapps.io +short`
-2. Si no hay NS records, solicitar delegacion a Nullplatform (ver paso 5.4 del wizard)
-3. Una vez delegado, el certificado se validara automaticamente
+**Solution**:
+1. Verify delegation: `dig NS {slug}.nullapps.io +short`
+2. If there are no NS records, request delegation from Nullplatform (see wizard step 5.4)
+3. Once delegated, the certificate will validate automatically
 
-## Cluster no se crea
+## Cluster doesn't get created
 
-- Verificar quotas del cloud provider
-- Revisar permisos del service account/role
+- Verify cloud provider quotas
+- Review service account/role permissions
 
-## Agent no conecta
+## Agent doesn't connect
 
-- Verificar autenticacion: invocar `/np-api check-auth`
-- Verificar `tags_selectors` coinciden con la configuracion esperada
+- Verify authentication: invoke `/np-api check-auth`
+- Verify `tags_selectors` match the expected configuration
 
-## DNS no resuelve
+## DNS doesn't resolve
 
-- Verificar que external-dns esta corriendo
-- Revisar configuracion del DNS provider
-- Verificar delegacion de subzona
+- Verify that external-dns is running
+- Review DNS provider configuration
+- Verify subzone delegation
 
 ## Error: namespace already exists
 
-**Causa**: Si un `tofu apply` falla a mitad de ejecucion (ej: timeout de certificado), algunos recursos ya fueron creados pero no quedaron registrados en el state de Terraform.
+**Cause**: If a `tofu apply` fails mid-execution (e.g., certificate timeout), some resources were already created but were not registered in the Terraform state.
 
-**Solucion**: Importar el recurso existente al state:
+**Solution**: Import the existing resource into the state:
 
 ```bash
 tofu import module.ingress.kubernetes_namespace_v1.namespace nullplatform
 tofu apply
 ```
 
-**Prevencion**: Seguir el flujo de DNS primero (paso 5) para evitar timeouts en certificados.
+**Prevention**: Follow the DNS-first flow (step 5) to avoid certificate timeouts.
 
-## Validacion post-apply (generica)
+## Post-apply validation (generic)
 
 ```bash
 kubectl cluster-info

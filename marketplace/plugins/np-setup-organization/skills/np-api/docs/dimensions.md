@@ -1,24 +1,24 @@
 # Dimensions
 
-Dimensions definen los ejes de variacion (environment, country, region, etc.) para clasificar
-scopes, servicios, parametros, approvals y runtime configurations.
+Dimensions define the variation axes (environment, country, region, etc.) to classify
+scopes, services, parameters, approvals, and runtime configurations.
 
-**IMPORTANTE**: Las dimensions se crean a un nivel de NRN especifico, NO necesariamente a nivel
-de organizacion. Cascadean hacia abajo (los hijos heredan). No puede haber la misma dimension
-en una relacion parent-child (si, en siblings).
+**IMPORTANT**: Dimensions are created at a specific NRN level, NOT necessarily at the
+organization level. They cascade downward (children inherit). The same dimension cannot exist
+in a parent-child relationship (but can in siblings).
 
-Se usan al crear scopes, servicios, deployments y en policies de approvals.
+They are used when creating scopes, services, deployments, and in approval policies.
 
 ## @endpoint /dimension
 
-Lista dimensions disponibles en un NRN, incluyendo dimensions heredadas de niveles superiores.
+Lists dimensions available at an NRN, including dimensions inherited from upper levels.
 
-### Parametros
-- `nrn` (query, required): NRN con URL encoding. Acepta cualquier nivel de la jerarquia.
-  - Escanea hacia arriba: devuelve dimensions del NRN especificado y todos sus padres
-  - Soporta wildcards: `account=*` para escanear hijos
+### Parameters
+- `nrn` (query, required): URL-encoded NRN. Accepts any hierarchy level.
+  - Scans upward: returns dimensions of the specified NRN and all its parents
+  - Supports wildcards: `account=*` to scan children
 
-### Respuesta
+### Response
 ```json
 {
   "paging": {"total": 2, "offset": 0, "limit": 30},
@@ -42,21 +42,21 @@ Lista dimensions disponibles en un NRN, incluyendo dimensions heredadas de nivel
 }
 ```
 
-### Campos clave
-- `id`: ID numerico de la dimension
-- `name`: Nombre visible (ej: "Environment", "Country")
-- `slug`: Identificador URL-friendly. **Este es el key que se usa en el campo `dimensions` de scopes y servicios**
-- `nrn`: NRN donde fue creada la dimension (puede ser org, account, namespace, etc.)
-- `order`: Orden de prioridad/display
-- `values[]`: Valores posibles para la dimension
-  - `id`: ID numerico del valor
-  - `name`: Nombre visible (ej: "AR", "Production")
-  - `slug`: **Este es el value que se usa en el campo `dimensions`** (ej: "argentina", "production")
-  - `nrn`: NRN del valor (puede ser un nivel mas bajo que la dimension misma)
+### Key fields
+- `id`: Numeric dimension ID
+- `name`: Visible name (e.g., "Environment", "Country")
+- `slug`: URL-friendly identifier. **This is the key used in the `dimensions` field of scopes and services**
+- `nrn`: NRN where the dimension was created (can be org, account, namespace, etc.)
+- `order`: Priority/display order
+- `values[]`: Possible values for the dimension
+  - `id`: Numeric value ID
+  - `name`: Visible name (e.g., "AR", "Production")
+  - `slug`: **This is the value used in the `dimensions` field** (e.g., "argentina", "production")
+  - `nrn`: Value's NRN (can be a lower level than the dimension itself)
 
-### Relacion con otras entidades
+### Relationship with other entities
 
-El campo `dimensions` en scopes, servicios, links, approvals y runtime configurations usa los slugs:
+The `dimensions` field in scopes, services, links, approvals, and runtime configurations uses slugs:
 ```json
 {
   "dimensions": {
@@ -65,49 +65,49 @@ El campo `dimensions` en scopes, servicios, links, approvals y runtime configura
   }
 }
 ```
-Donde `"environment"` es el slug de la dimension y `"production"` es el slug del valor.
+Where `"environment"` is the dimension slug and `"production"` is the value slug.
 
-### NRN y herencia de dimensions
+### NRN and dimension inheritance
 
-Las dimensions cascadean hacia abajo en la jerarquia de NRN:
-- Una dimension creada en `organization=1` es visible en todos los accounts, namespaces y applications
-- Una dimension creada en `organization=1:account=2` es visible solo en ese account y sus hijos
+Dimensions cascade downward in the NRN hierarchy:
+- A dimension created at `organization=1` is visible in all accounts, namespaces, and applications
+- A dimension created at `organization=1:account=2` is visible only in that account and its children
 
-**Restriccion parent-child**: No puede existir la misma dimension (mismo slug) en un NRN parent Y un NRN child. Si puede existir en siblings (ej: dos accounts diferentes pueden tener dimensions con el mismo slug).
+**Parent-child restriction**: The same dimension (same slug) cannot exist in both a parent NRN AND a child NRN. It can exist in siblings (e.g., two different accounts can have dimensions with the same slug).
 
-### Ejemplo
+### Example
 ```bash
-# Dimensions de la organizacion (nivel mas alto)
+# Organization dimensions (highest level)
 np-api fetch-api "/dimension?nrn=organization%3D1255165411"
 
-# Dimensions visibles desde un account (incluye heredadas de org)
+# Dimensions visible from an account (includes inherited from org)
 np-api fetch-api "/dimension?nrn=organization%3D1255165411%3Aaccount%3D95118862"
 
-# Dimensions de todos los accounts (wildcard)
+# Dimensions from all accounts (wildcard)
 np-api fetch-api "/dimension?nrn=organization%3D1255165411%3Aaccount%3D*"
 
-# Solo las dimensions activas con sus valores
+# Only active dimensions with their values
 np-api fetch-api "/dimension?nrn=organization%3D1255165411" | jq '[.results[] | {name: .slug, values: [.values[] | .slug]}]'
 ```
 
-### Notas
-- Las dimensions se crean a un nivel de NRN especifico, no necesariamente a nivel de org
-- Los valores de dimension pueden tener NRN propio (a nivel mas bajo que la dimension)
-- Al crear un scope, los valores de `dimensions` deben coincidir con slugs validos de este endpoint
-- Al crear un servicio, las `dimensions` restringen en que scopes puede linkearse
-- Se necesitan permisos `ops` para crear/modificar dimensions
-- Precaucion al agregar muchas dimensions: aumenta la complejidad de la matriz de scopes
+### Notes
+- Dimensions are created at a specific NRN level, not necessarily at org level
+- Dimension values can have their own NRN (at a lower level than the dimension)
+- When creating a scope, `dimensions` values must match valid slugs from this endpoint
+- When creating a service, `dimensions` restrict which scopes can link to it
+- `ops` permissions are needed to create/modify dimensions
+- Be cautious when adding many dimensions: it increases the scope matrix complexity
 
 ---
 
 ## @endpoint /dimension/{id}
 
-Obtiene detalle de una dimension especifica (sin sus valores).
+Gets detail of a specific dimension (without its values).
 
-### Parametros
-- `id` (path, required): ID numerico de la dimension
+### Parameters
+- `id` (path, required): Numeric dimension ID
 
-### Respuesta
+### Response
 ```json
 {
   "id": 1599217067,
@@ -121,20 +121,20 @@ Obtiene detalle de una dimension especifica (sin sus valores).
 }
 ```
 
-### Notas
-- No incluye los valores de la dimension (usar `GET /dimension?nrn=...` para obtener valores incluidos)
-- Util para verificar si una dimension especifica existe
+### Notes
+- Does not include dimension values (use `GET /dimension?nrn=...` to get values included)
+- Useful to verify if a specific dimension exists
 
 ---
 
 ## @endpoint /dimension/value
 
-Lista dimension values filtrados por NRN.
+Lists dimension values filtered by NRN.
 
-### Parametros
-- `nrn` (query, required): NRN con URL encoding. Soporta wildcards.
+### Parameters
+- `nrn` (query, required): URL-encoded NRN. Supports wildcards.
 
-### Respuesta
+### Response
 ```json
 {
   "paging": {"total": 10, "offset": 0, "limit": 30},
@@ -152,29 +152,29 @@ Lista dimension values filtrados por NRN.
 }
 ```
 
-### Ejemplo
+### Example
 ```bash
-# Valores de dimension a nivel de organizacion
+# Dimension values at organization level
 np-api fetch-api "/dimension/value?nrn=organization%3D1255165411"
 
-# Valores con wildcard (todos los accounts)
+# Values with wildcard (all accounts)
 np-api fetch-api "/dimension/value?nrn=organization%3D1255165411%3Aaccount%3D*"
 ```
 
-### Notas
-- Util cuando se necesitan solo los valores sin la dimension padre
-- Los valores individuales pueden tener NRN propio a un nivel mas bajo que la dimension
+### Notes
+- Useful when only values are needed without the parent dimension
+- Individual values can have their own NRN at a lower level than the dimension
 
 ---
 
 ## @endpoint /dimension/value/{id}
 
-Obtiene detalle de un dimension value especifico.
+Gets detail of a specific dimension value.
 
-### Parametros
-- `id` (path, required): ID numerico del valor
+### Parameters
+- `id` (path, required): Numeric value ID
 
-### Respuesta
+### Response
 ```json
 {
   "id": 587888267,
@@ -187,6 +187,6 @@ Obtiene detalle de un dimension value especifico.
 }
 ```
 
-### Notas
-- Util para verificar si un valor especifico existe
-- El `slug` es lo que se usa como value en el campo `dimensions` de scopes/servicios
+### Notes
+- Useful to verify if a specific value exists
+- The `slug` is what's used as value in the `dimensions` field of scopes/services

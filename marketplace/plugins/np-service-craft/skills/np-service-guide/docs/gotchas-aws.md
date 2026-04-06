@@ -2,7 +2,7 @@
 
 ## S3 Lifecycle Rules
 
-AWS provider requiere un bloque `filter {}` explicito en lifecycle rules, incluso si aplica a todos los objetos:
+AWS provider requires an explicit `filter {}` block in lifecycle rules, even if it applies to all objects:
 
 ```hcl
 rule {
@@ -13,33 +13,33 @@ rule {
 }
 ```
 
-Sin el `filter {}`, las versiones actuales dan warning y futuras versiones daran error.
+Without `filter {}`, current versions give a warning and future versions will give an error.
 
-## Credentials para Testing Local
+## Credentials for Local Testing
 
-Antes de correr el agente localmente con servicios AWS:
+Before running the agent locally with AWS services:
 
 ```bash
 aws sso login --profile <name>
-aws sts get-caller-identity --profile <name>  # verificar
+aws sts get-caller-identity --profile <name>  # verify
 ```
 
-El profile se configura en `values.yaml` (`aws_profile`) y `build_context` lo exporta como `AWS_PROFILE`.
+The profile is configured in `values.yaml` (`aws_profile`) and `build_context` exports it as `AWS_PROFILE`.
 
-## ARNs en Permissions
+## ARNs in Permissions
 
-Derivar ARNs de nombres en vez de leerlos de `service.attributes`:
+Derive ARNs from names instead of reading them from `service.attributes`:
 
 ```bash
-# S3 (deterministico):
+# S3 (deterministic):
 BUCKET_ARN="arn:aws:s3:::${BUCKET_NAME}"
 
 # RDS:
 DB_ARN="arn:aws:rds:${REGION}:${ACCOUNT_ID}:db:${DB_INSTANCE_NAME}"
 ```
 
-Motivo: `.service.attributes` puede no contener el ARN como campo directo.
+Reason: `.service.attributes` may not contain the ARN as a direct field.
 
 ## IAM Policy: MalformedPolicyDocument
 
-Si ves `"Resource must be in ARN format"`, un ARN esta vacio. Verificar que `build_permissions_context` deriva los ARNs correctamente.
+If you see `"Resource must be in ARN format"`, an ARN is empty. Verify that `build_permissions_context` derives the ARNs correctly.

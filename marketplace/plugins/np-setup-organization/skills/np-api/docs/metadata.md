@@ -1,29 +1,29 @@
 # Metadata (Catalog)
 
-Metadata y metadata specifications de entidades. Tambien conocido como **Catalog** en la
-documentacion oficial (rebranding). El sistema de catalog permite adjuntar metadata estructurada
-y reutilizable a entidades (applications, builds, namespaces).
+Metadata and metadata specifications for entities. Also known as **Catalog** in the
+official documentation (rebranding). The catalog system allows attaching structured
+and reusable metadata to entities (applications, builds, namespaces).
 
-Estos endpoints viven en el microservicio `metadata.nullplatform.io` y se acceden via la API
-publica con el prefijo `/metadata/`.
+These endpoints live in the `metadata.nullplatform.io` microservice and are accessed via the
+public API with the `/metadata/` prefix.
 
-**IMPORTANTE**: Todos los endpoints de este archivo requieren el prefijo `/metadata/` en la URL.
-Ejemplo: para llegar a `metadata.nullplatform.io/metadata_specification` se usa
+**IMPORTANT**: All endpoints in this file require the `/metadata/` prefix in the URL.
+Example: to reach `metadata.nullplatform.io/metadata_specification` use
 `np-api fetch-api "/metadata/metadata_specification?..."`.
 
 ---
 
 ## @endpoint /metadata/metadata_specification
 
-Obtiene el schema formal de metadata para una entidad en un NRN especifico.
-Devuelve los campos requeridos, tipos, enums y descripciones definidos por la organizacion.
+Gets the formal metadata schema for an entity at a specific NRN.
+Returns the required fields, types, enums, and descriptions defined by the organization.
 
-### Parametros
-- `entity` (query, required): Tipo de entidad (`application`, `build`, `namespace`, etc.)
-- `nrn` (query, required): NRN del contexto (URL-encoded). Puede ser a nivel namespace, account u organization.
-- `merge` (query, optional): `true` para mergear specifications heredadas de niveles superiores del NRN
+### Parameters
+- `entity` (query, required): Entity type (`application`, `build`, `namespace`, etc.)
+- `nrn` (query, required): Context NRN (URL-encoded). Can be at namespace, account, or organization level.
+- `merge` (query, optional): `true` to merge inherited specifications from upper NRN levels
 
-### Respuesta
+### Response
 ```json
 {
   "paging": {"offset": 0, "limit": 30},
@@ -56,62 +56,62 @@ Devuelve los campos requeridos, tipos, enums y descripciones definidos por la or
 }
 ```
 
-### Navegacion
-- **← desde application creation**: Se necesita para saber que metadata pedir al usuario al crear una app
-- **← desde build metadata**: Se usa para validar metadata de builds
+### Navigation
+- **← from application creation**: Needed to know what metadata to request from the user when creating an app
+- **← from build metadata**: Used to validate build metadata
 
-### Ejemplo
+### Example
 ```bash
-# Metadata specification para aplicaciones en un namespace
+# Metadata specification for applications in a namespace
 np-api fetch-api "/metadata/metadata_specification?entity=application&nrn=organization%3D1255165411%3Aaccount%3D95118862%3Anamespace%3D463208973&merge=true"
 ```
 
-### Propiedades de Catalog en el schema
+### Catalog Properties in the schema
 
-Las properties del JSON Schema pueden tener campos adicionales que controlan el comportamiento
-en la UI (sistema Catalog):
+The JSON Schema properties may have additional fields that control behavior
+in the UI (Catalog system):
 
-| Campo | Descripcion | Ejemplo |
+| Field | Description | Example |
 |-------|-------------|---------|
-| `visibleOn` | Controla donde se muestra el campo en la UI | `["create", "read", "update", "list"]` |
-| `tag` | Habilita el campo como tag/filtro en dashboards | `true` o `"custom_tag_name"` |
-| `uiSchema` | Override del layout automatico del formulario | `{"ui:widget": "textarea"}` |
-| `links` | Renderiza bloques de recursos dedicados | Ver docs oficiales |
+| `visibleOn` | Controls where the field is shown in the UI | `["create", "read", "update", "list"]` |
+| `tag` | Enables the field as a tag/filter in dashboards | `true` or `"custom_tag_name"` |
+| `uiSchema` | Override of the automatic form layout | `{"ui:widget": "textarea"}` |
+| `links` | Renders dedicated resource blocks | See official docs |
 
-**`visibleOn` valores:**
-- `create`: visible al crear la entidad
-- `read`: visible al ver la entidad
-- `update`: visible al editar la entidad
-- `list`: visible en listados/tablas
+**`visibleOn` values:**
+- `create`: visible when creating the entity
+- `read`: visible when viewing the entity
+- `update`: visible when editing the entity
+- `list`: visible in listings/tables
 
-### Entidades soportadas
-- `application`: metadata de aplicaciones
-- `build`: metadata de builds (ej: test coverage, security scan results)
-- `namespace`: metadata de namespaces
+### Supported entities
+- `application`: application metadata
+- `build`: build metadata (e.g., test coverage, security scan results)
+- `namespace`: namespace metadata
 
-### Notas
-- El `nrn` en el query param debe estar URL-encoded (`:` → `%3A`, `=` → `%3D`)
-- Los campos del schema son **organizacion-especificos**: cada org define sus propios campos
-- `merge=true` combina specifications de todos los niveles del NRN (org + account + namespace)
-- El campo `schema` sigue el formato JSON Schema draft-07
-- `required` indica campos obligatorios al crear la entidad
-- `enum` en las properties define los valores validos (se muestran como dropdowns en el UI)
-- Si `results` esta vacio, la organizacion no requiere metadata para esa entidad
-- **Catalog vs Metadata**: "Catalog" es el nombre nuevo en la documentacion oficial; la API sigue usando `/metadata/` como prefijo
-- Los campos con `tag: true` se indexan y permiten filtrado rapido en la UI
-- `visibleOn` es clave para controlar que campos aparecen en cada contexto de la UI
+### Notes
+- The `nrn` in the query param must be URL-encoded (`:` → `%3A`, `=` → `%3D`)
+- Schema fields are **organization-specific**: each org defines its own fields
+- `merge=true` combines specifications from all NRN levels (org + account + namespace)
+- The `schema` field follows JSON Schema draft-07 format
+- `required` indicates mandatory fields when creating the entity
+- `enum` in properties defines valid values (shown as dropdowns in the UI)
+- If `results` is empty, the organization doesn't require metadata for that entity
+- **Catalog vs Metadata**: "Catalog" is the new name in official documentation; the API still uses `/metadata/` as prefix
+- Fields with `tag: true` are indexed and allow fast filtering in the UI
+- `visibleOn` is key to controlling which fields appear in each UI context
 
 ---
 
 ## @endpoint /metadata/{entity}/{id}
 
-Lee metadata de una entidad especifica.
+Reads metadata of a specific entity.
 
-### Parametros
-- `entity` (path, required): Tipo de entidad (`application`, `build`, `namespace`)
-- `id` (path, required): ID de la entidad
+### Parameters
+- `entity` (path, required): Entity type (`application`, `build`, `namespace`)
+- `id` (path, required): Entity ID
 
-### Respuesta (GET)
+### Response (GET)
 ```json
 {
   "application": {
@@ -124,15 +124,15 @@ Lee metadata de una entidad especifica.
 }
 ```
 
-### Ejemplo
+### Example
 ```bash
-# Leer metadata de una aplicacion
+# Read application metadata
 np-api fetch-api "/metadata/application/489238271"
 
-# Leer metadata de multiples entidades por ID
+# Read metadata for multiple entities by ID
 np-api fetch-api "/metadata/application?id=123,456,789"
 ```
 
-### Notas
-- La metadata de una aplicacion tambien se incluye en `GET /application/{id}` (campo `metadata`)
-- Pero la lista `GET /application` NO incluye metadata - requiere fetch individual o usar este endpoint
+### Notes
+- Application metadata is also included in `GET /application/{id}` (`metadata` field)
+- But the list `GET /application` does NOT include metadata - requires individual fetch or using this endpoint

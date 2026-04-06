@@ -5,107 +5,107 @@ description: This skill should be used when the user asks "why did my scope fail
 
 # Nullplatform Setup Troubleshooting
 
-Skill para diagnosticar por qué fallaron entidades en Nullplatform.
+Skill to diagnose why entities failed in Nullplatform.
 
-## Comandos Disponibles
+## Available Commands
 
-| Comando | Propósito |
-|---------|-----------|
-| `/np-setup-troubleshooting scope <id>` | Diagnosticar por qué falló un scope |
-| `/np-setup-troubleshooting app <id>` | Diagnosticar por qué falló una aplicación |
+| Command | Purpose |
+|---------|---------|
+| `/np-setup-troubleshooting scope <id>` | Diagnose why a scope failed |
+| `/np-setup-troubleshooting app <id>` | Diagnose why an application failed |
 
 ---
 
-## Comando: scope <id>
+## Command: scope <id>
 
-Diagnostica por qué un scope está en estado `failed`.
+Diagnoses why a scope is in `failed` state.
 
-### Flujo
+### Flow
 
-1. **Obtener el scope**:
-   - Invocar `/np-api fetch-api "/scope/{id}"`
-   - Extraer `instance_id` de la respuesta
+1. **Get the scope**:
+   - Invoke `/np-api fetch-api "/scope/{id}"`
+   - Extract `instance_id` from the response
 
-2. **Listar actions del service**:
-   - Invocar `/np-api fetch-api "/service/{instance_id}/action"`
-   - Buscar actions con `status: failed`
+2. **List service actions**:
+   - Invoke `/np-api fetch-api "/service/{instance_id}/action"`
+   - Search for actions with `status: failed`
 
-3. **Para cada action fallida**:
-   - Invocar `/np-api fetch-api "/service/{instance_id}/action/{action_id}?include_messages=true"`
-   - Extraer los mensajes de error
+3. **For each failed action**:
+   - Invoke `/np-api fetch-api "/service/{instance_id}/action/{action_id}?include_messages=true"`
+   - Extract error messages
 
-4. **Generar reporte**:
-   - Resumir los errores encontrados
-   - Interpretar los mensajes técnicos
-   - Sugerir posibles soluciones
+4. **Generate report**:
+   - Summarize the errors found
+   - Interpret technical messages
+   - Suggest possible solutions
 
-### Ejemplo de uso
+### Usage example
 
 ```
-Usuario: El scope 1019650520 está en failed, ¿por qué?
+User: Scope 1019650520 is in failed state, why?
 
-Claude: Usaré /np-setup-troubleshooting scope 1019650520 para diagnosticar.
+Claude: I'll use /np-setup-troubleshooting scope 1019650520 to diagnose.
 ```
 
-### Errores comunes
+### Common errors
 
-| Error | Causa probable | Solución |
+| Error | Probable cause | Solution |
 |-------|----------------|----------|
-| "You're not authorized to perform this operation" | API key sin permisos | Ver **Diagnóstico de Permisos** abajo |
-| "Timeout waiting for ingress reconciliation" | Problemas de networking K8s | Revisar configuración de ingress y certificados |
-| "ECR repository not found" | Falta ECR o permisos | Ejecutar `/np-infrastructure-wizard` |
-| "Unsupported DNS type 'aws'" | `dns_type` incorrecto en terraform.tfvars | Ver **Diagnóstico de dns_type** abajo |
+| "You're not authorized to perform this operation" | API key without permissions | See **Permission Diagnosis** below |
+| "Timeout waiting for ingress reconciliation" | K8s networking issues | Review ingress and certificate configuration |
+| "ECR repository not found" | Missing ECR or permissions | Run `/np-infrastructure-wizard` |
+| "Unsupported DNS type 'aws'" | Incorrect `dns_type` in terraform.tfvars | See **dns_type Diagnosis** below |
 
-### Diagnóstico de Permisos (para "not authorized")
+### Permission Diagnosis (for "not authorized")
 
-Cuando el error contiene "not authorized", ejecutar diagnóstico extendido de API keys:
+When the error contains "not authorized", run extended API key diagnosis:
 
-#### Flujo Adicional
+#### Additional Flow
 
-1. **Identificar el notification channel del scope**:
-   - Del scope fallido, obtener el `nrn`
-   - Invocar `/np-api fetch-api "https://notifications.nullplatform.com/notification/channel?nrn={nrn}&showDescendants=true"`
-   - Buscar canales de tipo `agent`
+1. **Identify the scope's notification channel**:
+   - From the failed scope, get the `nrn`
+   - Invoke `/np-api fetch-api "https://notifications.nullplatform.com/notification/channel?nrn={nrn}&showDescendants=true"`
+   - Search for `agent` type channels
 
-2. **Obtener la API key del canal**:
-   - Invocar `/np-api fetch-api "https://notifications.nullplatform.com/notification/channel/{channel_id}"`
-   - El nombre de la API key está en `configuration.agent.api_key` (parcialmente visible)
-   - Buscar la API key completa: `/np-api fetch-api "/api-key?name={nombre_api_key}"`
+2. **Get the channel's API key**:
+   - Invoke `/np-api fetch-api "https://notifications.nullplatform.com/notification/channel/{channel_id}"`
+   - The API key name is in `configuration.agent.api_key` (partially visible)
+   - Search for the complete API key: `/np-api fetch-api "/api-key?name={api_key_name}"`
 
-3. **Comparar roles de la API key**:
-   - Invocar `/np-api fetch-api "/api-key/{api_key_id}"`
-   - Extraer `grants[].role_slug`
-   - Verificar contra roles requeridos
+3. **Compare API key roles**:
+   - Invoke `/np-api fetch-api "/api-key/{api_key_id}"`
+   - Extract `grants[].role_slug`
+   - Verify against required roles
 
-4. **Generar reporte de permisos**:
+4. **Generate permissions report**:
 
-   | Rol | Requerido | Presente |
-   |-----|-----------|----------|
-   | `controlplane:agent` | Sí | ✓/✗ |
-   | `ops` | Sí | ✓/✗ |
+   | Role | Required | Present |
+   |------|----------|---------|
+   | `controlplane:agent` | Yes | ✓/✗ |
+   | `ops` | Yes | ✓/✗ |
 
-#### Roles Requeridos para Notification Channels
+#### Required Roles for Notification Channels
 
-| Rol | Propósito |
-|-----|-----------|
-| `controlplane:agent` | Comunicación con el control plane |
-| `ops` | Ejecutar comandos en el agente |
+| Role | Purpose |
+|------|---------|
+| `controlplane:agent` | Communication with the control plane |
+| `ops` | Execute commands on the agent |
 
-#### Causa Raíz Común
+#### Common Root Cause
 
-Si falta el rol `ops`, el problema está en el módulo Terraform `scope_definition_agent_association`.
+If the `ops` role is missing, the problem is in the Terraform module `scope_definition_agent_association`.
 
-**Archivo problemático:** `nullplatform/scope_definition_agent_association/auth.tf`
+**Problematic file:** `nullplatform/scope_definition_agent_association/auth.tf`
 
 ```hcl
-# INCORRECTO - solo tiene controlplane:agent
+# INCORRECT - only has controlplane:agent
 resource "nullplatform_api_key" "nullplatform_agent_api_key" {
   grants {
     role_slug = "controlplane:agent"
   }
 }
 
-# CORRECTO - necesita también ops
+# CORRECT - also needs ops
 resource "nullplatform_api_key" "nullplatform_agent_api_key" {
   grants {
     role_slug = "controlplane:agent"
@@ -116,204 +116,204 @@ resource "nullplatform_api_key" "nullplatform_agent_api_key" {
 }
 ```
 
-**Solución:** Actualizar el módulo y re-aplicar bindings con `tofu apply`
+**Solution:** Update the module and re-apply bindings with `tofu apply`
 
 ---
 
-### Diagnostico de Error 404 (Istio vs ALB mismatch)
+### Error 404 Diagnosis (Istio vs ALB mismatch)
 
-Cuando el scope despliega correctamente pero el servicio retorna 404 desde `istio-envoy`.
+When the scope deploys correctly but the service returns 404 from `istio-envoy`.
 
-#### Sintoma
+#### Symptom
 
-- DNS resuelve correctamente
-- Certificado TLS valido
-- Pod corriendo
-- Pero curl retorna: `upstream connect error` o 404 desde istio-envoy
+- DNS resolves correctly
+- Valid TLS certificate
+- Pod running
+- But curl returns: `upstream connect error` or 404 from istio-envoy
 
-#### Flujo de Diagnostico
+#### Diagnosis Flow
 
-1. **Verificar arquitectura de LB**:
+1. **Verify LB architecture**:
 
 ```bash
-# Si retorna algo → Istio activo
+# If it returns something → Istio active
 kubectl get svc -n istio-system istio-ingressgateway
 ```
 
-2. **Verificar recursos creados por agent**:
+2. **Verify resources created by agent**:
 
 ```bash
 kubectl get httproute -A -l scope_id={scope_id}
 kubectl get ingress -A -l scope_id={scope_id}
 ```
 
-3. **Verificar configuracion del agent**:
+3. **Verify agent configuration**:
 
 ```bash
 kubectl get secret -n nullplatform-tools nullplatform-agent-secret-nullplatform-agent \
   -o jsonpath='{.data.INITIAL_INGRESS_PATH}' | base64 -d
 ```
 
-- Si contiene "istio" → Configurado para Istio (HTTPRoute)
-- Si vacio → Configurado para ALB (Ingress)
+- If it contains "istio" → Configured for Istio (HTTPRoute)
+- If empty → Configured for ALB (Ingress)
 
-4. **Generar tabla de mismatch**:
+4. **Generate mismatch table**:
 
-| Componente | Detectado | Esperado |
-|------------|-----------|----------|
+| Component | Detected | Expected |
+|-----------|----------|----------|
 | Load Balancer | NLB (Istio) / ALB | - |
-| Recursos creados | HTTPRoute / Ingress | - |
-| Config agent | Istio / ALB | Debe coincidir con LB |
+| Resources created | HTTPRoute / Ingress | - |
+| Agent config | Istio / ALB | Must match LB |
 
-#### Causa Raiz
+#### Root Cause
 
-| DNS apunta a | Agent crea | Resultado |
-|--------------|------------|-----------|
+| DNS points to | Agent creates | Result |
+|---------------|---------------|--------|
 | NLB (Istio) | HTTPRoute | OK |
 | NLB (Istio) | Ingress | **404** |
 | ALB | Ingress | OK |
 | ALB | HTTPRoute | No routing |
 
-#### Solucion
+#### Solution
 
-Si hay mismatch, actualizar `infrastructure/aws/main.tf`:
+If there's a mismatch, update `infrastructure/aws/main.tf`:
 
-**Para Istio** (si tienes NLB/Istio Gateway):
+**For Istio** (if you have NLB/Istio Gateway):
 
 ```hcl
 module "agent" {
-  # Agregar estas lineas:
+  # Add these lines:
   initial_ingress_path    = "$SERVICE_PATH/deployment/templates/istio/initial-httproute.yaml.tpl"
   blue_green_ingress_path = "$SERVICE_PATH/deployment/templates/istio/blue-green-httproute.yaml.tpl"
 }
 ```
 
-Y en terraform.tfvars:
+And in terraform.tfvars:
 
 ```hcl
 resources = ["service", "istio-gateway"]
 ```
 
-**Para ALB** (si tienes ALB):
+**For ALB** (if you have ALB):
 
 ```hcl
 module "agent" {
-  # NO incluir initial_ingress_path ni blue_green_ingress_path
+  # Do NOT include initial_ingress_path or blue_green_ingress_path
 }
 ```
 
-Y en terraform.tfvars:
+And in terraform.tfvars:
 
 ```hcl
 resources = ["ingress", "service"]
 ```
 
-Luego:
+Then:
 
 1. `tofu apply`
 2. `kubectl rollout restart deployment -n nullplatform-tools nullplatform-agent-nullplatform-agent`
-3. Eliminar recursos viejos: `kubectl delete ingress -n nullplatform -l scope_id={id}` o `kubectl delete httproute...`
-4. Redesplegar scope desde UI de Nullplatform
+3. Delete old resources: `kubectl delete ingress -n nullplatform -l scope_id={id}` or `kubectl delete httproute...`
+4. Redeploy scope from Nullplatform UI
 
-Ver documentacion completa: `infrastructure/aws/ISTIO_VS_ALB.md`
+See full documentation: `infrastructure/aws/ISTIO_VS_ALB.md`
 
 ---
 
-### Diagnostico de dns_type (para "Unsupported DNS type")
+### dns_type Diagnosis (for "Unsupported DNS type")
 
-Cuando el error contiene "Unsupported DNS type", el valor de `dns_type` en terraform.tfvars no es válido.
+When the error contains "Unsupported DNS type", the `dns_type` value in terraform.tfvars is not valid.
 
-#### Valores válidos por cloud
+#### Valid values by cloud
 
-| Cloud | dns_type correcto | Incorrecto |
-| ----- | ----------------- | ---------- |
-| AWS   | `route53`         | `aws`      |
-| Azure | `azure`           | -          |
-| GCP   | `gcp`             | -          |
+| Cloud | Correct dns_type | Incorrect |
+| ----- | ---------------- | --------- |
+| AWS   | `route53`        | `aws`     |
+| Azure | `azure`          | -         |
+| GCP   | `gcp`            | -         |
 
-#### Flujo de diagnóstico
+#### Diagnosis flow
 
-1. **Verificar valor en K8s:**
+1. **Verify value in K8s:**
 
 ```bash
 kubectl get secret -n nullplatform-tools nullplatform-agent-secret-nullplatform-agent -o jsonpath='{.data.DNS_TYPE}' | base64 -d
 ```
 
-2. **Verificar valor en terraform.tfvars:**
+2. **Verify value in terraform.tfvars:**
 
 ```bash
 grep dns_type infrastructure/aws/terraform.tfvars
 ```
 
-3. **Si no coinciden con la tabla** → Corregir tfvars:
+3. **If they don't match the table** → Fix tfvars:
 
 ```hcl
-# Incorrecto
+# Incorrect
 dns_type = "aws"
 
-# Correcto
+# Correct
 dns_type = "route53"
 ```
 
-4. **Aplicar cambios:**
+4. **Apply changes:**
 
 ```bash
 cd infrastructure/aws && tofu apply
 ```
 
-5. **Verificar que el agente tomó el cambio:**
+5. **Verify the agent picked up the change:**
 
 ```bash
 kubectl get secret -n nullplatform-tools nullplatform-agent-secret-nullplatform-agent -o jsonpath='{.data.DNS_TYPE}' | base64 -d
-# Debe mostrar: route53
+# Should show: route53
 ```
 
 ---
 
-## Comando: app <id>
+## Command: app <id>
 
-Diagnostica por qué una aplicación está en estado `failed`.
+Diagnoses why an application is in `failed` state.
 
-### Flujo
+### Flow
 
-1. **Obtener la aplicación**:
-   - Invocar `/np-api fetch-api "/application/{id}"`
-   - Revisar status y mensajes
+1. **Get the application**:
+   - Invoke `/np-api fetch-api "/application/{id}"`
+   - Review status and messages
 
-2. **Revisar builds fallidos**:
-   - Invocar `/np-api fetch-api "/build?application_id={id}&status=failed&limit=5"`
-   - Para cada build fallido, revisar `error_message`
+2. **Review failed builds**:
+   - Invoke `/np-api fetch-api "/build?application_id={id}&status=failed&limit=5"`
+   - For each failed build, review `error_message`
 
-3. **Revisar scopes fallidos**:
-   - Invocar `/np-api fetch-api "/scope?application_id={id}"`
-   - Para cada scope en `failed`, ejecutar diagnóstico de scope
+3. **Review failed scopes**:
+   - Invoke `/np-api fetch-api "/scope?application_id={id}"`
+   - For each scope in `failed`, run scope diagnosis
 
-4. **Generar reporte**:
-   - Consolidar errores de builds y scopes
-   - Identificar el problema raíz
+4. **Generate report**:
+   - Consolidate build and scope errors
+   - Identify the root cause
 
 ---
 
-## Diagnóstico de Telemetría (Logs y Métricas via API)
+## Telemetry Diagnosis (Logs and Metrics via API)
 
-Cuando la API de telemetría de Nullplatform (`/telemetry/application/{id}/log` o `/telemetry/application/{id}/metric/{name}`) no funciona.
+When the Nullplatform telemetry API (`/telemetry/application/{id}/log` or `/telemetry/application/{id}/metric/{name}`) is not working.
 
-### Síntomas
+### Symptoms
 
-| Error | Recurso | Causa |
-|-------|---------|-------|
-| `"Keys not present for NRN"` | Logs | No hay `global.logProvider` configurado |
-| `"Oops.. there was an internal error"` | Métricas | telemetry-api no puede conectar a Prometheus interno |
+| Error | Resource | Cause |
+|-------|----------|-------|
+| `"Keys not present for NRN"` | Logs | No `global.logProvider` configured |
+| `"Oops.. there was an internal error"` | Metrics | telemetry-api cannot connect to internal Prometheus |
 
-### Flujo de Diagnóstico
+### Diagnosis Flow
 
-#### 1. Verificar configuración del NRN
+#### 1. Verify NRN configuration
 
 ```bash
 np-api fetch-api "/nrn/organization={org_id}:account={account_id}?ids=global.logProvider,global.metricsProvider"
 ```
 
-**Respuesta esperada:**
+**Expected response:**
 ```json
 {
   "namespaces": {
@@ -325,88 +325,88 @@ np-api fetch-api "/nrn/organization={org_id}:account={account_id}?ids=global.log
 }
 ```
 
-**Si `logProvider` no existe:** El default es `cloudwatchlogs`, que falla si no hay CloudWatch configurado.
+**If `logProvider` doesn't exist:** The default is `cloudwatchlogs`, which fails if CloudWatch is not configured.
 
-**Si `metricsProvider` es `prometheusmetrics`:** Fallará porque telemetry-api no puede conectarse a Prometheus interno del cluster.
+**If `metricsProvider` is `prometheusmetrics`:** It will fail because telemetry-api cannot connect to the cluster's internal Prometheus.
 
-#### 2. Para scopes de Service Specifications (containers-default, etc.)
+#### 2. For Service Specification scopes (containers-default, etc.)
 
-Los scopes creados por service specifications tienen un problema conocido:
+Scopes created by service specifications have a known issue:
 
-- El provider `k8slogs` existe en telemetry-api pero **NO soporta** scopes de service specifications
-- El código espera `scope.provider = "AWS:WEB_POOL:EKS"` pero recibe el UUID del service specification
-- Ver código: `telemetry-api/services/providers/commons/k8s_commons.js:20-31`
+- The `k8slogs` provider exists in telemetry-api but **does NOT support** service specification scopes
+- The code expects `scope.provider = "AWS:WEB_POOL:EKS"` but receives the service specification UUID
+- See code: `telemetry-api/services/providers/commons/k8s_commons.js:20-31`
 
-### Solución para Logs: Usar Provider "external"
+### Solution for Logs: Use "external" Provider
 
-El provider `external` delega la obtención de logs al agente via notification channel.
+The `external` provider delegates log retrieval to the agent via notification channel.
 
-#### Fix Inmediato (via API)
+#### Immediate Fix (via API)
 
 ```bash
-# 1. Obtener token desde secrets.tfvars
+# 1. Get token from secrets.tfvars
 NP_KEY=$(grep 'np_api_key' secrets.tfvars | sed 's/.*= *"\(.*\)"/\1/')
 TOKEN=$(curl -s -X POST "https://api.nullplatform.com/token" \
   -H "Content-Type: application/json" \
   -d "{\"api_key\": \"$NP_KEY\"}" | jq -r '.access_token')
 
-# 2. Configurar logProvider como external
+# 2. Configure logProvider as external
 curl -X PATCH "https://api.nullplatform.com/nrn/organization={org_id}:account={account_id}" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $TOKEN" \
   -d '{"global.logProvider": "external"}'
 ```
 
-#### Verificar que funciona
+#### Verify it works
 
 ```bash
-# Debe retornar logs del scope
+# Should return scope logs
 np-api fetch-api "/telemetry/application/{app_id}/log?type=application&scope={scope_id}&limit=5"
 ```
 
-### Solución para Métricas: Usar Provider "externalmetrics"
+### Solution for Metrics: Use "externalmetrics" Provider
 
-El provider `externalmetrics` delega la obtención de métricas al agente via notification channel.
+The `externalmetrics` provider delegates metric retrieval to the agent via notification channel.
 
-**Causa raíz del problema:** El provider `prometheusmetrics` intenta conectarse directamente a Prometheus usando la URL configurada (`prometheus.url`), pero esta URL es interna del cluster y no es accesible desde telemetry-api.
+**Root cause of the problem:** The `prometheusmetrics` provider tries to connect directly to Prometheus using the configured URL (`prometheus.url`), but this URL is internal to the cluster and not accessible from telemetry-api.
 
-#### Fix Inmediato (via API)
+#### Immediate Fix (via API)
 
 ```bash
-# 1. Obtener token desde secrets.tfvars
+# 1. Get token from secrets.tfvars
 NP_KEY=$(grep 'np_api_key' secrets.tfvars | sed 's/.*= *"\(.*\)"/\1/')
 TOKEN=$(curl -s -X POST "https://api.nullplatform.com/token" \
   -H "Content-Type: application/json" \
   -d "{\"api_key\": \"$NP_KEY\"}" | jq -r '.access_token')
 
-# 2. Configurar metricsProvider como externalmetrics
+# 2. Configure metricsProvider as externalmetrics
 curl -X PATCH "https://api.nullplatform.com/nrn/organization={org_id}:account={account_id}" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $TOKEN" \
   -d '{"global.metricsProvider": "externalmetrics"}'
 ```
 
-#### Verificar que funciona
+#### Verify it works
 
 ```bash
-# Debe retornar métricas del scope
+# Should return scope metrics
 np-api fetch-api "/telemetry/application/{app_id}/metric/http.rpm?scope_id={scope_id}&minutes=30&period=300"
 ```
 
-**Nota:** El provider Prometheus sigue siendo necesario para configurar `prometheus.url` que el agente usa internamente.
+**Note:** The Prometheus provider is still needed to configure `prometheus.url` which the agent uses internally.
 
-### Estado Actual y Pendientes
+### Current Status and Pending Items
 
-| Recurso | Provider | Estado | Notas |
-|---------|----------|--------|-------|
-| Logs | `external` | ✅ Funciona | Delega al agente via notification channel |
-| Métricas | `externalmetrics` | ✅ Funciona | Delega al agente via notification channel |
+| Resource | Provider | Status | Notes |
+|----------|----------|--------|-------|
+| Logs | `external` | ✅ Works | Delegates to agent via notification channel |
+| Metrics | `externalmetrics` | ✅ Works | Delegates to agent via notification channel |
 
-### PENDIENTE: Solución Permanente (Equipo Nullplatform)
+### PENDING: Permanent Solution (Nullplatform Team)
 
-**Problema:** No existen provider specifications para configurar `global.logProvider` y `global.metricsProvider` via OpenTofu.
+**Problem:** There are no provider specifications to configure `global.logProvider` and `global.metricsProvider` via OpenTofu.
 
-**Propuesta:** Crear provider specifications para logs y métricas:
+**Proposal:** Create provider specifications for logs and metrics:
 
 ```json
 {
@@ -433,55 +433,55 @@ np-api fetch-api "/telemetry/application/{app_id}/metric/http.rpm?scope_id={scop
 }
 ```
 
-**Beneficios:**
-1. Configuración via OpenTofu (no requiere PATCH manual al NRN)
-2. Consistente con el patrón del provider Prometheus
-3. No requiere cambios en telemetry-api
+**Benefits:**
+1. Configuration via OpenTofu (no manual PATCH to NRN required)
+2. Consistent with the Prometheus provider pattern
+3. No changes required in telemetry-api
 
-**Referencias:**
+**References:**
 - Prometheus provider spec: `/provider_specification/e88cbbd3-7df9-4985-9210-a075420b619e`
-- Código del provider external: `telemetry-api/services/providers/logs/external_log_service.js`
-- Entrypoint del agente: `scopes/entrypoint:66-67` (maneja `log:read`)
+- External provider code: `telemetry-api/services/providers/logs/external_log_service.js`
+- Agent entrypoint: `scopes/entrypoint:66-67` (handles `log:read`)
 
-### Archivos de Referencia
+### Reference Files
 
-| Archivo | Propósito |
-|---------|-----------|
-| `telemetry-api/services/nrn_service.js:220-253` | `getLogProvider()` - determina qué provider usar |
+| File | Purpose |
+|------|---------|
+| `telemetry-api/services/nrn_service.js:220-253` | `getLogProvider()` - determines which provider to use |
 | `telemetry-api/services/nrn_service.js:9` | `DEFAULT_LOG_PROVIDER = "cloudwatchlogs"` |
-| `telemetry-api/services/providers/commons/k8s_commons.js:20-31` | Switch que falla con service specs |
-| `scopes/entrypoint:66-67` | Agente maneja `log:read` action |
+| `telemetry-api/services/providers/commons/k8s_commons.js:20-31` | Switch that fails with service specs |
+| `scopes/entrypoint:66-67` | Agent handles `log:read` action |
 
 ---
 
-## Notas importantes
+## Important Notes
 
-- **SIEMPRE usar `include_messages=true`** al consultar actions - sin este parámetro los mensajes vienen vacíos
-- El campo `instance_id` del scope es el UUID del service que contiene las actions
-- Los errores de creación de scope están en `/service/{instance_id}/action`, NO en el scope directamente
-- Este skill usa `/np-api` de forma declarativa - no conoce detalles de implementación
+- **ALWAYS use `include_messages=true`** when querying actions - without this parameter, messages come empty
+- The scope's `instance_id` field is the UUID of the service that contains the actions
+- Scope creation errors are in `/service/{instance_id}/action`, NOT in the scope directly
+- This skill uses `/np-api` declaratively - it doesn't know implementation details
 
 ---
 
-## Flujo Visual de Diagnóstico
+## Visual Diagnosis Flow
 
 ```
 Scope failed
     │
     ▼
-GET /scope/{id} → extraer instance_id
+GET /scope/{id} → extract instance_id
     │
     ▼
 GET /service/{instance_id}/action
     │
     ▼
-GET action con ?include_messages=true
+GET action with ?include_messages=true
     │
     ▼
-Analizar error en logs
+Analyze error in logs
     │
-    ├─► "not authorized" → Diagnóstico de Permisos
-    ├─► "Unsupported DNS type" → Diagnóstico de dns_type
+    ├─► "not authorized" → Permission Diagnosis
+    ├─► "Unsupported DNS type" → dns_type Diagnosis
     ├─► "ECR repository not found" → /np-infrastructure-wizard
-    └─► Otro error → Revisar K8s y Terraform
+    └─► Other error → Review K8s and Terraform
 ```

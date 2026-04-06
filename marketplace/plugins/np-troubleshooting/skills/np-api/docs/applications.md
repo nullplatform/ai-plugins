@@ -1,55 +1,55 @@
 # Applications
 
-Aplicaciones son contenedores de código desplegable que definen runtime, build, health checks y recursos.
+Applications are deployable code containers that define runtime, build, health checks, and resources.
 
 ## @endpoint /application/{id}
 
-Obtiene detalles de una aplicación.
+Gets details of an application.
 
-### Parámetros
-- `id` (path, required): ID de la aplicación
+### Parameters
+- `id` (path, required): Application ID
 
-### Respuesta
-- `id`: ID numérico
-- `name`: Nombre único dentro del namespace
+### Response
+- `id`: Numeric ID
+- `name`: Unique name within the namespace
 - `type`: service | function | job | static
 - `status`: active | inactive | archived
-- `nrn`: Identificador jerárquico (organization=X:account=Y:namespace=Z:application=W)
+- `nrn`: Hierarchical identifier (organization=X:account=Y:namespace=Z:application=W)
 - `specification.runtime`: language, version
 - `specification.build`: command, output_path
 - `specification.health_check`: path, port, initial_delay_seconds, period_seconds, timeout_seconds, failure_threshold
 - `specification.resources`: memory, cpu
-- `metadata`: Propiedades adicionales (solo en GET individual, NO en listas)
+- `metadata`: Additional properties (only in individual GET, NOT in lists)
 
-### Navegación
-- **→ namespace**: del NRN extraer namespace_id → `/namespace/{namespace_id}`
+### Navigation
+- **→ namespace**: extract namespace_id from NRN → `/namespace/{namespace_id}`
 - **→ scopes**: `/scope?application_id={id}`
 - **→ builds**: `/build?application_id={id}`
-- **→ services**: via `linkable_to` en services
+- **→ services**: via `linkable_to` in services
 
-### Ejemplo
+### Example
 ```bash
 np-api fetch-api "/application/489238271"
 ```
 
-### Notas
-- `specification.health_check` es crítico para troubleshooting de deployments
-- `initial_delay_seconds` muy bajo causa probe failures en apps Java (necesitan 60-120s)
-- `metadata` solo disponible en GET individual, NO en listas - no se puede filtrar por metadata
+### Notes
+- `specification.health_check` is critical for deployment troubleshooting
+- `initial_delay_seconds` too low causes probe failures in Java apps (need 60-120s)
+- `metadata` only available in individual GET, NOT in lists - cannot filter by metadata
 
 ---
 
 ## @endpoint /application
 
-Lista aplicaciones con filtros.
+Lists applications with filters.
 
-### Parámetros
-- `namespace_id` (query): Filtra por namespace
-- `status` (query): Filtra por status (active, inactive, archived)
-- `limit` (query): Máximo de resultados (default 30)
-- `offset` (query): Para paginación
+### Parameters
+- `namespace_id` (query): Filter by namespace
+- `status` (query): Filter by status (active, inactive, archived)
+- `limit` (query): Maximum results (default 30)
+- `offset` (query): For pagination
 
-### Respuesta
+### Response
 ```json
 {
   "paging": {"total": 69, "offset": 0, "limit": 30},
@@ -59,34 +59,34 @@ Lista aplicaciones con filtros.
 }
 ```
 
-### Navegación
-- **→ application details**: `/application/{id}` para cada resultado
+### Navigation
+- **→ application details**: `/application/{id}` for each result
 
-### Ejemplo
+### Example
 ```bash
 np-api fetch-api "/application?namespace_id={namespace_id}&limit=100"
 
-# Solo aplicaciones activas
+# Only active applications
 np-api fetch-api "/application?namespace_id={namespace_id}&status=active"
 ```
 
-### Notas
-- Respuesta paginada con `paging` y `results`
-- NO incluye campo `metadata` - requiere fetch individual por ID
-- Usar `status=active` para excluir aplicaciones inactivas o archivadas
+### Notes
+- Paginated response with `paging` and `results`
+- Does NOT include `metadata` field - requires individual fetch by ID
+- Use `status=active` to exclude inactive or archived applications
 
 ---
 
 ## @endpoint /template
 
-Lista templates de tecnologia disponibles para crear aplicaciones.
+Lists available technology templates for creating applications.
 
-### Parametros
-- `target_nrn` (query, recommended): NRN del namespace para filtrar templates aplicables
-- `global_templates` (query): `true` para incluir templates globales de Nullplatform ademas de las de la org
-- `limit` (query): Maximo de resultados (default 30, usar 200 para obtener todos)
+### Parameters
+- `target_nrn` (query, recommended): Namespace NRN to filter applicable templates
+- `global_templates` (query): `true` to include global Nullplatform templates in addition to org ones
+- `limit` (query): Maximum results (default 30, use 200 to get all)
 
-### Respuesta
+### Response
 ```json
 {
   "paging": {},
@@ -106,18 +106,18 @@ Lista templates de tecnologia disponibles para crear aplicaciones.
 }
 ```
 
-### Navegacion
-- **← desde application**: `template_id` en la aplicacion → `/template/{id}` (no documentado, usar lista)
+### Navigation
+- **← from application**: `template_id` in the application → `/template/{id}` (not documented, use list)
 
-### Ejemplo
+### Example
 ```bash
-# Templates para un namespace especifico (incluye globales)
+# Templates for a specific namespace (includes globals)
 np-api fetch-api "/template?limit=200&target_nrn=organization=X:account=Y:namespace=Z&global_templates=true"
 ```
 
-### Notas
-- Templates con `organization: null` son globales de Nullplatform
-- Templates con `organization` y `account` son especificas de la org/cuenta
-- Filtrar `status: "active"` antes de mostrar al usuario
-- El campo `rules` puede contener reglas de validacion de nombre y path de repositorio
-- `components` describe la tecnologia (language, framework, runtime)
+### Notes
+- Templates with `organization: null` are global Nullplatform templates
+- Templates with `organization` and `account` are org/account-specific
+- Filter `status: "active"` before showing to the user
+- The `rules` field may contain name and repository path validation rules
+- `components` describes the technology (language, framework, runtime)

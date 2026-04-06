@@ -5,23 +5,23 @@ description: This skill should be used when the user asks to "configure cloud cr
 
 # Nullplatform Cloud Provider Setup
 
-Configura las credenciales de tu cloud provider para poder crear infraestructura.
+Configure your cloud provider credentials to be able to create infrastructure.
 
-## Cuando Usar
+## When to Use
 
-- Configurando credenciales de cloud por primera vez
-- Cambiando de cloud provider
-- Validando credenciales existentes
-- Infraestructura ya existe y solo necesitas validar acceso
+- Configuring cloud credentials for the first time
+- Changing cloud provider
+- Validating existing credentials
+- Infrastructure already exists and you only need to validate access
 
-## Prerequisitos
+## Prerequisites
 
-Antes de usar este skill, asegurate de tener configurado:
+Before using this skill, make sure you have configured:
 
-1. Verificar que `NP_API_KEY` está configurada (variable de entorno o `.env`)
-2. Invocar `/np-api check-auth` para verificar autenticacion y obtener el organization_id
+1. Verify that `NP_API_KEY` is configured (environment variable or `.env`)
+2. Invoke `/np-api check-auth` to verify authentication and get the organization_id
 
-## Cloud Providers Soportados
+## Supported Cloud Providers
 
 | Provider | Kubernetes | Container Registry | DNS |
 |----------|------------|-------------------|-----|
@@ -29,71 +29,71 @@ Antes de usar este skill, asegurate de tener configurado:
 | Azure | AKS | ACR | Azure DNS / Cloudflare |
 | GCP | GKE | Artifact Registry | Cloud DNS |
 
-## Configuracion por Provider
+## Configuration by Provider
 
 ### AWS
 
-**Requisitos:**
+**Requirements:**
 
-- AWS Account con permisos para crear EKS, VPC, Route53, ECR
-- AWS CLI configurado
-- IAM credentials (Access Key + Secret Key) o IAM Role
+- AWS Account with permissions to create EKS, VPC, Route53, ECR
+- AWS CLI configured
+- IAM credentials (Access Key + Secret Key) or IAM Role
 
-**Validacion:**
+**Validation:**
 
 ```bash
-# Verificar credenciales
+# Verify credentials
 aws sts get-caller-identity
 
-# Verificar permisos basicos
+# Verify basic permissions
 aws ec2 describe-vpcs --max-items 1
 ```
 
-**Templates de referencia:** `infrastructure/example/aws/`
+**Reference templates:** `infrastructure/example/aws/`
 
 ---
 
 ### Azure
 
-**Requisitos:**
+**Requirements:**
 
-- Azure Subscription con permisos para crear AKS, VNet, ACR, DNS
-- Azure CLI instalado y logueado
-- Service Principal con permisos de Contributor
+- Azure Subscription with permissions to create AKS, VNet, ACR, DNS
+- Azure CLI installed and logged in
+- Service Principal with Contributor permissions
 
-**Crear Service Principal:**
+**Create Service Principal:**
 
 ```bash
 az ad sp create-for-rbac --name "nullplatform-sp" --role Contributor \
   --scopes /subscriptions/YOUR_SUBSCRIPTION_ID
 ```
 
-**Validacion:**
+**Validation:**
 
 ```bash
 # Login
 az login
 
-# Verificar subscription
+# Verify subscription
 az account show
 
-# Verificar permisos
+# Verify permissions
 az group list --query "[0].name"
 ```
 
-**Templates de referencia:** `infrastructure/example/azure/`
+**Reference templates:** `infrastructure/example/azure/`
 
 ---
 
 ### GCP
 
-**Requisitos:**
+**Requirements:**
 
-- GCP Project con APIs habilitadas (GKE, VPC, Cloud DNS, Artifact Registry)
-- Service Account con permisos de Editor
-- gcloud CLI configurado
+- GCP Project with enabled APIs (GKE, VPC, Cloud DNS, Artifact Registry)
+- Service Account with Editor permissions
+- gcloud CLI configured
 
-**Habilitar APIs:**
+**Enable APIs:**
 
 ```bash
 gcloud services enable container.googleapis.com
@@ -102,61 +102,61 @@ gcloud services enable dns.googleapis.com
 gcloud services enable artifactregistry.googleapis.com
 ```
 
-**Validacion:**
+**Validation:**
 
 ```bash
-# Verificar configuracion
+# Verify configuration
 gcloud config list
 
-# Verificar permisos
+# Verify permissions
 gcloud projects get-iam-policy YOUR_PROJECT_ID
 ```
 
-**Templates de referencia:** `infrastructure/example/gcp/`
+**Reference templates:** `infrastructure/example/gcp/`
 
-## Casos de Uso
+## Use Cases
 
-### Caso 1: Crear infraestructura nueva
+### Case 1: Create new infrastructure
 
-Si no tenes infraestructura, el wizard te ayudara a:
-1. Elegir tu estructura de carpetas
-2. Copiar templates desde `infrastructure/example/{provider}/`
-3. Personalizar las variables
+If you don't have infrastructure, the wizard will help you:
+1. Choose your folder structure
+2. Copy templates from `infrastructure/example/{provider}/`
+3. Customize the variables
 
-### Caso 2: Infraestructura ya existe
+### Case 2: Infrastructure already exists
 
-Si ya tenes infraestructura (VPC, K8s, etc.), solo necesitas:
-1. Validar acceso con los comandos de arriba
-2. Saltar al skill `/np-nullplatform-wizard`
+If you already have infrastructure (VPC, K8s, etc.), you only need to:
+1. Validate access with the commands above
+2. Skip to the `/np-nullplatform-wizard` skill
 
-## Checklist Antes de Continuar
+## Checklist Before Continuing
 
-- [ ] Cloud CLI instalado y configurado
-- [ ] Credenciales validas con permisos suficientes
-- [ ] Region/location seleccionado
-- [ ] Dominio disponible para DNS (opcional pero recomendado)
+- [ ] Cloud CLI installed and configured
+- [ ] Valid credentials with sufficient permissions
+- [ ] Region/location selected
+- [ ] Domain available for DNS (optional but recommended)
 
-## Siguiente Paso
+## Next Step
 
-Una vez configuradas las credenciales, el siguiente paso es crear la infraestructura:
+Once credentials are configured, the next step is to create the infrastructure:
 
-**Decile a Claude**: "Creemos la infraestructura"
+**Tell Claude**: "Let's create the infrastructure"
 
-O invoca directamente: `/np-infrastructure-wizard`
+Or invoke directly: `/np-infrastructure-wizard`
 
 ## Troubleshooting
 
 ### AWS: Access Denied
 
-- Verificar que el IAM user tiene permisos para EKS, EC2, Route53
-- Revisar policies attached al user/role
+- Verify that the IAM user has permissions for EKS, EC2, Route53
+- Review policies attached to the user/role
 
 ### Azure: Authentication Failed
 
-- Verificar que el Service Principal no expiro
-- Regenerar secret si es necesario: `az ad sp credential reset --name "nullplatform-sp"`
+- Verify that the Service Principal hasn't expired
+- Regenerate secret if needed: `az ad sp credential reset --name "nullplatform-sp"`
 
 ### GCP: Permission Denied
 
-- Verificar que las APIs estan habilitadas
-- Revisar IAM roles del Service Account
+- Verify that APIs are enabled
+- Review Service Account IAM roles

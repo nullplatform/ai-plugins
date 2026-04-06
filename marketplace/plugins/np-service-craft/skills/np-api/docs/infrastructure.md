@@ -1,23 +1,23 @@
 # Infrastructure (Organization, Account, Namespace, Provider, Agent)
 
-Entidades de infraestructura y jerarquía organizacional.
+Infrastructure entities and organizational hierarchy.
 
 ## @endpoint /organization/{id}
 
-Obtiene detalles de una organización.
+Gets details of an organization.
 
-### Parámetros
-- `id` (path, required): ID de la organización
+### Parameters
+- `id` (path, required): Organization ID
 
-### Respuesta
-- `id`: ID numérico
-- `name`: Nombre de la organización
-- `settings`: Configuración a nivel de org
+### Response
+- `id`: Numeric ID
+- `name`: Organization name
+- `settings`: Org-level configuration
 
-### Navegación
-- **→ accounts**: `/account?organization_id={id}` (si existe filtro)
+### Navigation
+- **→ accounts**: `/account?organization_id={id}` (if filter exists)
 
-### Ejemplo
+### Example
 ```bash
 np-api fetch-api "/organization/549683990"
 ```
@@ -26,9 +26,9 @@ np-api fetch-api "/organization/549683990"
 
 ## @endpoint /organization
 
-Lista organizaciones.
+Lists organizations.
 
-### Ejemplo
+### Example
 ```bash
 np-api fetch-api "/organization"
 ```
@@ -37,26 +37,26 @@ np-api fetch-api "/organization"
 
 ## @endpoint /account/{id}
 
-Obtiene detalles de un account.
+Gets details of an account.
 
-### Parámetros
-- `id` (path, required): ID del account
+### Parameters
+- `id` (path, required): Account ID
 
-### Respuesta
-- `id`: ID numérico
-- `name`: Nombre del account
-- `slug`: Identificador URL-friendly
-- `status`: Estado
-- `organization_id`: ID de la organización padre
-- `settings`: Configuración (region, tier)
+### Response
+- `id`: Numeric ID
+- `name`: Account name
+- `slug`: URL-friendly identifier
+- `status`: Status
+- `organization_id`: Parent organization ID
+- `settings`: Configuration (region, tier)
 - `created_at`, `updated_at`: Timestamps
 
-### Navegación
+### Navigation
 - **→ organization**: `organization_id` → `/organization/{organization_id}`
-- **→ namespaces**: `/namespace?account_id={id}` (si existe filtro)
-- **← organization**: parte del NRN
+- **→ namespaces**: `/namespace?account_id={id}` (if filter exists)
+- **← organization**: part of the NRN
 
-### Ejemplo
+### Example
 ```bash
 np-api fetch-api "/account/463975847"
 ```
@@ -65,15 +65,15 @@ np-api fetch-api "/account/463975847"
 
 ## @endpoint /account
 
-Lista accounts de una organizacion.
+Lists accounts of an organization.
 
-### Parámetros
-- `organization_id` (query, required): ID de la organizacion. Se obtiene del JWT token (check-auth lo muestra).
-- `status` (query): Filtra por status (active, inactive)
-- `limit` (query): Máximo de resultados (default 30)
-- `offset` (query): Para paginacion
+### Parameters
+- `organization_id` (query, required): Organization ID. Obtained from the JWT token (check-auth shows it).
+- `status` (query): Filter by status (active, inactive)
+- `limit` (query): Maximum results (default 30)
+- `offset` (query): For pagination
 
-### Respuesta
+### Response
 ```json
 {
   "paging": {"total": 8, "offset": 0, "limit": 30},
@@ -92,48 +92,48 @@ Lista accounts de una organizacion.
 }
 ```
 
-### Navegacion
-- **← organization**: `organization_id` del JWT token
+### Navigation
+- **← organization**: `organization_id` from JWT token
 - **→ namespaces**: `/namespace?account_id={id}`
 
-### Ejemplo
+### Example
 ```bash
-# Listar accounts de la organizacion (organization_id del JWT)
+# List organization accounts (organization_id from JWT)
 np-api fetch-api "/account?organization_id=1255165411"
 
-# Solo accounts activos
+# Only active accounts
 np-api fetch-api "/account?organization_id=1255165411&status=active"
 ```
 
-### Notas
-- Este es el primer paso del bootstrap: JWT → accounts → namespaces → aplicaciones
-- `repository_prefix` y `repository_provider` indican donde se crean los repos de las apps
-- Respuesta paginada con `paging` y `results`
+### Notes
+- This is the first bootstrap step: JWT → accounts → namespaces → applications
+- `repository_prefix` and `repository_provider` indicate where app repos are created
+- Paginated response with `paging` and `results`
 
 ---
 
 ## @endpoint /namespace/{id}
 
-Obtiene detalles de un namespace.
+Gets details of a namespace.
 
-### Parámetros
-- `id` (path, required): ID del namespace
+### Parameters
+- `id` (path, required): Namespace ID
 
-### Respuesta
-- `id`: ID numérico
-- `name`: Nombre del namespace
-- `slug`: Identificador URL-friendly
-- `status`: Estado
-- `account_id`: ID del account padre
-- `nrn`: NRN completo
+### Response
+- `id`: Numeric ID
+- `name`: Namespace name
+- `slug`: URL-friendly identifier
+- `status`: Status
+- `account_id`: Parent account ID
+- `nrn`: Complete NRN
 - `configuration`: region, cluster settings
-- `metadata`: Propiedades adicionales
+- `metadata`: Additional properties
 
-### Navegación
+### Navigation
 - **→ account**: `account_id` → `/account/{account_id}`
 - **→ applications**: `/application?namespace_id={id}`
 
-### Ejemplo
+### Example
 ```bash
 np-api fetch-api "/namespace/476951634"
 ```
@@ -142,15 +142,15 @@ np-api fetch-api "/namespace/476951634"
 
 ## @endpoint /namespace
 
-Lista namespaces de un account.
+Lists namespaces of an account.
 
-### Parámetros
-- `account_id` (query, required): ID del account. Se obtiene de `GET /account?organization_id=<org_id>`.
-- `status` (query): Filtra por status (active, inactive)
-- `limit` (query): Máximo de resultados (default 30)
-- `offset` (query): Para paginacion
+### Parameters
+- `account_id` (query, required): Account ID. Obtained from `GET /account?organization_id=<org_id>`.
+- `status` (query): Filter by status (active, inactive)
+- `limit` (query): Maximum results (default 30)
+- `offset` (query): For pagination
 
-### Respuesta
+### Response
 ```json
 {
   "paging": {"total": 143, "offset": 0, "limit": 30},
@@ -167,56 +167,56 @@ Lista namespaces de un account.
 }
 ```
 
-### Navegacion
+### Navigation
 - **← account**: `account_id` → `/account/{account_id}`
 - **→ applications**: `/application?namespace_id={id}`
 
-### Ejemplo
+### Example
 ```bash
-# Listar namespaces de un account
+# List namespaces of an account
 np-api fetch-api "/namespace?account_id=95118862&status=active&limit=50"
 ```
 
-### Notas
-- Segundo paso del bootstrap: JWT → accounts → **namespaces** → aplicaciones
-- Respuesta paginada con `paging` y `results`
-- Un namespace puede no tener aplicaciones (ej: namespace recien creado)
+### Notes
+- Second bootstrap step: JWT → accounts → **namespaces** → applications
+- Paginated response with `paging` and `results`
+- A namespace may have no applications (e.g., newly created namespace)
 
 ---
 
 ## @endpoint /provider
 
-Lista providers (instancias de cloud providers configuradas).
+Lists providers (configured cloud provider instances).
 
-### Parámetros
-- `nrn` (query, required): NRN base
-- `show_descendants` (query): **snake_case** - incluye providers de jerarquía inferior
-- `limit` (query): Máximo de resultados
+### Parameters
+- `nrn` (query, required): Base NRN
+- `show_descendants` (query): **snake_case** - includes providers from lower hierarchy
+- `limit` (query): Maximum results
 
-### Ejemplo
+### Example
 ```bash
 np-api fetch-api "/provider?nrn=organization=4&show_descendants=true&limit=200"
 ```
 
-### Notas
-- Usar `show_descendants` (**snake_case**) NO `showDescendants`
-- Sin `show_descendants=true` solo retorna providers a nivel del NRN especificado
+### Notes
+- Use `show_descendants` (**snake_case**) NOT `showDescendants`
+- Without `show_descendants=true` only returns providers at the specified NRN level
 
 ---
 
 ## @endpoint /provider_specification
 
-Lista especificaciones de providers disponibles.
+Lists available provider specifications.
 
-### Parámetros
-- `nrn` (query): NRN para filtrar
+### Parameters
+- `nrn` (query): NRN to filter
 
-### Dominio
+### Domain
 ```
 https://providers.nullplatform.com/provider_specification?nrn=organization=123
 ```
 
-### Ejemplo
+### Example
 ```bash
 np-api fetch-api "https://providers.nullplatform.com/provider_specification?nrn=organization=549683990"
 ```
@@ -225,18 +225,18 @@ np-api fetch-api "https://providers.nullplatform.com/provider_specification?nrn=
 
 ## @endpoint /controlplane/agent
 
-Lista agents (runtime agents en infraestructura del cliente).
+Lists agents (runtime agents on client infrastructure).
 
-Los agents son servicios ligeros outbound-only que conectan la infraestructura del cliente
-con Nullplatform. Se conectan a `agents.nullplatform.com:443` y pollan por tareas que
-matcheen sus tags.
+Agents are lightweight outbound-only services that connect the client's infrastructure
+with Nullplatform. They connect to `agents.nullplatform.com:443` and poll for tasks that
+match their tags.
 
-### Parámetros
-- `organization_id` (query): ID de la organización
-- `account_id` (query): ID del account
-- `nrn` (query): NRN alternativo (ej: `organization=1:account=2`)
+### Parameters
+- `organization_id` (query): Organization ID
+- `account_id` (query): Account ID
+- `nrn` (query): Alternative NRN (e.g., `organization=1:account=2`)
 
-### Respuesta
+### Response
 ```json
 {
   "results": [
@@ -255,44 +255,44 @@ matcheen sus tags.
 }
 ```
 
-### Campos clave
-- `id`: UUID del agent
-- `name`: Nombre del agent
-- `nrns[]`: Array de NRNs donde el agent esta registrado (puede estar en multiples accounts)
-- `status`: `active` | otros
-- `capabilities`: Capacidades del agent
-- `tags`: Tags para routing. Las tareas se rutean al agent cuyas tags matcheen
-- `heartbeat`: Ultimo heartbeat — util para verificar si el agent esta vivo
-- `version`: Version del agent
+### Key fields
+- `id`: Agent UUID
+- `name`: Agent name
+- `nrns[]`: Array of NRNs where the agent is registered (can be in multiple accounts)
+- `status`: `active` | others
+- `capabilities`: Agent capabilities
+- `tags`: Tags for routing. Tasks are routed to the agent whose tags match
+- `heartbeat`: Last heartbeat — useful to verify if the agent is alive
+- `version`: Agent version
 
 ### Agent notification channels
 
-Los agents pueden procesar notificaciones de la plataforma ejecutando scripts en la infraestructura
-del cliente. Hay dos tipos de canales de notificacion para agents:
+Agents can process platform notifications by executing scripts on the client's infrastructure.
+There are two types of notification channels for agents:
 
-| Tipo | Descripcion |
+| Type | Description |
 |------|-------------|
-| `agent` | Ejecuta un script local en la infraestructura donde corre el agent |
-| `http` | Hace un HTTP request a un handler remoto |
+| `agent` | Executes a local script on the infrastructure where the agent runs |
+| `http` | Makes an HTTP request to a remote handler |
 
-Los agent notification channels se configuran en `/notification/channel` con `type: agent` o
-`type: http`. El agent polls por notificaciones que matcheen sus tags y las procesa.
+Agent notification channels are configured in `/notification/channel` with `type: agent` or
+`type: http`. The agent polls for notifications matching its tags and processes them.
 
-### Autenticacion
-Los agents requieren una API key con roles `controlplane:agent` y `ops` para registrarse
-y autenticarse con el control plane.
+### Authentication
+Agents require an API key with `controlplane:agent` and `ops` roles to register
+and authenticate with the control plane.
 
-### Ejemplo
+### Example
 ```bash
-# Por organization_id y account_id
+# By organization_id and account_id
 np-api fetch-api "/controlplane/agent?organization_id=1255165411&account_id=95118862"
 
-# Por NRN
+# By NRN
 np-api fetch-api "/controlplane/agent?nrn=organization%3D1255165411%3Aaccount%3D95118862"
 ```
 
-### Notas
-- Agents son outbound-only: se conectan a Nullplatform, no al reves
-- Tag-based routing: los agents solo procesan tareas que matcheen sus tags
-- Soporta deployment via: Helm, Docker, binary, serverless
-- Si un agent no tiene heartbeat reciente, esta caido o desconectado
+### Notes
+- Agents are outbound-only: they connect to Nullplatform, not the other way around
+- Tag-based routing: agents only process tasks that match their tags
+- Supports deployment via: Helm, Docker, binary, serverless
+- If an agent has no recent heartbeat, it's down or disconnected

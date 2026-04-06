@@ -25,17 +25,17 @@ The `*` operator in jq merges objects; parameters take precedence.
 
 ## Cloud Provider Profile
 
-El profile de values.yaml **siempre debe overridear** lo que haya en el entorno. El agente hereda todas las env vars del shell donde se inicio (ej: `AWS_PROFILE`, `AZURE_SUBSCRIPTION_ID`). Si el script solo setea cuando la variable esta vacia, el profile del entorno del agente gana y puede apuntar a un account incorrecto.
+The values.yaml profile **must always override** whatever is in the environment. The agent inherits all env vars from the shell where it was started (e.g., `AWS_PROFILE`, `AZURE_SUBSCRIPTION_ID`). If the script only sets when the variable is empty, the agent's environment profile wins and may point to an incorrect account.
 
 ```bash
-# CORRECTO: values.yaml siempre gana sobre el entorno
+# CORRECT: values.yaml always wins over the environment
 AWS_PROFILE_VAL=$(yaml_value "aws_profile" "" "$VALUES")
 if [ -n "$AWS_PROFILE_VAL" ]; then
   export AWS_PROFILE="$AWS_PROFILE_VAL"
 fi
 ```
 
-Mismo patron para otros providers:
+Same pattern for other providers:
 ```bash
 # Azure
 AZURE_SUB=$(yaml_value "azure_subscription_id" "" "$VALUES")

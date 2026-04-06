@@ -5,36 +5,36 @@ description: This skill should be used when the user asks to "create a notificat
 
 # np-notification-manager
 
-Skill dedicado a la gestión de notification channels y notificaciones en NullPlatform. Centraliza la creación, inspección, y debugging de channels que conectan eventos de la plataforma con agentes.
+Dedicated skill for managing notification channels and notifications in NullPlatform. Centralizes creation, inspection, and debugging of channels that connect platform events with agents.
 
 ## Critical Rules
 
-1. **Siempre usar `/np-api fetch-api`** para acceder a la API. NUNCA usar `curl` directamente contra `api.nullplatform.com`.
-2. **Confirmar antes de crear o modificar** channels. Mostrar la configuración completa y pedir confirmación explícita.
-3. **Validar selector/tags** contra el agente target antes de crear un channel.
+1. **Always use `/np-api fetch-api`** to access the API. NEVER use `curl` directly against `api.nullplatform.com`.
+2. **Confirm before creating or modifying** channels. Show the complete configuration and ask for explicit confirmation.
+3. **Validate selector/tags** against the target agent before creating a channel.
 
 ## Available Commands
 
 | Command | Description |
 |---------|-------------|
-| `/np-notification-manager list` | Listar channels activos para un NRN |
-| `/np-notification-manager create` | Crear un notification channel (guiado) |
-| `/np-notification-manager inspect <channel-id>` | Ver configuración detallada de un channel |
-| `/np-notification-manager notifications <nrn>` | Ver notificaciones recientes para un NRN |
-| `/np-notification-manager resend <notification-id> [channel-id]` | Reenviar una notificación |
-| `/np-notification-manager debug <channel-id>` | Diagnosticar problemas de delivery |
+| `/np-notification-manager list` | List active channels for an NRN |
+| `/np-notification-manager create` | Create a notification channel (guided) |
+| `/np-notification-manager inspect <channel-id>` | View detailed configuration of a channel |
+| `/np-notification-manager notifications <nrn>` | View recent notifications for an NRN |
+| `/np-notification-manager resend <notification-id> [channel-id]` | Resend a notification |
+| `/np-notification-manager debug <channel-id>` | Diagnose delivery problems |
 
 ---
 
 ## Command: List Channels (`/np-notification-manager list`)
 
-Listar todos los channels activos para un NRN:
+List all active channels for an NRN:
 
 ```
 /np-api fetch-api "/notification/channel?nrn=<account-nrn>&status=active"
 ```
 
-Mostrar tabla resumen:
+Show summary table:
 
 ```
 | ID        | Description       | Type  | Source           | Selector              | Filters                              |
@@ -47,9 +47,9 @@ Mostrar tabla resumen:
 
 ## Command: Create Channel (`/np-notification-manager create`)
 
-Flujo guiado para crear un notification channel.
+Guided flow to create a notification channel.
 
-### Preguntas
+### Questions
 
 1. **NRN**: "What account/organization NRN should own this channel?"
 2. **Description**: "Human-readable name for this channel?"
@@ -98,33 +98,33 @@ Flujo guiado para crear un notification channel.
 }
 ```
 
-### Campos clave
+### Key fields
 
-| Campo | Descripción | Valores comunes |
-|-------|-------------|-----------------|
-| `type` | Tipo de channel | `agent` (siempre para scopes/services) |
-| `source` | Qué eventos recibe | `["service"]`, `["telemetry"]`, `["telemetry", "service"]` |
-| `configuration.command.type` | Cómo ejecutar | `exec` (ejecuta comando en el agente) |
-| `configuration.command.data.cmdline` | Comando a ejecutar | Path al entrypoint con args |
-| `configuration.command.data.environment` | Variables de entorno | Siempre incluir `NP_ACTION_CONTEXT` |
-| `configuration.selector` | Tags del agente target | Deben coincidir con `--tags` del agente |
-| `filters` | Qué notificaciones matchear | Slug del service specification |
+| Field | Description | Common values |
+|-------|-------------|---------------|
+| `type` | Channel type | `agent` (always for scopes/services) |
+| `source` | What events it receives | `["service"]`, `["telemetry"]`, `["telemetry", "service"]` |
+| `configuration.command.type` | How to execute | `exec` (executes command on the agent) |
+| `configuration.command.data.cmdline` | Command to execute | Path to entrypoint with args |
+| `configuration.command.data.environment` | Environment variables | Always include `NP_ACTION_CONTEXT` |
+| `configuration.selector` | Target agent tags | Must match the agent's `--tags` |
+| `filters` | Which notifications to match | Service specification slug |
 
-### Sources explicadas
+### Sources explained
 
-- `"service"`: Recibe notificaciones de acciones sobre scopes y deployments (create, deploy, delete, etc.)
-- `"telemetry"`: Recibe requests de logs, métricas, instancias, y parámetros
-- Para un scope completo, siempre usar ambas: `["telemetry", "service"]`
+- `"service"`: Receives notifications for scope and deployment actions (create, deploy, delete, etc.)
+- `"telemetry"`: Receives requests for logs, metrics, instances, and parameters
+- For a complete scope, always use both: `["telemetry", "service"]`
 
-### Filters avanzados
+### Advanced filters
 
-Operadores disponibles en filters:
-- `$eq` — igualdad exacta
-- `$ne` — diferente
-- `$in` — uno de varios valores
-- `$contains` — contiene substring
+Available operators in filters:
+- `$eq` — exact equality
+- `$ne` — not equal
+- `$in` — one of several values
+- `$contains` — contains substring
 
-Ejemplo con múltiples filtros:
+Example with multiple filters:
 ```json
 {
   "filters": {
@@ -134,48 +134,48 @@ Ejemplo con múltiples filtros:
 }
 ```
 
-### Crear el channel
+### Create the channel
 
-Mostrar el JSON completo al usuario y pedir confirmación. Luego:
+Show the complete JSON to the user and ask for confirmation. Then:
 
 ```
-/np-api fetch-api "POST /notification/channel" con body: <channel-json>
+/np-api fetch-api "POST /notification/channel" with body: <channel-json>
 ```
 
-Capturar el ID del channel creado y mostrarlo al usuario.
+Capture the created channel ID and show it to the user.
 
 ---
 
 ## Command: Inspect Channel (`/np-notification-manager inspect <channel-id>`)
 
-Ver la configuración completa de un channel:
+View the complete configuration of a channel:
 
 ```
 /np-api fetch-api "/notification/channel/<channel-id>"
 ```
 
-Mostrar:
-1. **Configuración general**: ID, NRN, description, type, status, sources
-2. **Comando**: cmdline, environment variables
-3. **Selector**: Tags que debe tener el agente
-4. **Filters**: Qué notificaciones matchea
+Show:
+1. **General configuration**: ID, NRN, description, type, status, sources
+2. **Command**: cmdline, environment variables
+3. **Selector**: Tags the agent must have
+4. **Filters**: Which notifications it matches
 5. **Timestamps**: created_at, updated_at
-6. **Validaciones**:
-   - Verificar que el selector tiene tags razonables
-   - Verificar que los filters referencian un slug válido
-   - Verificar que el cmdline apunta a un path existente (si es local)
+6. **Validations**:
+   - Verify the selector has reasonable tags
+   - Verify the filters reference a valid slug
+   - Verify the cmdline points to an existing path (if local)
 
 ---
 
 ## Command: List Notifications (`/np-notification-manager notifications <nrn>`)
 
-Ver notificaciones recientes:
+View recent notifications:
 
 ```
 /np-api fetch-api "/notification?nrn=<nrn>&per_page=20"
 ```
 
-Mostrar tabla con:
+Show table with:
 
 ```
 | ID       | Action              | Status    | Created            | Channel Deliveries |
@@ -185,7 +185,7 @@ Mostrar tabla con:
 | 12345680 | log:read            | failed    | 2025-05-17T16:39Z  | 0 success         |
 ```
 
-Para ver el detalle de delivery de una notificación:
+To view the delivery detail of a notification:
 
 ```
 /np-api fetch-api "/notification/<notification-id>/result"
@@ -195,74 +195,74 @@ Para ver el detalle de delivery de una notificación:
 
 ## Command: Resend Notification (`/np-notification-manager resend <notification-id> [channel-id]`)
 
-Reenvía una notificación para retesting sin necesidad de recrear recursos desde la UI.
+Resends a notification for retesting without needing to recreate resources from the UI.
 
 ```
-/np-api fetch-api "POST /notification/<notification-id>/resend" con body:
+/np-api fetch-api "POST /notification/<notification-id>/resend" with body:
 ```
 
-Sin channel específico (reenvía a todos los channels que matchean):
+Without specific channel (resends to all matching channels):
 ```json
 {}
 ```
 
-Con channel específico:
+With specific channel:
 ```json
 {
   "channels": [{ "id": <channel-id> }]
 }
 ```
 
-### Cuándo usar resend
+### When to use resend
 
-- **Debugging**: El script falló y lo corregiste, querés reejecutar sin recrear el scope/deployment
-- **Testing iterativo**: Estás desarrollando un scope y querés probar cambios en scripts
-- **Validación**: Querés verificar que un fix en el agente resuelve el problema
+- **Debugging**: The script failed and you fixed it, you want to re-execute without recreating the scope/deployment
+- **Iterative testing**: You're developing a scope and want to test script changes
+- **Validation**: You want to verify that an agent fix resolves the problem
 
-### Encontrar el notification ID
+### Finding the notification ID
 
 ```
 /np-api fetch-api "/notification?nrn=<scope-nrn>&per_page=5"
 ```
 
-Filtrar por acción específica si es necesario, revisando el campo `action` en cada notificación.
+Filter by specific action if needed, reviewing the `action` field in each notification.
 
 ---
 
 ## Command: Debug Channel (`/np-notification-manager debug <channel-id>`)
 
-Diagnóstico completo de un channel que no está funcionando.
+Complete diagnosis of a channel that is not working.
 
-### Checks automáticos
+### Automatic checks
 
-1. **Channel status**: Verificar que está `active`
+1. **Channel status**: Verify it's `active`
    ```
    /np-api fetch-api "/notification/channel/<channel-id>"
    ```
 
-2. **Agent connection**: Buscar agentes con tags que matcheen el selector
+2. **Agent connection**: Find agents with tags matching the selector
    ```
    /np-api fetch-api "/controlplane/agent"
    ```
-   Filtrar por tags del selector y verificar que al menos un agente está activo.
+   Filter by selector tags and verify at least one agent is active.
 
-3. **Filter validation**: Verificar que el slug en los filters corresponde a un service specification existente
+3. **Filter validation**: Verify the slug in filters corresponds to an existing service specification
    ```
    /np-api fetch-api "/service/specification?slug=<slug>"
    ```
 
-4. **Recent deliveries**: Revisar las últimas notificaciones y sus resultados
+4. **Recent deliveries**: Review last notifications and their results
    ```
    /np-api fetch-api "/notification?nrn=<channel-nrn>&per_page=10"
    ```
-   Para cada una, revisar delivery result.
+   For each one, review delivery result.
 
-5. **Command path validation**: Si tenemos acceso local, verificar que el cmdline apunta a archivos existentes:
-   - ¿Existe el entrypoint?
-   - ¿Existe el service-path?
-   - ¿Los scripts tienen permisos de ejecución?
+5. **Command path validation**: If we have local access, verify the cmdline points to existing files:
+   - Does the entrypoint exist?
+   - Does the service-path exist?
+   - Do scripts have execute permissions?
 
-### Reporte de diagnóstico
+### Diagnosis report
 
 ```
 Channel Debug Report: <channel-id>
@@ -285,13 +285,13 @@ Issues Found:
 
 ## Reference: Channel Types
 
-| Type | Uso | Configuración |
-|------|-----|---------------|
-| `agent` | Scopes y services — ejecuta comandos en el agente | `command.type: "exec"`, `cmdline`, `environment` |
-| `webhook` | Integraciones externas — envía HTTP POST | `url`, `headers`, `body_template` |
-| `sns` | AWS SNS — publica en un topic | `topic_arn`, `region` |
+| Type | Usage | Configuration |
+|------|-------|---------------|
+| `agent` | Scopes and services — executes commands on the agent | `command.type: "exec"`, `cmdline`, `environment` |
+| `webhook` | External integrations — sends HTTP POST | `url`, `headers`, `body_template` |
+| `sns` | AWS SNS — publishes to a topic | `topic_arn`, `region` |
 
-Para scopes y services, siempre usar `type: "agent"`.
+For scopes and services, always use `type: "agent"`.
 
 ## Reference: Notification Lifecycle
 
@@ -311,11 +311,11 @@ Para scopes y services, siempre usar `type: "agent"`.
 
 ## Troubleshooting
 
-| Problema | Causa probable | Diagnóstico |
-|----------|---------------|-------------|
-| Channel no matchea notificaciones | Filters incorrectos o source faltante | Verificar slug y sources con `/inspect` |
-| Notificación delivered pero script no corre | cmdline incorrecto o permisos | Verificar path y `chmod +x` |
-| Agent no recibe | Tags no coinciden con selector | Comparar `--tags` del agente con `selector` del channel |
-| Delivery timeout | Script tarda mucho o se cuelga | Revisar agent logs con `--command-executor-debug` |
-| Notificación failed | Error en la ejecución del script | Ver `/notification/<id>/result` para detalles del error |
-| Channel en status inactive | Fue desactivado manual o automáticamente | Reactivar via API PATCH |
+| Problem | Probable cause | Diagnosis |
+|---------|---------------|-----------|
+| Channel doesn't match notifications | Incorrect filters or missing source | Verify slug and sources with `/inspect` |
+| Notification delivered but script doesn't run | Incorrect cmdline or permissions | Verify path and `chmod +x` |
+| Agent doesn't receive | Tags don't match selector | Compare agent `--tags` with channel `selector` |
+| Delivery timeout | Script takes too long or hangs | Review agent logs with `--command-executor-debug` |
+| Notification failed | Error in script execution | See `/notification/<id>/result` for error details |
+| Channel in inactive status | Was deactivated manually or automatically | Reactivate via API PATCH |

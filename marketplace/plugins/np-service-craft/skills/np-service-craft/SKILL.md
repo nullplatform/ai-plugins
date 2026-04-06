@@ -6,7 +6,7 @@ allowed-tools: Bash(.claude/skills/np-service-craft/scripts/*.sh), AskUserQuesti
 
 # Nullplatform Service Wizard
 
-Orquestador para crear, listar, registrar y testear servicios de Nullplatform.
+Orchestrator to create, list, register, and test Nullplatform services.
 
 ## Critical Rules
 

@@ -5,103 +5,103 @@ description: This skill should be used when the user asks to "run agent locally"
 
 # np-agent-local-setup
 
-Setup y ejecucion del agente de nullplatform en modo local para desarrollo y testing iterativo de services y scopes.
+Setup and execution of the nullplatform agent in local mode for iterative development and testing of services and scopes.
 
-## Objetivo
+## Objective
 
-El resultado de este skill es **un agente corriendo localmente y verificado** — conectado a la plataforma, respondiendo pings, y listo para recibir notificaciones de services/scopes.
+The result of this skill is **an agent running locally and verified** — connected to the platform, responding to pings, and ready to receive notifications from services/scopes.
 
-## Cuando Usar
+## When to Use
 
-- Antes de testear un service o scope nuevo localmente
-- Cuando se necesita un ambiente de testing iterativo (edit script -> trigger -> ver logs -> fix -> retry)
-- Como prerequisito de `/np-service-craft test`, `/np-scope-craft`, o cualquier flujo que necesite ejecucion local del agente
+- Before testing a new service or scope locally
+- When an iterative testing environment is needed (edit script -> trigger -> see logs -> fix -> retry)
+- As a prerequisite for `/np-service-craft test`, `/np-scope-craft`, or any flow that needs local agent execution
 
 ## Critical Rules
 
-1. **NUNCA correr el agente en Docker para testing local** — correrlo directo en el host
-2. **El agente DEBE estar corriendo ANTES de crear entidades** (scopes, services, deployments) — si no esta corriendo, las notificaciones no llegan
-3. **NUNCA loguear el API Key en texto plano** — usar `$NP_API_KEY` en logs y documentacion
-4. **Confirmar con el usuario antes de arrancar el agente** — mostrar el comando completo
+1. **NEVER run the agent in Docker for local testing** — run it directly on the host
+2. **The agent MUST be running BEFORE creating entities** (scopes, services, deployments) — if it's not running, notifications don't arrive
+3. **NEVER log the API Key in plain text** — use `$NP_API_KEY` in logs and documentation
+4. **Confirm with the user before starting the agent** — show the complete command
 
-## Workflow Operativo
+## Operational Workflow
 
-Claude DEBE ejecutar cada paso, no solo documentarlos. El workflow termina cuando el agente esta corriendo y verificado.
+Claude MUST execute each step, not just document them. The workflow ends when the agent is running and verified.
 
-### Paso 0: Verificar instalacion
+### Step 0: Verify installation
 
-Ejecutar:
+Run:
 
 ```bash
 which np-agent && np-agent version
 ```
 
-Si no esta instalado, pedir confirmacion e instalar con:
+If not installed, ask for confirmation and install with:
 
 ```bash
 curl https://cli.nullplatform.com/agent/install.sh | bash
 ```
 
-Se instala en `~/.local/bin/np-agent`. Verificar que `~/.local/bin` esta en el PATH.
+It installs to `~/.local/bin/np-agent`. Verify that `~/.local/bin` is in the PATH.
 
-### Paso 1: API Key
+### Step 1: API Key
 
-Verificar si ya esta seteado:
+Check if it's already set:
 
 ```bash
 echo "NP_API_KEY: ${NP_API_KEY:-(not set)}"
 ```
 
-Si no esta seteado, pedirle al usuario que:
+If not set, ask the user to:
 
-1. **Cree el API Key en la UI**: Ir a nullplatform UI → Settings → API Keys → Create
-2. **Lo pegue en el chat** o lo exporte en su terminal
+1. **Create the API Key in the UI**: Go to nullplatform UI → Settings → API Keys → Create
+2. **Paste it in the chat** or export it in their terminal
 
-El formato del key es `base64.base64` (dos segmentos separados por punto).
+The key format is `base64.base64` (two segments separated by a dot).
 
-### Paso 2: Preparar el repo en ~/.np/
+### Step 2: Prepare the repo in ~/.np/
 
-El agente busca scripts en `~/.np/` (basepath por defecto). Derivar org y repo del contexto del proyecto (remote git, nombre del directorio, o preguntarle al usuario). Crear el symlink:
+The agent looks for scripts in `~/.np/` (default basepath). Derive org and repo from the project context (git remote, directory name, or ask the user). Create the symlink:
 
 ```bash
 mkdir -p ~/.np/<org>
 ln -sf $(pwd) ~/.np/<org>/<repo-name>
 ```
 
-Si el symlink ya existe y apunta al directorio correcto, no recrearlo. Verificar:
+If the symlink already exists and points to the correct directory, don't recreate it. Verify:
 
 ```bash
 ls -la ~/.np/<org>/<repo-name>/
 ```
 
-**Alternativas** (preguntar si el symlink no aplica):
+**Alternatives** (ask if symlink doesn't apply):
 
-- `-command-executor-command-folders /path/to/parent/folder` — agrega paths de busqueda sin symlinks
-- `-command-executor-git-command-repos "https://TOKEN@github.com/org/repo.git#main"` — clone automatico (para CI, no dev)
+- `-command-executor-command-folders /path/to/parent/folder` — adds search paths without symlinks
+- `-command-executor-git-command-repos "https://TOKEN@github.com/org/repo.git#main"` — automatic clone (for CI, not dev)
 
-### Paso 3: Verificar que el puerto 8080 este libre
+### Step 3: Verify port 8080 is free
 
 ```bash
 lsof -i :8080
 ```
 
-Si el puerto esta ocupado, informar al usuario y pedirle que lo libere antes de continuar.
+If the port is occupied, inform the user and ask them to free it before continuing.
 
-### Paso 4: Crear script de arranque
+### Step 4: Create startup script
 
-Verificar si `scripts/start-agent.sh` ya existe en el repo. Si existe, no recrearlo (puede tener customizaciones del usuario). Si no existe, crearlo con permisos de ejecucion. El script debe:
+Check if `scripts/start-agent.sh` already exists in the repo. If it exists, don't recreate it (it may have user customizations). If it doesn't exist, create it with execute permissions. The script should:
 
-- Validar que `NP_API_KEY` este seteado (exit 1 si no)
-- Arrancar np-agent con los flags correctos
-- Redirigir output a `/tmp/np-agent.log` con `tee`
+- Validate that `NP_API_KEY` is set (exit 1 if not)
+- Start np-agent with the correct flags
+- Redirect output to `/tmp/np-agent.log` with `tee`
 
 ```bash
 #!/bin/bash
 set -euo pipefail
 
 if [ -z "${NP_API_KEY:-}" ]; then
-  echo "ERROR: NP_API_KEY no esta seteado. Exportalo primero:"
-  echo "  export NP_API_KEY=\"tu-api-key\""
+  echo "ERROR: NP_API_KEY is not set. Export it first:"
+  echo "  export NP_API_KEY=\"your-api-key\""
   exit 1
 fi
 
@@ -117,39 +117,39 @@ np-agent \
   2>&1 | tee /tmp/np-agent.log
 ```
 
-Hacerlo ejecutable: `chmod +x scripts/start-agent.sh`
+Make it executable: `chmod +x scripts/start-agent.sh`
 
-Para scopes, agregar estos flags adicionales al script:
+For scopes, add these additional flags to the script:
 
 ```bash
 -tags "environment:development,cluster:local"
 -command-executor-command-folders /path/to/parent/of/scope
 ```
 
-### Paso 5: Indicar al usuario que arranque el agente
+### Step 5: Tell the user to start the agent
 
-El agente es un proceso daemon que corre en loop (WebSocket + heartbeat). **NO se puede correr en background desde Claude** porque el shell del task termina y mata el proceso.
+The agent is a daemon process that runs in a loop (WebSocket + heartbeat). **It CANNOT be run in background from Claude** because the task shell terminates and kills the process.
 
-Indicarle al usuario que abra **otra terminal** y ejecute:
+Tell the user to open **another terminal** and run:
 
 ```bash
-export NP_API_KEY="<su-api-key>"
+export NP_API_KEY="<their-api-key>"
 ./scripts/start-agent.sh
 ```
 
-Decirle explicitamente: "Ejecuta esto en otra terminal para que no bloquee esta sesion. Cuando veas `Successfully connected to command executor` en los logs, avisame."
+Explicitly say: "Run this in another terminal so it doesn't block this session. When you see `Successfully connected to command executor` in the logs, let me know."
 
-Esperar a que el usuario confirme que arranco antes de continuar.
+Wait for the user to confirm it started before continuing.
 
-### Paso 6: Verificar conexion
+### Step 6: Verify connection
 
-Leer los logs y verificar que el agente esta conectado:
+Read the logs and verify the agent is connected:
 
 ```bash
 tail -20 /tmp/np-agent.log
 ```
 
-Debe mostrar:
+Should show:
 
 ```
 INFO  Agent registered 200 OK
@@ -158,31 +158,31 @@ INFO  Successfully connected to command executor
 DEBUG Command <id> [ping] executed with response: map[pong:true status:ok ...]
 ```
 
-Si los pings responden OK, el agente esta listo. Informar al usuario:
+If pings respond OK, the agent is ready. Inform the user:
 - Agent ID
 - Organization ID
-- Tags registrados
-- Que el agente esta listo para recibir notificaciones
+- Registered tags
+- That the agent is ready to receive notifications
 
-### Post-setup: Ciclo de testing iterativo
+### Post-setup: Iterative testing cycle
 
-Una vez que el agente esta corriendo, el ciclo de desarrollo es:
+Once the agent is running, the development cycle is:
 
 ```
-1. Editar script/workflow
-2. Trigger accion (crear service, crear scope, o resend notification)
-3. Ver logs del agente: tail -f /tmp/np-agent.log
-4. Si falla: fix -> resend notification (sin recrear el recurso)
-5. Repetir hasta que funcione
+1. Edit script/workflow
+2. Trigger action (create service, create scope, or resend notification)
+3. View agent logs: tail -f /tmp/np-agent.log
+4. If it fails: fix -> resend notification (without recreating the resource)
+5. Repeat until it works
 ```
 
-Para reenviar una notificacion sin recrear el recurso:
+To resend a notification without recreating the resource:
 
 ```
 /np-notification-manager resend <notification-id>
 ```
 
-Para encontrar el notification ID:
+To find the notification ID:
 
 ```
 /np-api fetch-api "/notification?nrn=<nrn>&per_page=5"
@@ -190,48 +190,48 @@ Para encontrar el notification ID:
 
 ## Flags Reference
 
-| Flag | Default | Uso |
-|------|---------|-----|
-| `-api-key` | `$NP_API_KEY` | Autenticacion (obligatorio) |
-| `-runtime` | - | `host` para local (obligatorio) |
-| `-tags` | - | Tags para matching con notification channels (`k:v,k2:v2`) |
-| `-command-executor-basepath` | `~/.np` | Donde busca scripts |
-| `-command-executor-command-folders` | - | Folders adicionales de busqueda |
-| `-command-executor-debug` | `false` | Imprime stdout de scripts ejecutados |
-| `-command-executor-env` | - | Env vars inyectadas a scripts (`K=V,K2=V2`) |
-| `-command-executor-git-command-repos` | - | Repos a clonar en basepath |
-| `-command-executor-disable-known-commands-validate` | `false` | Desactiva validacion de paths (bypass seguridad) |
+| Flag | Default | Usage |
+|------|---------|-------|
+| `-api-key` | `$NP_API_KEY` | Authentication (mandatory) |
+| `-runtime` | - | `host` for local (mandatory) |
+| `-tags` | - | Tags for matching with notification channels (`k:v,k2:v2`) |
+| `-command-executor-basepath` | `~/.np` | Where to look for scripts |
+| `-command-executor-command-folders` | - | Additional search folders |
+| `-command-executor-debug` | `false` | Prints stdout of executed scripts |
+| `-command-executor-env` | - | Env vars injected into scripts (`K=V,K2=V2`) |
+| `-command-executor-git-command-repos` | - | Repos to clone into basepath |
+| `-command-executor-disable-known-commands-validate` | `false` | Disables path validation (security bypass) |
 | `-log-level` | `ERROR` | `DEBUG`, `INFO`, `WARNING`, `ERROR` |
-| `-log-pretty-print` | `false` | Logs con colores |
-| `-webserver-enabled` | `false` | Habilita health check HTTP en :8080 |
-| `-heartbeat-interval` | `60` | Segundos entre heartbeats |
+| `-log-pretty-print` | `false` | Colored logs |
+| `-webserver-enabled` | `false` | Enables HTTP health check on :8080 |
+| `-heartbeat-interval` | `60` | Seconds between heartbeats |
 
-**Nota**: `np-agent` usa flags estilo Go con **single dash** (`-api-key`), no double dash (`--api-key`). Ambos funcionan pero el estilo canonico es single dash.
+**Note**: `np-agent` uses Go-style flags with **single dash** (`-api-key`), not double dash (`--api-key`). Both work but the canonical style is single dash.
 
-## Gotcha: El agente hereda env vars del shell
+## Gotcha: The agent inherits env vars from the shell
 
-El agente pasa **todas** las variables de entorno del shell donde se inicio a los scripts que ejecuta. Si tu shell tiene `AWS_PROFILE=algo`, los scripts lo van a usar aunque `values.yaml` tenga otro profile configurado.
+The agent passes **all** environment variables from the shell where it was started to the scripts it executes. If your shell has `AWS_PROFILE=something`, the scripts will use it even if `values.yaml` has a different profile configured.
 
-Los scripts (`build_context`) deben overridear explicitamente las variables del cloud provider cuando `values.yaml` tiene un valor. El patron correcto es:
+Scripts (`build_context`) must explicitly override cloud provider variables when `values.yaml` has a value. The correct pattern is:
 
 ```bash
-# values.yaml siempre gana (sin check de -z)
+# values.yaml always wins (no -z check)
 if [ -n "$PROFILE_FROM_VALUES" ]; then
   export AWS_PROFILE="$PROFILE_FROM_VALUES"
 fi
 ```
 
-Si un script falla con "profile not found", verificar que env var hereda el agente con `env | grep AWS` en el shell donde corre.
+If a script fails with "profile not found", verify which env vars the agent inherits with `env | grep AWS` in the shell where it runs.
 
-## Variables de Entorno
+## Environment Variables
 
-| Variable | Quien la usa | Descripcion |
-|----------|-------------|-------------|
-| `NP_API_KEY` | np-agent | Autenticacion del agente con la plataforma |
-| `NULLPLATFORM_API_KEY` | np CLI | El CLI `np` espera esta variable, NO `NP_API_KEY` |
-| `NP_ACTION_CONTEXT` | Notification payload | JSON con el contexto de la accion (seteado por la plataforma) |
+| Variable | Used by | Description |
+|----------|---------|-------------|
+| `NP_API_KEY` | np-agent | Agent authentication with the platform |
+| `NULLPLATFORM_API_KEY` | np CLI | The `np` CLI expects this variable, NOT `NP_API_KEY` |
+| `NP_ACTION_CONTEXT` | Notification payload | JSON with the action context (set by the platform) |
 
-**Bridge critico**: El agente pasa `NP_API_KEY` pero el CLI `np` espera `NULLPLATFORM_API_KEY`. El entrypoint del service/scope debe hacer el bridge:
+**Critical bridge**: The agent passes `NP_API_KEY` but the `np` CLI expects `NULLPLATFORM_API_KEY`. The service/scope entrypoint must do the bridge:
 
 ```bash
 if [ -n "${NP_API_KEY:-}" ] && [ -z "${NULLPLATFORM_API_KEY:-}" ]; then
@@ -241,51 +241,51 @@ fi
 
 ## Path Resolution
 
-El agente resuelve comandos asi:
+The agent resolves commands like this:
 
 ```
-cmdline recibido: "org/repo/services/my-svc/entrypoint/entrypoint"
-resolucion:       basepath + cmdline = ~/.np/org/repo/services/my-svc/entrypoint/entrypoint
+cmdline received: "org/repo/services/my-svc/entrypoint/entrypoint"
+resolution:       basepath + cmdline = ~/.np/org/repo/services/my-svc/entrypoint/entrypoint
 ```
 
-Si el archivo no se encuentra en ninguno de los basepaths + command-folders, el agente devuelve: `"command not found in any allowed paths"`.
+If the file is not found in any of the basepaths + command-folders, the agent returns: `"command not found in any allowed paths"`.
 
-Verificar que el path existe:
+Verify the path exists:
 
 ```bash
 ls -la ~/.np/<org>/<repo>/services/<service>/entrypoint/entrypoint
 ```
 
-Y que tiene permisos de ejecucion:
+And has execute permissions:
 
 ```bash
 chmod +x ~/.np/<org>/<repo>/services/<service>/entrypoint/entrypoint
 ```
 
-Symlinks son validos pero el target debe resolver dentro de los basepaths.
+Symlinks are valid but the target must resolve within the basepaths.
 
 ## Troubleshooting
 
-| Problema | Causa | Solucion |
-|----------|-------|----------|
-| FATAL "bind: address already in use" | Puerto 8080 ocupado por otra instancia | Pedir al usuario que libere el puerto |
-| Agent imprime help y sale | Falta `-runtime host` | Agregar el flag |
-| "Malformed API key" | Key no tiene formato `base64.base64` | Verificar el key en la UI |
-| "command not found in any allowed paths" | Script no esta en basepath | Verificar symlink/clone en `~/.np/` |
-| "symlink points outside allowed paths" | Target del symlink fuera de basepaths | Agregar folder con `-command-executor-command-folders` |
-| Notification llega pero script no corre | Tags del agente no matchean el channel selector | Comparar `-tags` del agente con el selector del channel |
-| "please login first" | `NULLPLATFORM_API_KEY` no seteada | Agregar bridge NP_API_KEY -> NULLPLATFORM_API_KEY en entrypoint |
-| Entrypoint falla silenciosamente (exit 1, sin output) | `SERVICE_PATH` relativo no resuelve | Resolver path absoluto en el entrypoint (ver np-service-craft docs/troubleshooting.md) |
-| WebSocket se desconecta | Red, token expirado | El agente reconecta automaticamente (backoff 1s-20s) |
-| Heartbeat 404 | Server evicto al agente | El agente se re-registra automaticamente |
-| Credentials cloud error al ejecutar tofu | No hay sesion activa del cloud provider | `aws sso login --profile <name>` o `az login` antes de arrancar el agente |
+| Problem | Cause | Solution |
+|---------|-------|----------|
+| FATAL "bind: address already in use" | Port 8080 occupied by another instance | Ask the user to free the port |
+| Agent prints help and exits | Missing `-runtime host` | Add the flag |
+| "Malformed API key" | Key doesn't have `base64.base64` format | Verify the key in the UI |
+| "command not found in any allowed paths" | Script not in basepath | Verify symlink/clone in `~/.np/` |
+| "symlink points outside allowed paths" | Symlink target outside basepaths | Add folder with `-command-executor-command-folders` |
+| Notification arrives but script doesn't run | Agent tags don't match the channel selector | Compare agent `-tags` with channel selector |
+| "please login first" | `NULLPLATFORM_API_KEY` not set | Add bridge NP_API_KEY -> NULLPLATFORM_API_KEY in entrypoint |
+| Entrypoint fails silently (exit 1, no output) | Relative `SERVICE_PATH` doesn't resolve | Resolve absolute path in the entrypoint (see np-service-craft docs/troubleshooting.md) |
+| WebSocket disconnects | Network, expired token | The agent reconnects automatically (backoff 1s-20s) |
+| Heartbeat 404 | Server evicted the agent | The agent re-registers automatically |
+| Cloud credentials error when running tofu | No active cloud provider session | `aws sso login --profile <name>` or `az login` before starting the agent |
 
-## Detener el agente
+## Stopping the agent
 
 ```bash
-# Si corre en foreground: Ctrl+C
-# Si corre en background:
+# If running in foreground: Ctrl+C
+# If running in background:
 kill $(pgrep np-agent)
 ```
 
-El agente hace cleanup al recibir SIGINT/SIGTERM: se marca como inactive en la API.
+The agent does cleanup on SIGINT/SIGTERM: marks itself as inactive in the API.

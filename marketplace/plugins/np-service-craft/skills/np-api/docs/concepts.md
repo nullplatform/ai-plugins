@@ -1,6 +1,6 @@
-# Nullplatform API - Conceptos y Entidades
+# Nullplatform API - Concepts and Entities
 
-## Jerarquía Principal
+## Main Hierarchy
 
 ```
 Organization
@@ -12,7 +12,7 @@ Organization
         │     │     ├── Scope (environment: qa/staging/prod)
         │     │     │     ├── Deployment → DeploymentGroup
         │     │     │     │     └── Deployment Action (blue-green steps)
-        │     │     │     └── Parameter (env vars por scope)
+        │     │     │     └── Parameter (env vars per scope)
         │     │     ├── Service Link → Service Link Action
         │     │     ├── Telemetry (Logs, Metrics)
         │     │     └── Catalog/Metadata (tags, schemas)
@@ -23,85 +23,85 @@ Organization
         │     │     └── Service Action (provision, update, delete)
         │     └── Approval → Approval Action → Policy
         ├── Provider (AWS, GCP, Azure)
-        └── Agent (runtime en infra del cliente)
+        └── Agent (runtime on client infrastructure)
 ```
 
-## Entidades asociadas a NRN (cualquier nivel)
+## NRN-associated Entities (any level)
 
-Estas entidades se crean a un nivel de NRN especifico y cascadean a hijos.
-No estan fijas a un nivel de la jerarquia.
+These entities are created at a specific NRN level and cascade to children.
+They are not fixed to a hierarchy level.
 
-| Entidad | Descripción | Ver docs |
-|---------|-------------|----------|
-| **Dimension** | Ejes de variación (environment, country, region). Cascadean a hijos del NRN | `dimensions.md` |
-| **Entity Hook** (Action) | Interceptores de ciclo de vida (before/after create/write/delete) | `entity-hooks.md` |
-| **Notification Channel** | Destino de alertas: Slack, email, webhook, agent | `workflows.md` |
-| **NRN Config** | Key-value store jerarquico con herencia y merge (potencialmente deprecado) | - |
-| **Runtime Configuration** | Ambientes reutilizables para scopes (potencialmente deprecado) | `runtime-configuration.md` |
+| Entity | Description | See docs |
+|--------|-------------|----------|
+| **Dimension** | Variation axes (environment, country, region). Cascade to NRN children | `dimensions.md` |
+| **Entity Hook** (Action) | Lifecycle interceptors (before/after create/write/delete) | `entity-hooks.md` |
+| **Notification Channel** | Alert destination: Slack, email, webhook, agent | `workflows.md` |
+| **NRN Config** | Hierarchical key-value store with inheritance and merge (potentially deprecated) | - |
+| **Runtime Configuration** | Reusable environments for scopes (potentially deprecated) | `runtime-configuration.md` |
 
-## Entidades Transversales
+## Cross-cutting Entities
 
-| Entidad | Descripción |
-|---------|-------------|
-| **Agent** | Runtime outbound-only en infra del cliente, ejecuta comandos via control plane. Ver `infrastructure.md` |
-| **Agent Command** | Comando remoto ejecutado via control plane (ej: dump de diagnóstico) |
-| **Template** | Plantilla de aplicación (React, Node.js, Java, etc) |
-| **Catalog Specification** | Schema de metadata por entidad (antes "Metadata Specification"). Ver `metadata.md` |
-| **Report** | Analytics y reportes de compliance |
-| **User** | Usuarios humanos y service accounts |
-| **API Key** | Credenciales programáticas con roles asignados (grants). Ver `api-keys.md` |
+| Entity | Description |
+|--------|-------------|
+| **Agent** | Outbound-only runtime on client infrastructure, executes commands via control plane. See `infrastructure.md` |
+| **Agent Command** | Remote command executed via control plane (e.g., diagnostic dump) |
+| **Template** | Application template (React, Node.js, Java, etc) |
+| **Catalog Specification** | Per-entity metadata schema (formerly "Metadata Specification"). See `metadata.md` |
+| **Report** | Analytics and compliance reports |
+| **User** | Human users and service accounts |
+| **API Key** | Programmatic credentials with assigned roles (grants). See `api-keys.md` |
 
-## Microservicios y prefijos de URL
+## Microservices and URL Prefixes
 
-La API publica (`api.nullplatform.com`) es un gateway que rutea a distintos microservicios.
-La mayoria de endpoints van directo sin prefijo, pero algunos microservicios requieren prefijo:
+The public API (`api.nullplatform.com`) is a gateway that routes to different microservices.
+Most endpoints go directly without prefix, but some microservices require a prefix:
 
-| Prefijo | Microservicio | Endpoints |
-|---------|---------------|-----------|
-| *(ninguno)* | `api.nullplatform.io` (core) | account, namespace, application, scope, deployment, build, release, template, etc. |
-| `/metadata/` | `metadata.nullplatform.io` | metadata_specification, {entity}/{id} (metadata de entidades) |
+| Prefix | Microservice | Endpoints |
+|--------|-------------|-----------|
+| *(none)* | `api.nullplatform.io` (core) | account, namespace, application, scope, deployment, build, release, template, etc. |
+| `/metadata/` | `metadata.nullplatform.io` | metadata_specification, {entity}/{id} (entity metadata) |
 
-**Ejemplo**: `np-api fetch-api "/metadata/metadata_specification?entity=application&nrn=..."` llega a `metadata.nullplatform.io/metadata_specification`.
+**Example**: `np-api fetch-api "/metadata/metadata_specification?entity=application&nrn=..."` reaches `metadata.nullplatform.io/metadata_specification`.
 
-## Conceptos Clave
+## Key Concepts
 
 ### Dimension
-Ejes de variación definidos a un **nivel de NRN especifico** (no necesariamente organización).
-Cascadean hacia hijos del NRN. No puede haber la misma dimension en parent Y child (si en siblings).
+Variation axes defined at a **specific NRN level** (not necessarily organization).
+Cascade downward to NRN children. The same dimension cannot exist in a parent-child relationship (but can in siblings).
 - `environment`: prod, staging, qa, dev
 - `country`: us, mx, ar, br
 - `compliance`: banxico, pci, hipaa
 
-Ver `dimensions.md` para endpoints y detalles.
+See `dimensions.md` for endpoints and details.
 
 ### Capability
-Features configurables por scope:
-- `scheduled_stop`: Auto-stop después de inactividad (timer en segundos)
-- `auto_scaling`: Configuración de HPA (min, max, cpu threshold)
-- `health_check`: Configuración de probes K8s
-- `logs`: Provider y throttling de logs
+Configurable features per scope:
+- `scheduled_stop`: Auto-stop after inactivity (timer in seconds)
+- `auto_scaling`: HPA configuration (min, max, cpu threshold)
+- `health_check`: K8s probe configuration
+- `logs`: Log provider and throttling
 
 ### Resource Specification
-Asignación de recursos para containers:
-- CPU: en millicores (300m = 0.3 cores)
-- Memory: en unidades binarias (512Mi, 1Gi)
+Resource allocation for containers:
+- CPU: in millicores (300m = 0.3 cores)
+- Memory: in binary units (512Mi, 1Gi)
 
 ### NRN (Nullplatform Resource Name)
-Identificador jerárquico único de cualquier recurso:
+Unique hierarchical identifier for any resource:
 ```
 organization=123:account=456:namespace=789:application=101:scope=202
 ```
 
-**NRN como scope de configuracion**: Muchas entidades (dimensions, entity hooks, notification
-channels, runtime configurations) se crean a un nivel de NRN y cascadean a hijos. Los hijos
-heredan y pueden extender (pero no duplicar) la configuracion del parent.
+**NRN as configuration scope**: Many entities (dimensions, entity hooks, notification
+channels, runtime configurations) are created at an NRN level and cascade to children. Children
+inherit and can extend (but not duplicate) the parent's configuration.
 
-**NRN como config store** (potencialmente deprecado): El endpoint `/nrn/{nrn_string}` funciona
-como key-value store jerarquico con herencia automatica, merge de JSON objects, namespaces y
-profiles. Recomendado usar platform settings/providers en su lugar.
+**NRN as config store** (potentially deprecated): The `/nrn/{nrn_string}` endpoint works
+as a hierarchical key-value store with automatic inheritance, JSON object merge, namespaces and
+profiles. Recommended to use platform settings/providers instead.
 
-**Wildcards**: Algunos endpoints soportan wildcards en NRN (`account=*`) para escanear
-todos los hijos de un nivel.
+**Wildcards**: Some endpoints support wildcards in NRN (`account=*`) to scan
+all children of a level.
 
 ### Status Lifecycle
 
@@ -115,59 +115,59 @@ todos los hijos de un nivel.
 
 **API Key**: active → revoked
 
-## Uso del CLI
+## CLI Usage
 
 ```bash
-np-api                                  # Muestra este mapa de entidades
-np-api search-endpoint <term>           # Busca endpoints por término
-np-api describe-endpoint <endpoint>     # Documentación completa del endpoint
-np-api fetch-api <url>                  # Ejecuta request a la API
+np-api                                  # Shows this entity map
+np-api search-endpoint <term>           # Search endpoints by term
+np-api describe-endpoint <endpoint>     # Complete endpoint documentation
+np-api fetch-api <url>                  # Execute API request
 ```
 
-### Ejemplos
+### Examples
 
 ```bash
-np-api search-endpoint deployment       # Lista todos los endpoints de deployment
-np-api describe-endpoint /deployment    # Documentación de GET /deployment
+np-api search-endpoint deployment       # List all deployment endpoints
+np-api describe-endpoint /deployment    # Documentation for GET /deployment
 np-api fetch-api "/application/123"
 ```
 
-## Bootstrap - Discovery desde el JWT
+## Bootstrap - Discovery from the JWT
 
-El unico dato garantizado al inicio es el `organization_id`, que se extrae del JWT token
-(lo muestra `check-auth`). No siempre existen accounts, namespaces o aplicaciones previas.
+The only guaranteed data at startup is the `organization_id`, extracted from the JWT token
+(shown by `check-auth`). Accounts, namespaces, or applications may not always exist.
 
-La cadena de discovery para navegar la jerarquia es:
+The discovery chain to navigate the hierarchy is:
 
 ```
-organization_id (del JWT)
-  → GET /account?organization_id=<org_id>           → lista accounts
-    → GET /namespace?account_id=<account_id>         → lista namespaces
-      → GET /application?namespace_id=<namespace_id> → lista aplicaciones
+organization_id (from JWT)
+  → GET /account?organization_id=<org_id>           → list accounts
+    → GET /namespace?account_id=<account_id>         → list namespaces
+      → GET /application?namespace_id=<namespace_id> → list applications
 ```
 
-### Ejemplo completo
+### Complete Example
 
 ```bash
-# 1. Obtener organization_id del token (check-auth lo muestra)
+# 1. Get organization_id from token (check-auth shows it)
 np-api check-auth
 # Output: Organization ID: 1255165411
 
-# 2. Listar accounts de la organizacion
+# 2. List organization accounts
 np-api fetch-api "/account?organization_id=1255165411"
-# Resultado: accounts con id, name, slug, status, repository_prefix, nrn
+# Result: accounts with id, name, slug, status, repository_prefix, nrn
 
-# 3. Elegir un account y listar sus namespaces
+# 3. Choose an account and list its namespaces
 np-api fetch-api "/namespace?account_id=95118862&status=active&limit=50"
-# Resultado: namespaces con id, name, slug, status, nrn
+# Result: namespaces with id, name, slug, status, nrn
 
-# 4. Elegir un namespace y listar sus aplicaciones
+# 4. Choose a namespace and list its applications
 np-api fetch-api "/application?namespace_id=463208973&status=active&limit=100"
-# Resultado: aplicaciones con id, name, slug, status, template_id, repository_url, nrn
+# Result: applications with id, name, slug, status, template_id, repository_url, nrn
 ```
 
-### Notas
-- Cada nivel puede no tener hijos (ej: namespace sin aplicaciones si estamos creando la primera)
-- Filtrar por `status=active` para excluir entidades inactivas/archivadas
-- Todas las respuestas de lista son paginadas con `paging` y `results`
-- El `nrn` de cada entidad contiene la jerarquia completa hasta ese nivel
+### Notes
+- Each level may have no children (e.g., namespace without applications if we're creating the first one)
+- Filter by `status=active` to exclude inactive/archived entities
+- All list responses are paginated with `paging` and `results`
+- Each entity's `nrn` contains the complete hierarchy up to that level

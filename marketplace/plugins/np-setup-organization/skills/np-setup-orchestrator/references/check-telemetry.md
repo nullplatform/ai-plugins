@@ -1,59 +1,59 @@
-# check-telemetry: Verificar Telemetría
+# check-telemetry: Verify Telemetry
 
-## Prerequisitos
+## Prerequisites
 
-- `check-np` debe haber pasado (necesita auth y al menos un scope activo)
-- Debe existir al menos una aplicación con un scope activo
+- `check-np` must have passed (requires auth and at least one active scope)
+- There must be at least one application with an active scope
 
-## Flujo
+## Flow
 
-### 1. Obtener un scope activo para testear
+### 1. Get an active scope for testing
 
-Invocar `/np-api fetch-api "/scope?status=active&limit=10"`
+Invoke `/np-api fetch-api "/scope?status=active&limit=10"`
 
-Seleccionar el primero que tenga `domain` no vacío y `status=active`. Si no hay scopes activos, advertir y saltar el check.
+Select the first one that has a non-empty `domain` and `status=active`. If there are no active scopes, warn and skip the check.
 
-### 2. Verificar Logs
+### 2. Verify Logs
 
-Invocar `/np-api fetch-api "/telemetry/application/{app_id}/log?type=application&scope={scope_id}&limit=10"`
+Invoke `/np-api fetch-api "/telemetry/application/{app_id}/log?type=application&scope={scope_id}&limit=10"`
 
-- Si retorna `results` con datos → ok
-- Si retorna `results` vacío → warning (puede ser normal)
-- Si retorna error → error
+- If it returns `results` with data → ok
+- If it returns empty `results` → warning (may be normal)
+- If it returns error → error
 
-### 3. Verificar Métricas HTTP
+### 3. Verify HTTP Metrics
 
-Invocar `/np-api fetch-api "/telemetry/application/{app_id}/metric/http.rpm?scope_id={scope_id}&minutes=60&period=300"`
+Invoke `/np-api fetch-api "/telemetry/application/{app_id}/metric/http.rpm?scope_id={scope_id}&minutes=60&period=300"`
 
-### 4. Verificar Métricas de Sistema (CPU)
+### 4. Verify System Metrics (CPU)
 
-Invocar `/np-api fetch-api "/telemetry/application/{app_id}/metric/system.cpu_usage_percentage?scope_id={scope_id}&minutes=60&period=300"`
+Invoke `/np-api fetch-api "/telemetry/application/{app_id}/metric/system.cpu_usage_percentage?scope_id={scope_id}&minutes=60&period=300"`
 
-### 5. Verificar Métricas de Sistema (Memoria)
+### 5. Verify System Metrics (Memory)
 
-Invocar `/np-api fetch-api "/telemetry/application/{app_id}/metric/system.memory_usage_percentage?scope_id={scope_id}&minutes=60&period=300"`
+Invoke `/np-api fetch-api "/telemetry/application/{app_id}/metric/system.memory_usage_percentage?scope_id={scope_id}&minutes=60&period=300"`
 
-## Diagnóstico de Problemas
+## Problem Diagnosis
 
-**Si logs fallan:**
-- Verificar que la aplicación está corriendo (`kubectl get pods -n nullplatform`)
-- Verificar que el log-controller está corriendo en `nullplatform-tools`
+**If logs fail:**
+- Verify that the application is running (`kubectl get pods -n nullplatform`)
+- Verify that the log-controller is running in `nullplatform-tools`
 
-**Si métricas HTTP funcionan pero sistema no:**
-- Las métricas HTTP vienen del Istio sidecar
-- Las métricas de sistema requieren configuración adicional del agente
-- Verificar la configuración del provider de telemetría en Nullplatform
+**If HTTP metrics work but system metrics don't:**
+- HTTP metrics come from the Istio sidecar
+- System metrics require additional agent configuration
+- Verify the telemetry provider configuration in Nullplatform
 
-**Si todo falla:**
-- Verificar conectividad del agente a la API
-- Revisar logs del nullplatform-agent: `kubectl logs -n nullplatform-tools -l app=nullplatform-agent`
+**If everything fails:**
+- Verify agent connectivity to the API
+- Review nullplatform-agent logs: `kubectl logs -n nullplatform-tools -l app=nullplatform-agent`
 
-## Lógica de Recomendaciones
+## Recommendation Logic
 
-| Condición | Recomendación |
-|-----------|---------------|
-| Sin scopes activos | Crear scope desde la UI |
-| Logs error | Verificar log-controller y conectividad |
-| HTTP metrics warning | Normal si no hay tráfico al endpoint |
-| CPU/Memory error | Verificar configuración de telemetría del agente o provider |
-| Todo OK | Telemetría funcionando correctamente |
+| Condition | Recommendation |
+|-----------|----------------|
+| No active scopes | Create scope from the UI |
+| Logs error | Verify log-controller and connectivity |
+| HTTP metrics warning | Normal if there's no traffic to the endpoint |
+| CPU/Memory error | Verify agent telemetry configuration or provider |
+| All OK | Telemetry working correctly |

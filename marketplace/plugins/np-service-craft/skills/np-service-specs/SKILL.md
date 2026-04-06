@@ -5,7 +5,7 @@ description: Use when working with nullplatform service spec files — service-s
 
 # Nullplatform Service Specs
 
-Convenciones para archivos de especificacion de servicios: service-spec.json.tpl, link specs, y values.yaml.
+Conventions for service specification files: service-spec.json.tpl, link specs, and values.yaml.
 
 ## Critical Rules
 

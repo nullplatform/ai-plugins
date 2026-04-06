@@ -1,25 +1,25 @@
-# Telemetry (Logs y Metrics)
+# Telemetry (Logs and Metrics)
 
-Logs y métricas de aplicaciones. Hay dos tipos distintos de logs.
+Application logs and metrics. There are two distinct types of logs.
 
 ## @endpoint /telemetry/application/{app_id}/log
 
-Obtiene logs de aplicación (stdout/stderr del container).
+Gets application logs (container stdout/stderr).
 
-### Parámetros
-- `app_id` (path, required): ID de la aplicación
-- `type` (query, required): `application` (requerido)
-- `scope` (query, required): ID del scope (numérico, NO `scope_id`)
-- `limit` (query): Máximo de resultados (default 50, max 1000)
-- `deploy` (query): Filtra por deployment ID
-- `instance` (query): Filtra por pod/instance
-- `container` (query): Filtra por container name
-- `start_time` (query): Inicio del rango (ISO 8601)
-- `end_time` (query): Fin del rango (ISO 8601)
-- `q` (query): Búsqueda full-text
-- `next_page_token` (query): Paginación
+### Parameters
+- `app_id` (path, required): Application ID
+- `type` (query, required): `application` (required)
+- `scope` (query, required): Scope ID (numeric, NOT `scope_id`)
+- `limit` (query): Maximum results (default 50, max 1000)
+- `deploy` (query): Filter by deployment ID
+- `instance` (query): Filter by pod/instance
+- `container` (query): Filter by container name
+- `start_time` (query): Range start (ISO 8601)
+- `end_time` (query): Range end (ISO 8601)
+- `q` (query): Full-text search
+- `next_page_token` (query): Pagination
 
-### Respuesta
+### Response
 ```json
 {
   "results": [
@@ -33,47 +33,47 @@ Obtiene logs de aplicación (stdout/stderr del container).
 }
 ```
 
-### Ejemplo
+### Example
 ```bash
 np-api fetch-api "/telemetry/application/489238271/log?type=application&scope=415005828&limit=100"
 
-# Con filtro de búsqueda
+# With search filter
 np-api fetch-api "/telemetry/application/489238271/log?type=application&scope=415005828&q=error&limit=100"
 
-# Por rango de tiempo
+# By time range
 np-api fetch-api "/telemetry/application/489238271/log?type=application&scope=415005828&start_time=2025-11-28T17:00:00Z&end_time=2025-11-28T18:00:00Z"
 ```
 
-### Notas
-- **Application logs** = stdout/stderr del container (código de aplicación)
-- **Deployment messages** (en `/deployment/{id}?include_messages=true`) = eventos K8s
-- Usar `scope` (NO `scope_id`) como nombre del parámetro
-- `type=application` es requerido
+### Notes
+- **Application logs** = container stdout/stderr (application code)
+- **Deployment messages** (in `/deployment/{id}?include_messages=true`) = K8s events
+- Use `scope` (NOT `scope_id`) as the parameter name
+- `type=application` is required
 
 ---
 
 ## @endpoint /telemetry/application/{app_id}/metric/{metric_name}
 
-Obtiene métricas de una aplicación.
+Gets application metrics.
 
-### Parámetros
-- `app_id` (path, required): ID de la aplicación
-- `metric_name` (path, required): Nombre de la métrica
-- `scope_id` (query): ID del scope (numérico)
-- `minutes` (query): Ventana de tiempo en minutos
-- `start_time` (query): Inicio del rango
-- `end_time` (query): Fin del rango
-- `period` (query, **recomendado**): Granularidad en segundos (usar 300+)
-- `dimensions` (query): Filtros adicionales (ej: `scope_id:123`)
+### Parameters
+- `app_id` (path, required): Application ID
+- `metric_name` (path, required): Metric name
+- `scope_id` (query): Scope ID (numeric)
+- `minutes` (query): Time window in minutes
+- `start_time` (query): Range start
+- `end_time` (query): Range end
+- `period` (query, **recommended**): Granularity in seconds (use 300+)
+- `dimensions` (query): Additional filters (e.g., `scope_id:123`)
 
-### Métricas Disponibles
-- `system.cpu_usage_percentage` - Uso de CPU
-- `system.memory_usage_percentage` - Uso de memoria
+### Available Metrics
+- `system.cpu_usage_percentage` - CPU usage
+- `system.memory_usage_percentage` - Memory usage
 - `http.rpm` - HTTP requests per minute
-- `http.error_rate` - Tasa de errores HTTP
-- `http.response_time` - Tiempo de respuesta (puede requerir instrumentación)
+- `http.error_rate` - HTTP error rate
+- `http.response_time` - Response time (may require instrumentation)
 
-### Respuesta
+### Response
 ```json
 {
   "application_id": 989212014,
@@ -92,30 +92,30 @@ Obtiene métricas de una aplicación.
 }
 ```
 
-### Ejemplo
+### Example
 ```bash
 np-api fetch-api "/telemetry/application/489238271/metric/system.cpu_usage_percentage?scope_id=415005828&minutes=60&period=300"
 ```
 
-### Notas
-- **Usar `period=300` o mayor** - period=60 puede causar anomalías de CloudWatch
-- Respuesta usa `results[].data[]`, NO `datapoints[]`
-- Dimensiones usan IDs numéricos, NO slugs (`scope_id:123`, NO `scope:production`)
-- `http.response_time` puede retornar vacío si no hay instrumentación adecuada
-- Endpoint es `/telemetry/application/...` NO `logs.nullplatform.com` (ese dominio no resuelve)
-- Métricas de scopes auto-stopped muestran 0 aunque `status` siga siendo `active`
+### Notes
+- **Use `period=300` or greater** - period=60 may cause CloudWatch anomalies
+- Response uses `results[].data[]`, NOT `datapoints[]`
+- Dimensions use numeric IDs, NOT slugs (`scope_id:123`, NOT `scope:production`)
+- `http.response_time` may return empty if there's no adequate instrumentation
+- Endpoint is `/telemetry/application/...` NOT `logs.nullplatform.com` (that domain doesn't resolve)
+- Metrics for auto-stopped scopes show 0 even though `status` remains `active`
 
 ---
 
 ## @endpoint /telemetry/instance
 
-Lista instancias/pods de un scope.
+Lists instances/pods of a scope.
 
-### Parámetros
-- `application_id` (query, required): ID de la aplicación
-- `scope_id` (query, required): ID del scope
+### Parameters
+- `application_id` (query, required): Application ID
+- `scope_id` (query, required): Scope ID
 
-### Respuesta
+### Response
 ```json
 {
   "results": [
@@ -147,14 +147,14 @@ Lista instancias/pods de un scope.
 }
 ```
 
-### Ejemplo
+### Example
 ```bash
 np-api fetch-api "/telemetry/instance?application_id={app_id}&scope_id={scope_id}"
 ```
 
-### Notas
-- Devuelve todas las instancias/pods corriendo para el scope
-- `deployment_id` indica de qué deployment proviene cada instancia
-- Útil para verificar si hay instancias de deployments antiguos (stale instances)
-- `state` puede ser: running, pending, terminated
-- Si no hay instancias, devuelve `results: []`
+### Notes
+- Returns all running instances/pods for the scope
+- `deployment_id` indicates which deployment each instance comes from
+- Useful to verify if there are instances from old deployments (stale instances)
+- `state` can be: running, pending, terminated
+- If there are no instances, returns `results: []`

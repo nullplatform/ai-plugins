@@ -1,119 +1,119 @@
 # NRN (Nullplatform Resource Name)
 
-NRN es un identificador jerarquico unico para cualquier recurso en Nullplatform (similar a AWS ARN).
-Ademas de identificar recursos, el endpoint `/nrn/` funciona como un key-value store jerarquico
-con herencia automatica.
+NRN is a unique hierarchical identifier for any resource in Nullplatform (similar to AWS ARN).
+In addition to identifying resources, the `/nrn/` endpoint functions as a hierarchical key-value store
+with automatic inheritance.
 
-**NOTA DEPRECACION**: El NRN como key-value store podria ser removido en el futuro.
-Nullplatform recomienda usar platform settings y providers en su lugar.
+**DEPRECATION NOTE**: The NRN as key-value store may be removed in the future.
+Nullplatform recommends using platform settings and providers instead.
 
-## Formato
+## Format
 
 ```
 organization=123:account=456:namespace=789:application=101:scope=202
 ```
 
-Niveles (de mayor a menor):
+Levels (from highest to lowest):
 1. `organization=<id>`
 2. `organization=<id>:account=<id>`
 3. `organization=<id>:account=<id>:namespace=<id>`
 4. `organization=<id>:account=<id>:namespace=<id>:application=<id>`
 5. `organization=<id>:account=<id>:namespace=<id>:application=<id>:scope=<id>`
 
-## NRN como scope de configuracion
+## NRN as configuration scope
 
-Muchas entidades se crean a un nivel de NRN y cascadean a hijos:
+Many entities are created at an NRN level and cascade to children:
 
-| Entidad | Cascadea | Ejemplo |
-|---------|----------|---------|
-| Dimension | Si | Creada en org, visible en todos los accounts/namespaces/apps |
-| Entity Hook Action | Si | Creada en account, aplica a todas las apps del account |
-| Notification Channel | Si (con showDescendants) | Creada en account, visible con `showDescendants=true` |
-| Runtime Configuration | Si | Creada a un nivel, afecta scopes que matcheen dimensions |
-| Approval Action | Si | Creada en account, aplica a todas las apps del account |
+| Entity | Cascades | Example |
+|--------|----------|---------|
+| Dimension | Yes | Created at org, visible in all accounts/namespaces/apps |
+| Entity Hook Action | Yes | Created at account, applies to all account apps |
+| Notification Channel | Yes (with showDescendants) | Created at account, visible with `showDescendants=true` |
+| Runtime Configuration | Yes | Created at a level, affects scopes that match dimensions |
+| Approval Action | Yes | Created at account, applies to all account apps |
 
-**Regla parent-child para Dimensions**: No puede haber la misma dimension en parent Y child.
-Si puede haber en siblings (dos accounts diferentes).
+**Parent-child rule for Dimensions**: The same dimension cannot exist in both parent AND child.
+It can exist in siblings (two different accounts).
 
 ## @endpoint /nrn/{nrn_string}
 
-Lee valores del key-value store jerarquico. Los valores se heredan y mergean desde niveles
-superiores.
+Reads values from the hierarchical key-value store. Values are inherited and merged from upper
+levels.
 
-### Parametros
-- `nrn_string` (path, required): NRN completo (NO URL-encoded en el path)
-- `ids` (query, **required**): Lista de keys separados por coma
-- `output_json_values` (query): `true` para parsear JSON en vez de devolver strings
-- `no-merge` (query): `true` para obtener solo valores de este nivel, sin herencia
-- `profile` (query): Nombre del profile a aplicar
+### Parameters
+- `nrn_string` (path, required): Complete NRN (NOT URL-encoded in the path)
+- `ids` (query, **required**): Comma-separated list of keys
+- `output_json_values` (query): `true` to parse JSON instead of returning strings
+- `no-merge` (query): `true` to get only values from this level, without inheritance
+- `profile` (query): Profile name to apply
 
-### Ejemplo
+### Example
 ```bash
-# Leer valores especificos
+# Read specific values
 np-api fetch-api "/nrn/organization=1255165411:account=95118862?ids=key1,key2"
 
-# Sin herencia (solo este nivel)
+# Without inheritance (only this level)
 np-api fetch-api "/nrn/organization=1255165411:account=95118862?ids=key1&no-merge=true"
 
-# Con profile
+# With profile
 np-api fetch-api "/nrn/organization=1255165411:account=95118862?ids=key1&profile=my-profile"
 ```
 
-### Herencia y merge
+### Inheritance and merge
 
-Cuando se lee un key en un NRN child:
-1. Se busca el key en el NRN especificado
-2. Si no existe, se busca en el parent (y asi sucesivamente)
-3. Si existe en multiples niveles, se hace **deep merge** de JSON objects y arrays
-4. El child overridea los valores del parent
+When reading a key at a child NRN:
+1. The key is searched at the specified NRN
+2. If it doesn't exist, it's searched in the parent (and so on)
+3. If it exists at multiple levels, a **deep merge** of JSON objects and arrays is performed
+4. The child overrides parent values
 
-### Notas
-- `ids` es **obligatorio** — sin el, el endpoint no devuelve nada util
-- Los valores pueden ser strings, JSON objects, o JSON arrays
-- Con `output_json_values=true`, los JSON strings se parsean automaticamente
-- Con `no-merge=true`, solo se devuelven valores del nivel exacto del NRN
-- **Potencialmente deprecado**: considerar usar platform settings/providers
+### Notes
+- `ids` is **mandatory** — without it, the endpoint returns nothing useful
+- Values can be strings, JSON objects, or JSON arrays
+- With `output_json_values=true`, JSON strings are automatically parsed
+- With `no-merge=true`, only values from the exact NRN level are returned
+- **Potentially deprecated**: consider using platform settings/providers
 
 ---
 
 ## @endpoint /nrn/{nrn_string}/available_profiles
 
-Lista los profiles disponibles para un NRN.
+Lists available profiles for an NRN.
 
-### Parametros
-- `nrn_string` (path, required): NRN completo
+### Parameters
+- `nrn_string` (path, required): Complete NRN
 
-### Ejemplo
+### Example
 ```bash
 np-api fetch-api "/nrn/organization=1255165411:account=95118862/available_profiles"
 ```
 
-### Notas
-- Los profiles permiten configuracion cross-cutting (ej: configuracion por ambiente)
+### Notes
+- Profiles allow cross-cutting configuration (e.g., per-environment configuration)
 - Naming convention: `${profile_name}::${namespace}.${key}`
-- Los profiles tienen ordering (numero menor = mayor prioridad)
-- Se asignan a scopes para aplicar la configuracion correspondiente
+- Profiles have ordering (lower number = higher priority)
+- They are assigned to scopes to apply the corresponding configuration
 
 ---
 
-## Wildcards en NRN
+## Wildcards in NRN
 
-Algunos endpoints soportan wildcards para escanear niveles:
+Some endpoints support wildcards to scan levels:
 
 ```bash
-# Todos los accounts de la org (dimension, service, etc.)
+# All org accounts (dimension, service, etc.)
 GET /dimension?nrn=organization%3D1255165411%3Aaccount%3D*
 
-# Todos los services de la org
+# All org services
 GET /service?nrn=organization%3D1255165411%3Aaccount%3D*&limit=1500
 ```
 
-El wildcard `*` reemplaza el ID en un nivel y devuelve resultados de todos los hijos.
+The `*` wildcard replaces the ID at a level and returns results from all children.
 
 ## URL Encoding
 
-En query params, el NRN debe estar URL-encoded:
+In query params, the NRN must be URL-encoded:
 - `=` → `%3D`
 - `:` → `%3A`
 
-En path params (`/nrn/{nrn_string}`), el NRN va sin encoding.
+In path params (`/nrn/{nrn_string}`), the NRN goes without encoding.

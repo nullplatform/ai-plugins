@@ -1,147 +1,147 @@
-# Arbol de Decision - Azure Infrastructure
+# Decision Tree - Azure Infrastructure
 
-> Invocado desde el paso 4 del wizard principal (`SKILL.md`).
-> **Input global**: `infrastructure/azure/` con archivos .tf originales
-> **Output global**: Archivos .tf customizados, `existing-resources.properties` (si aplica), variables nuevas en `terraform.tfvars`
+> Invoked from step 4 of the main wizard (`SKILL.md`).
+> **Global input**: `infrastructure/azure/` with original .tf files
+> **Global output**: Customized .tf files, `existing-resources.properties` (if applicable), new variables in `terraform.tfvars`
 
-## Contenido
+## Contents
 
-1. [Clasificacion de Modulos](#paso-1-clasificacion-de-modulos)
-2. [Preguntar por componentes Cloud](#paso-2-preguntar-por-cada-componente-cloud)
-3. [Resolver dependencias de excluidos](#paso-3-resolver-dependencias-de-modulos-excluidos)
-4. [Preguntar por componentes Commons](#paso-4-preguntar-por-componentes-commons)
-5. [Aplicar cambios a .tf](#paso-5-aplicar-cambios-a-los-archivos-tf)
-6. [Validar archivos .tf](#paso-6-validar-archivos-tf)
+1. [Module Classification](#step-1-module-classification)
+2. [Ask about Cloud components](#step-2-ask-about-each-cloud-component)
+3. [Resolve excluded dependencies](#step-3-resolve-excluded-module-dependencies)
+4. [Ask about Commons components](#step-4-ask-about-commons-components)
+5. [Apply changes to .tf](#step-5-apply-changes-to-tf-files)
+6. [Validate .tf files](#step-6-validate-tf-files)
 
-## Paso 1: Clasificacion de Modulos
+## Step 1: Module Classification
 
 > **Input**: `infrastructure/azure/main.tf`
-> **Output**: Modulos clasificados por categoria
+> **Output**: Modules classified by category
 
-Leer `main.tf` dinamicamente y clasificar:
+Read `main.tf` dynamically and classify:
 
-### Cloud (preguntables)
+### Cloud (askable)
 
-| Modulo | Pregunta |
+| Module | Question |
 |--------|----------|
-| `resource_group` | Ya tenes un Resource Group? |
-| `vnet` | Ya tenes una VNet? |
-| `aks` | Ya tenes un cluster AKS? |
-| `acr` | Ya tenes un Azure Container Registry? |
-| `dns` | Ya tenes una DNS Zone publica? |
-| `private_dns` | Ya tenes una DNS Zone privada? |
-| `base_security` | Ya tenes NSGs para los gateways? |
+| `resource_group` | Do you already have a Resource Group? |
+| `vnet` | Do you already have a VNet? |
+| `aks` | Do you already have an AKS cluster? |
+| `acr` | Do you already have an Azure Container Registry? |
+| `dns` | Do you already have a public DNS Zone? |
+| `private_dns` | Do you already have a private DNS Zone? |
+| `base_security` | Do you already have NSGs for the gateways? |
 
-### Nullplatform (siempre incluidos, no preguntar)
+### Nullplatform (always included, don't ask)
 
 - `agent_api_key`, `agent`, `base`
 
-Eliminar siempre: `scope_notification_api_key`, `service_notification_api_key`
+Always remove: `scope_notification_api_key`, `service_notification_api_key`
 
-### Commons (preguntables)
+### Commons (askable)
 
-| Modulo | Pregunta |
+| Module | Question |
 |--------|----------|
-| `cert_manager` | Ya tenes cert-manager instalado? |
-| `istio` | Ya tenes Istio instalado? |
-| `external_dns` | Ya tenes external-dns configurado? |
-| `prometheus` | Ya tenes Prometheus instalado? |
+| `cert_manager` | Do you already have cert-manager installed? |
+| `istio` | Do you already have Istio installed? |
+| `external_dns` | Do you already have external-dns configured? |
+| `prometheus` | Do you already have Prometheus installed? |
 
-## Paso 2: Preguntar por cada componente Cloud
+## Step 2: Ask about each Cloud component
 
-> **Input**: Lista de modulos Cloud
-> **Output**: Lista de modulos a mantener vs excluir
+> **Input**: List of Cloud modules
+> **Output**: List of modules to keep vs exclude
 
-Para cada modulo Cloud, preguntar: **"Ya tenes un {recurso} o necesitas que lo cree?"**
+For each Cloud module, ask: **"Do you already have a {resource} or do you need it created?"**
 
-- **Crear nuevo** → Mantener el bloque module
-- **Ya tengo uno** → Agregar a lista de excluidos, resolver dependencias en paso 3
+- **Create new** → Keep the module block
+- **I already have one** → Add to excluded list, resolve dependencies in step 3
 
-### Orden de preguntas (respetar dependencias)
+### Question order (respect dependencies)
 
-1. `resource_group` (muchos dependen de este)
-2. `vnet` (depende de resource_group)
-3. `aks` (depende de resource_group, vnet)
-4. `acr` (depende de resource_group)
-5. `dns` (depende de resource_group)
-6. `private_dns` (depende de resource_group, vnet)
-7. `base_security` (depende de resource_group)
+1. `resource_group` (many depend on this)
+2. `vnet` (depends on resource_group)
+3. `aks` (depends on resource_group, vnet)
+4. `acr` (depends on resource_group)
+5. `dns` (depends on resource_group)
+6. `private_dns` (depends on resource_group, vnet)
+7. `base_security` (depends on resource_group)
 
-> Si el usuario crea `resource_group`, no preguntar por sus dependencias en otros modulos.
+> If the user creates `resource_group`, don't ask about its dependencies in other modules.
 
-## Paso 3: Resolver dependencias de modulos excluidos
+## Step 3: Resolve excluded module dependencies
 
-> **Input**: Lista de modulos excluidos, `main.tf`
-> **Output**: Valores de reemplazo para cada output referenciado
+> **Input**: List of excluded modules, `main.tf`
+> **Output**: Replacement values for each referenced output
 
-Cuando el usuario dice "ya tengo" un recurso:
+When the user says "I already have" a resource:
 
-1. Buscar todas las referencias `module.{modulo_excluido}.{output}` en modulos que se mantienen
-2. Pedir al usuario el valor real de cada referencia encontrada
-3. Guardar los valores (se usan en paso 5)
+1. Find all `module.{excluded_module}.{output}` references in maintained modules
+2. Ask the user for the real value of each found reference
+3. Save the values (used in step 5)
 
-### Deteccion dinamica
+### Dynamic detection
 
 ```bash
-grep -oP 'module\.{modulo_excluido}\.\w+' infrastructure/azure/main.tf | sort -u
+grep -oP 'module\.{excluded_module}\.\w+' infrastructure/azure/main.tf | sort -u
 ```
 
-### Ejemplos
+### Examples
 
-**Resource Group excluido** → preguntar: nombre del RG, location (si referenciada)
+**Resource Group excluded** → ask: RG name, location (if referenced)
 
-**VNet excluida** → preguntar: ID de subnet para AKS, ID de VNet
+**VNet excluded** → ask: subnet ID for AKS, VNet ID
 
-**base_security excluido** → preguntar: ID del NSG publico, ID del NSG privado
+**base_security excluded** → ask: public NSG ID, private NSG ID
 
-## Paso 4: Preguntar por componentes Commons
+## Step 4: Ask about Commons components
 
-> **Input**: Lista de modulos Commons
-> **Output**: Lista de modulos Commons a mantener vs excluir
+> **Input**: List of Commons modules
+> **Output**: List of Commons modules to keep vs exclude
 
-Para cada modulo Commons: **"Ya tenes {componente} instalado o lo instalamos?"**
+For each Commons module: **"Do you already have {component} installed or should we install it?"**
 
-- **Instalar** → Mantener el bloque module
-- **Ya tengo** → Eliminar (generalmente sin outputs referenciados por otros modulos)
+- **Install** → Keep the module block
+- **I already have it** → Remove (generally no outputs referenced by other modules)
 
-## Paso 5: Aplicar cambios a los archivos .tf
+## Step 5: Apply changes to .tf files
 
-> **Input**: Modulos a excluir (pasos 2+4), valores de reemplazo (paso 3), todos los `.tf`
-> **Output**: Archivos `.tf` limpios, `terraform.tfvars` actualizado, `existing-resources.properties`
+> **Input**: Modules to exclude (steps 2+4), replacement values (step 3), all `.tf` files
+> **Output**: Clean `.tf` files, updated `terraform.tfvars`, `existing-resources.properties`
 
-Limpiar **todos** los archivos `.tf`, no solo `main.tf`:
+Clean **all** `.tf` files, not just `main.tf`:
 
 ### 5.1 main.tf
-- Eliminar bloques `module` de recursos excluidos
-- Eliminar siempre `scope_notification_api_key` y `service_notification_api_key`
-- Eliminar `depends_on` que referencien modulos eliminados
-- Reemplazar `module.{excluido}.{output}` con `var.existing_{output}`
+- Remove `module` blocks for excluded resources
+- Always remove `scope_notification_api_key` and `service_notification_api_key`
+- Remove `depends_on` referencing deleted modules
+- Replace `module.{excluded}.{output}` with `var.existing_{output}`
 
 ### 5.2 variables.tf
-- Eliminar variables huerfanas (buscar `var.{nombre}` en todos los `.tf`, si no aparece → eliminar)
-- Agregar variables nuevas para recursos existentes (`var.existing_*`)
+- Remove orphaned variables (search `var.{name}` in all `.tf`, if not found → remove)
+- Add new variables for existing resources (`var.existing_*`)
 
 ### 5.3 locals.tf
-- Eliminar locals huerfanos (buscar `local.{nombre}` en todos los `.tf`, si no aparece → eliminar)
+- Remove orphaned locals (search `local.{name}` in all `.tf`, if not found → remove)
 
 ### 5.4 outputs.tf
-- Eliminar outputs que referencian modulos eliminados
+- Remove outputs referencing deleted modules
 
 ### 5.5 data blocks
-- Eliminar bloques `data` huerfanos en cualquier `.tf`
+- Remove orphaned `data` blocks in any `.tf`
 
 ### 5.6 terraform.tfvars
-- Agregar valores de recursos existentes: `existing_resource_group_name = "mi-rg"`
+- Add existing resource values: `existing_resource_group_name = "my-rg"`
 
 ### 5.7 existing-resources.properties
-- Guardar como documentacion: `resource_group_name=mi-rg-existente`
+- Save as documentation: `resource_group_name=my-existing-rg`
 
-> `existing-resources.properties` es documentacion. Los valores reales van en `terraform.tfvars`.
+> `existing-resources.properties` is documentation. Real values go in `terraform.tfvars`.
 
-## Paso 6: Validar archivos .tf
+## Step 6: Validate .tf files
 
-> **Input**: Archivos `.tf` modificados, `terraform.tfvars`
-> **Output**: Archivos validados, listos para `tofu plan`/`tofu apply`
+> **Input**: Modified `.tf` files, `terraform.tfvars`
+> **Output**: Validated files, ready for `tofu plan`/`tofu apply`
 
 ```bash
 cd infrastructure/azure
@@ -150,10 +150,10 @@ tofu init
 tofu validate
 ```
 
-- **Si pasa** → Continuar con paso 5 de SKILL.md (DNS)
-- **Si falla** → Leer error, corregir, repetir. Causas comunes:
-  - Referencia a modulo eliminado sin reemplazo
-  - Variable sin definir o sin valor en tfvars
-  - `depends_on` apuntando a modulo eliminado
-  - Output referenciando modulo eliminado
-  - Local huerfano
+- **If it passes** → Continue with step 5 of SKILL.md (DNS)
+- **If it fails** → Read error, fix, repeat. Common causes:
+  - Reference to deleted module without replacement
+  - Undefined variable or missing value in tfvars
+  - `depends_on` pointing to deleted module
+  - Output referencing deleted module
+  - Orphaned local

@@ -1,78 +1,78 @@
-# Troubleshooting AWS
+# AWS Troubleshooting
 
-Para problemas genericos (DNS, agent, namespace) ver [troubleshooting.md](troubleshooting.md).
+For generic problems (DNS, agent, namespace) see [troubleshooting.md](troubleshooting.md).
 
-## ALB Controller webhook no ready
+## ALB Controller webhook not ready
 
-**Causa**: El ALB Controller necesita ~2 minutos para registrar su webhook de validacion. Si otros Helm charts se aplican antes, fallan con errores de webhook.
+**Cause**: The ALB Controller needs ~2 minutes to register its validation webhook. If other Helm charts are applied before, they fail with webhook errors.
 
-**Solucion**: Verificar que los modulos Helm posteriores (`cert_manager`, `external_dns`, `istio`, `ingress`) tienen `depends_on = [module.alb_controller]`. Tambien verificar que `alb_controller_iam` esta incluido y que `alb_controller` depende de el (crea el service account necesario).
+**Solution**: Verify that subsequent Helm modules (`cert_manager`, `external_dns`, `istio`, `ingress`) have `depends_on = [module.alb_controller]`. Also verify that `alb_controller_iam` is included and that `alb_controller` depends on it (it creates the required service account).
 
 ```bash
 kubectl get validatingwebhookconfigurations | grep alb
 ```
 
-## IRSA role no funciona
+## IRSA role not working
 
-**Causa**: El OIDC provider del cluster EKS no coincide con la trust policy del IAM role, o el service account no tiene la annotation correcta.
+**Cause**: The EKS cluster's OIDC provider doesn't match the IAM role's trust policy, or the service account doesn't have the correct annotation.
 
-**Solucion**:
-1. Verificar OIDC provider: `aws eks describe-cluster --name {cluster} --query "cluster.identity.oidc.issuer"`
-2. Verificar trust policy del role: `aws iam get-role --role-name {role} --query "Role.AssumeRolePolicyDocument"`
-3. Verificar annotation del service account: `kubectl get sa {sa-name} -n {namespace} -o yaml | grep eks.amazonaws.com/role-arn`
+**Solution**:
+1. Verify OIDC provider: `aws eks describe-cluster --name {cluster} --query "cluster.identity.oidc.issuer"`
+2. Verify role trust policy: `aws iam get-role --role-name {role} --query "Role.AssumeRolePolicyDocument"`
+3. Verify service account annotation: `kubectl get sa {sa-name} -n {namespace} -o yaml | grep eks.amazonaws.com/role-arn`
 
-## EKS endpoint no accesible
+## EKS endpoint not accessible
 
-**Causa**: El cluster EKS tiene configuracion de acceso publico/privado que no permite la conexion desde donde se ejecuta tofu.
+**Cause**: The EKS cluster has public/private access configuration that doesn't allow connection from where tofu is running.
 
-**Solucion**:
-1. Verificar config de acceso: `aws eks describe-cluster --name {cluster} --query "cluster.resourcesVpcConfig.{publicAccess:endpointPublicAccess,privateAccess:endpointPrivateAccess}"`
-2. Si es solo privado, tofu debe ejecutarse desde dentro de la VPC o via VPN
-3. Si es publico, verificar que el CIDR de origen esta en la allowlist
+**Solution**:
+1. Verify access config: `aws eks describe-cluster --name {cluster} --query "cluster.resourcesVpcConfig.{publicAccess:endpointPublicAccess,privateAccess:endpointPrivateAccess}"`
+2. If private only, tofu must run from within the VPC or via VPN
+3. If public, verify the source CIDR is in the allowlist
 
 ## S3 backend permission denied
 
-**Causa**: El profile de AWS CLI no tiene permisos sobre el bucket S3.
+**Cause**: The AWS CLI profile doesn't have permissions on the S3 bucket.
 
-**Solucion**:
-1. Verificar profile: `aws sts get-caller-identity --profile {profile}`
-2. Verificar acceso al bucket: `aws s3 ls s3://{bucket} --profile {profile}`
-3. Verificar que `backend.tf` tiene el `profile` correcto (es obligatorio en AWS)
+**Solution**:
+1. Verify profile: `aws sts get-caller-identity --profile {profile}`
+2. Verify bucket access: `aws s3 ls s3://{bucket} --profile {profile}`
+3. Verify that `backend.tf` has the correct `profile` (mandatory in AWS)
 
 ## NLB targets unhealthy (FailedHealthChecks)
 
-**Causa**: El SG del cluster EKS no tiene reglas de ingreso permitiendo trafico desde el SG del NLB (gateway). El NLB con target type `ip` envia trafico directo a los pods. Sin reglas explicitas en el cluster SG, los health checks (puerto 15021) y el trafico HTTPS (puerto 443) son bloqueados.
+**Cause**: The EKS cluster SG doesn't have ingress rules allowing traffic from the NLB (gateway) SG. The NLB with target type `ip` sends traffic directly to pods. Without explicit rules in the cluster SG, health checks (port 15021) and HTTPS traffic (port 443) are blocked.
 
-**Sintomas**:
-- DNS resuelve correctamente (dig devuelve IPs del NLB)
-- curl hace timeout (no conecta al puerto 443)
-- Target groups del NLB muestran `Target.FailedHealthChecks`
+**Symptoms**:
+- DNS resolves correctly (dig returns NLB IPs)
+- curl times out (doesn't connect to port 443)
+- NLB target groups show `Target.FailedHealthChecks`
 
-**Solucion**:
-1. Verificar que el modulo `security` recibe `cluster_security_group_id` con el **primary SG**:
+**Solution**:
+1. Verify that the `security` module receives `cluster_security_group_id` with the **primary SG**:
    ```hcl
    cluster_security_group_id = module.eks.eks_cluster_primary_security_group_id
    ```
-2. NO usar `eks_cluster_security_group_id` (es el additional SG, no esta adjunto a los nodos)
-3. Verificar targets: `aws elbv2 describe-target-health --target-group-arn {arn}`
-4. Verificar reglas del cluster SG: `aws ec2 describe-security-group-rules --filters "Name=group-id,Values={cluster_sg_id}"`
+2. DO NOT use `eks_cluster_security_group_id` (it's the additional SG, not attached to nodes)
+3. Verify targets: `aws elbv2 describe-target-health --target-group-arn {arn}`
+4. Verify cluster SG rules: `aws ec2 describe-security-group-rules --filters "Name=group-id,Values={cluster_sg_id}"`
 
-**Diferencia entre SGs de EKS**:
-- `eks_cluster_primary_security_group_id`: Creado por EKS, adjunto automaticamente a todos los nodos. Nombre: `eks-cluster-sg-{cluster}-*`
-- `eks_cluster_security_group_id`: Creado por el modulo Terraform de EKS (additional). Nombre: `{cluster}-cluster-*`
+**Difference between EKS SGs**:
+- `eks_cluster_primary_security_group_id`: Created by EKS, automatically attached to all nodes. Name: `eks-cluster-sg-{cluster}-*`
+- `eks_cluster_security_group_id`: Created by the EKS Terraform module (additional). Name: `{cluster}-cluster-*`
 
-## Agent crea Ingress ALB en vez de HTTPRoute
+## Agent creates ALB Ingress instead of HTTPRoute
 
-**Causa**: El agent no tiene configuradas las variables de templates Istio. Por defecto usa `/root/.np/nullplatform/scopes/k8s/deployment/templates/initial-ingress.yaml.tpl` que es un Ingress con `ingressClassName: alb`.
+**Cause**: The agent doesn't have Istio template variables configured. By default it uses `/root/.np/nullplatform/scopes/k8s/deployment/templates/initial-ingress.yaml.tpl` which is an Ingress with `ingressClassName: alb`.
 
-**Sintomas**:
-- `kubectl get ingress -A` muestra un Ingress con clase `alb`
-- `kubectl get httproute -A` no muestra HTTPRoutes para la app
-- El scope no tiene DNS resolution
+**Symptoms**:
+- `kubectl get ingress -A` shows an Ingress with class `alb`
+- `kubectl get httproute -A` doesn't show HTTPRoutes for the app
+- The scope has no DNS resolution
 
-**Solucion**: Agregar al modulo `agent` las variables `service_template`, `initial_ingress_path` y `blue_green_ingress_path` apuntando a los templates de `istio/`. Ver seccion "Agent HTTPRoute Templates" en [aws.md](aws.md).
+**Solution**: Add to the `agent` module the `service_template`, `initial_ingress_path`, and `blue_green_ingress_path` variables pointing to the `istio/` templates. See "Agent HTTPRoute Templates" section in [aws.md](aws.md).
 
-## Validacion post-apply AWS
+## AWS post-apply validation
 
 ```bash
 kubectl cluster-info

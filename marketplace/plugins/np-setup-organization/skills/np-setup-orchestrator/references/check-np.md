@@ -1,71 +1,71 @@
-# check-np: Verificar Nullplatform API
+# check-np: Verify Nullplatform API
 
-## Flujo
+## Flow
 
-### 1. Verificar autenticación
+### 1. Verify authentication
 
-Invocar `/np-api check-auth`. Si falla (token expirado), indicar cómo renovarlo y DETENERSE.
+Invoke `/np-api check-auth`. If it fails (expired token), indicate how to renew it and STOP.
 
-### 2. Consultar estructura básica
+### 2. Query basic structure
 
-Invocar `/np-api` para obtener:
+Invoke `/np-api` to get:
 
-| Información | Entidad a consultar |
-|-------------|---------------------|
-| Organization | organization por ID |
-| Accounts | accounts de la organization |
-| Namespaces | namespaces por account |
-| Providers | providers del account |
+| Information | Entity to query |
+|-------------|-----------------|
+| Organization | organization by ID |
+| Accounts | accounts of the organization |
+| Namespaces | namespaces by account |
+| Providers | providers of the account |
 
-### 3. Verificar actividad reciente (últimas 8 horas)
+### 3. Verify recent activity (last 8 hours)
 
-Para cada account:
+For each account:
 
-1. Buscar aplicaciones del namespace
-2. Buscar scopes de las aplicaciones activas
-3. Buscar builds de las aplicaciones
-4. Buscar deployments de las aplicaciones
+1. Search for namespace applications
+2. Search for scopes of active applications
+3. Search for application builds
+4. Search for application deployments
 
-Filtrar por `created_at > (now - 8h)` y verificar status de los más recientes.
+Filter by `created_at > (now - 8h)` and verify status of the most recent ones.
 
-5. Buscar service specifications del account. Para cada spec, verificar que existe al menos un scope activo reciente.
+5. Search for account service specifications. For each spec, verify that at least one recent active scope exists.
 
-### 4. Verificar endpoints
+### 4. Verify endpoints
 
-Si hay scopes activos con `domain_name`, verificar healthcheck:
+If there are active scopes with `domain_name`, verify healthcheck:
 
 ```bash
 curl -s -o /dev/null -w "%{http_code}" -m 10 "https://{domain_name}{health_check_path}"
 ```
 
-### 5. Verificar telemetría del scope
+### 5. Verify scope telemetry
 
-Invocar `/np-api` para obtener logs y métricas de la aplicación asociada al scope:
-- Si retorna datos → ok
-- Si falla o vacío → recomendar `/np-setup-troubleshooting`
+Invoke `/np-api` to get logs and metrics for the application associated with the scope:
+- If it returns data → ok
+- If it fails or is empty → recommend `/np-setup-troubleshooting`
 
-### 6. Generar reporte de salud
+### 6. Generate health report
 
-Para cada tipo de operación:
-- ok = Hay actividad exitosa reciente
-- error = Hay actividad reciente pero falló
-- sin actividad = Sin actividad reciente (neutral)
+For each operation type:
+- ok = There is recent successful activity
+- error = There is recent activity but it failed
+- no activity = No recent activity (neutral)
 
-## Lógica de Recomendaciones
+## Recommendation Logic
 
-Basarse en la **actividad más reciente**, no en el historial completo:
+Base on the **most recent activity**, not the complete history:
 
-| Condición | Recomendación |
-|-----------|---------------|
-| Sin actividad reciente | "La cuenta está configurada. Podés crear una app desde la UI." |
-| Última app falló | `/np-setup-troubleshooting app {id}` |
-| Último scope falló | `/np-setup-troubleshooting scope {id}` |
-| Último build falló | "Revisar logs del build en la UI o GitHub Actions" |
-| Último deploy falló | `/np-setup-troubleshooting scope {scope_id}` |
-| Endpoint no responde | `/np-setup-troubleshooting scope {id}` |
-| Logs no funcionan | `/np-setup-troubleshooting` (ver sección Telemetría) |
-| Métricas no funcionan | `/np-setup-troubleshooting` (ver sección Telemetría) |
-| Sin scopes de un spec | "Crear scope desde UI o verificar service specification" |
-| Todo OK | "El flujo completo funciona correctamente" |
+| Condition | Recommendation |
+|-----------|----------------|
+| No recent activity | "The account is configured. You can create an app from the UI." |
+| Last app failed | `/np-setup-troubleshooting app {id}` |
+| Last scope failed | `/np-setup-troubleshooting scope {id}` |
+| Last build failed | "Review build logs in the UI or GitHub Actions" |
+| Last deploy failed | `/np-setup-troubleshooting scope {scope_id}` |
+| Endpoint not responding | `/np-setup-troubleshooting scope {id}` |
+| Logs not working | `/np-setup-troubleshooting` (see Telemetry section) |
+| Metrics not working | `/np-setup-troubleshooting` (see Telemetry section) |
+| No scopes for a spec | "Create scope from UI or verify service specification" |
+| All OK | "The complete flow is working correctly" |
 
-> **Nota**: No listar TODAS las entidades fallidas históricamente, solo la más reciente de cada tipo si falló.
+> **Note**: Do not list ALL historically failed entities, only the most recent of each type if it failed.
