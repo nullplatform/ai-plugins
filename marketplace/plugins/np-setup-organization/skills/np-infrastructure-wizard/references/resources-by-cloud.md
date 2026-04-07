@@ -58,8 +58,6 @@ When using Istio (Gateway API) on any cloud, the agent module MUST include the f
 
 | Variable | Required Value |
 |----------|----------------|
-| `use_account_slug` | `true` |
-| `image_pull_secrets` | `""` (empty string if not applicable, but must be explicitly set) |
 | `service_template` | `/root/.np/nullplatform/scopes/k8s/deployment/templates/istio/service.yaml.tpl` |
 | `initial_ingress_path` | `/root/.np/nullplatform/scopes/k8s/deployment/templates/istio/initial-httproute.yaml.tpl` |
 | `blue_green_ingress_path` | `/root/.np/nullplatform/scopes/k8s/deployment/templates/istio/blue-green-httproute.yaml.tpl` |

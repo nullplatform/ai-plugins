@@ -61,14 +61,28 @@ kubectl cluster-info
 Before running validations, detect the networking schema to know which components to check:
 
 ```bash
-DNS_TYPE=$(kubectl get secret -n nullplatform-tools nullplatform-agent-secret-nullplatform-agent -o jsonpath='{.data.DNS_TYPE}' | base64 -d)
-echo "Detected schema: $DNS_TYPE"
+# Try reading from agent secret first
+DNS_TYPE_RAW=$(kubectl get secret -n nullplatform-tools nullplatform-agent-secret-nullplatform-agent -o jsonpath='{.data.DNS_TYPE}')
+if [ -n "$DNS_TYPE_RAW" ]; then
+  DNS_TYPE=$(echo "$DNS_TYPE_RAW" | base64 -d)
+  echo "Detected schema from cluster: $DNS_TYPE"
+else
+  # Fallback: read from terraform.tfvars
+  DNS_TYPE=$(grep 'dns_type' infrastructure/*/terraform.tfvars | grep -o '"[^"]*"' | tr -d '"')
+  if [ -n "$DNS_TYPE" ]; then
+    echo "Agent secret not found. Detected schema from terraform.tfvars: $DNS_TYPE"
+  else
+    echo "ERROR: Could not detect DNS_TYPE from cluster or terraform.tfvars" >&2
+    echo "WARNING: Skipping schema-conditional validations. Only running generic checks." >&2
+    DNS_TYPE=""
+  fi
+fi
 ```
 
 - `external_dns` → Istio schema (check all validations)
 - `route53` → ACM/Ingress schema (skip Istio-only validations marked below)
 
-If the command fails, check that the agent is deployed and the secret exists before continuing.
+If DNS_TYPE is empty after both attempts, the schema cannot be determined. Skip schema-conditional validations and run only the generic ones.
 
 ## Validations
 
@@ -207,7 +221,12 @@ kubectl get pods -n nullplatform-tools -l app=nullplatform-agent
 Verify dns_type matches the detected schema:
 
 ```bash
-kubectl get secret -n nullplatform-tools nullplatform-agent-secret-nullplatform-agent -o jsonpath='{.data.DNS_TYPE}' | base64 -d
+DNS_TYPE_RAW=$(kubectl get secret -n nullplatform-tools nullplatform-agent-secret-nullplatform-agent -o jsonpath='{.data.DNS_TYPE}')
+if [ -z "$DNS_TYPE_RAW" ]; then
+  echo "ERROR: Could not read DNS_TYPE from agent secret"
+else
+  echo "$DNS_TYPE_RAW" | base64 -d
+fi
 ```
 
 Must match the networking schema (see [resources-by-cloud.md](resources-by-cloud.md#ingress-by-cloud)).

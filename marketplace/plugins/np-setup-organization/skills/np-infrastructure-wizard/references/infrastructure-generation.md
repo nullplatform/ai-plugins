@@ -5,19 +5,20 @@ Generator for the `main.tf` of the **infrastructure/** layer in Nullplatform wit
 > **IMPORTANT**: Do not assume values or configurations. When in doubt, divergence, or ambiguity, **always ask the user** before generating code.
 
 > **MANDATORY VALIDATION**: Before generating or modifying any code, checklist:
-> 1. Did I read the downloaded module's `variables.tf`? (Technical rule #7)
-> 2. Did I include all required variables and verify the `validation` blocks of optional ones?
+> 1. Did I read the downloaded module's `variables.tf` AND `outputs.tf`? (Technical rule #7)
+> 2. Did I include ONLY required variables? (no default = include, has default = include ONLY if the default needs to change)
 > 3. Am I inferring any value that I should ask the user about?
 > 4. Does `dns_type` match the chosen networking schema? (dns_type rule)
 > 5. Am I using the module instead of creating resources directly?
 > 6. Are the module blocks clean, without inline comments?
 > 7. Are schema-dependent variables for Istio set with the exact required values from resources-by-cloud.md (not as placeholders)?
+> 8. Am I passing variables with their existing default value? If so, remove them — only pass variables that override the default.
 
 > **EXECUTION INSTRUCTIONS**:
 > 1. Follow the question flow using `AskUserQuestion` - DO NOT assume configurations
 > 2. Run `tofu init -backend=false` to download modules
 > 3. **MANDATORY BEFORE GENERATING**: Read the `variables.tf` of EACH module from `.terraform/modules/` (downloaded version). DO NOT generate main.tf without having read ALL variables.tf first. Variable names in this document may be outdated; the source of truth is always the downloaded module.
-> 4. Generate main.tf using ONLY variable names read from downloaded modules
+> 4. Generate main.tf using ONLY variable names read from downloaded modules. Include ONLY variables without default + variables whose default needs to change. Do NOT dump all variables from variables.tf into the module block.
 > 5. Run `tofu validate` to verify
 > 6. If validate fails, fix BEFORE considering it done
 > 7. **DO NOT make changes** to already generated code without explicit user confirmation
@@ -79,9 +80,23 @@ Provider configuration depends on whether the cluster is CREATED or EXISTING:
 - **Created cluster**: use EKS/AKS/GKE module outputs (read `outputs.tf` from downloaded module)
 - **Existing cluster**: use data sources (`aws_eks_cluster`, `aws_eks_cluster_auth`)
 
+> **CRITICAL**: Do NOT guess or invent output names for provider configuration. You MUST read the actual `outputs.tf` of the downloaded cluster module (in `.terraform/modules/`) BEFORE writing `provider.tf`. For example, AWS EKS outputs are `eks_cluster_endpoint`, `eks_cluster_ca`, `eks_cluster_name` — NOT `cluster_endpoint`, `cluster_certificate_authority`, `cluster_name`. See [aws.md](aws.md#new-cluster-created-by-tofu) for the exact provider blocks per cloud.
+
 **Helm v3.x**: Use `kubernetes = { ... }` syntax with `=` (object), NOT `kubernetes { }` (block). Reference: Helm Provider v3 Upgrade Guide.
 
 **AWS Profile**: If `aws_profile` is supported, use conditional in exec args to add `--profile` only if not null.
+
+## Providers per layer
+
+Each layer has its own `provider.tf` with ONLY the providers it needs. Do NOT copy the infrastructure providers into other layers.
+
+| Layer | Providers needed | Why |
+|-------|-----------------|-----|
+| `infrastructure/` | `aws` (or cloud), `kubernetes`, `helm`, `nullplatform` | Manages cloud resources, K8s components via Helm, and nullplatform agent/base |
+| `nullplatform/` | `nullplatform` only | Only creates nullplatform resources (scope_definition, dimensions, service_definition) |
+| `nullplatform-bindings/` | `aws` (or cloud), `nullplatform` | The `asset/ecr` module needs AWS, the rest are nullplatform resources |
+
+The `kubernetes` and `helm` providers are ONLY needed in `infrastructure/` — do not add them to `nullplatform/` or `nullplatform-bindings/`.
 
 ---
 
@@ -110,8 +125,9 @@ Provider configuration depends on whether the cluster is CREATED or EXISTING:
 4. **Sensitive variables** marked correctly
 5. **Data sources** for existing resources (not redundant variables)
 6. **Format with `terraform fmt`** after generating
-7. **Read READMEs and variables.tf** of each module from `.terraform/modules/` before generating
-8. **NEVER transform outputs between modules** - Pass outputs as-is (without `replace`, `regex`, `split`, etc.). If in doubt about the format a variable expects, read the module's internal code (main.tf, iam.tf, locals.tf) to see how it's used, don't infer by variable name
+7. **Read READMEs, variables.tf AND outputs.tf** of each module from `.terraform/modules/` before generating
+8. **NEVER invent or guess output names** - Read the actual `outputs.tf` of each downloaded module. Common mistake: using `cluster_endpoint` when the real output is `eks_cluster_endpoint`. Wrong output names cause `tofu validate` to fail on every first run.
+9. **NEVER transform outputs between modules** - Pass outputs as-is (without `replace`, `regex`, `split`, etc.). If in doubt about the format a variable expects, read the module's internal code (main.tf, iam.tf, locals.tf) to see how it's used, don't infer by variable name
 
 ---
 
@@ -256,6 +272,12 @@ Provider configuration depends on whether the cluster is CREATED or EXISTING:
 
 ## Correct module structure in infrastructure/
 
+**IMPORTANT**: Every module source MUST follow this exact pattern. Do not invent or modify the source format:
+```hcl
+source = "git::https://github.com/nullplatform/tofu-modules.git//{path}?ref={version}"
+```
+The `{path}` is the comment next to each module below. The `{version}` is a git tag (e.g., `v1.52.0`). See [tofu-modules-patterns.md](tofu-modules-patterns.md#module-source-git-ref) for details.
+
 ```hcl
 # Cloud infrastructure
 module "vpc" { }           # infrastructure/{cloud}/vpc
@@ -382,7 +404,7 @@ The `dns_type` variable of the agent module **has NO default value**, and its va
 
 | Schema | dns_type | Additional agent variables |
 |--------|----------|---------------------------|
-| **Istio** | `external_dns` | `use_account_slug`, `image_pull_secrets`, `service_template`, `initial_ingress_path`, `blue_green_ingress_path` |
+| **Istio** | `external_dns` | `service_template`, `initial_ingress_path`, `blue_green_ingress_path` |
 | **ACM + Ingress** | `route53` | None |
 
 - Do not mix schemas
