@@ -8,7 +8,7 @@ For cloud-specific problems see: [aws-troubleshooting.md](aws-troubleshooting.md
 
 **Solution**:
 1. Verify delegation: `dig NS {slug}.nullapps.io +short`
-2. If there are no NS records, request delegation from Nullplatform (see wizard step 5.4)
+2. If there are no NS records, request delegation from Nullplatform (see wizard step 5.5)
 3. Once delegated, the certificate will validate automatically
 
 ## Cluster doesn't get created

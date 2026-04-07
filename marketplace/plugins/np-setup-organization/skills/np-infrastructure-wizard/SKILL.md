@@ -1,6 +1,7 @@
 ---
 name: np-infrastructure-wizard
 description: Creates cloud infrastructure for Nullplatform. Use when you need to configure VPC/VNet, Kubernetes clusters (EKS/AKS/GKE/OKE/ARO), ingress (Istio/ALB), DNS zones, tfstate backend, and deploy the Nullplatform agent. Supports AWS, Azure, Azure ARO, GCP, and OCI.
+allowed-tools: AskUserQuestion
 ---
 
 # Nullplatform Infrastructure Wizard
@@ -95,16 +96,36 @@ The Nullplatform modules (`agent_api_key`, `agent`, `base`) are always included.
 
 Complete BEFORE the general apply. Without DNS delegation, the SSL certificate stays in PENDING_VALIDATION (1h+ timeout).
 
-#### 5.1 Verify existing delegation
+#### 5.1 Detect DNS zone topology
+
+Determine if the domain is a direct subzone of `nullapps.io` or a nested subzone:
+
+- **Direct subzone**: `{slug}.nullapps.io` (e.g., `acme.nullapps.io`) → Single DNS zone needed
+- **Nested subzone**: `{child}.{parent}.nullapps.io` (e.g., `staging.acme.nullapps.io`) → Two DNS zones needed: the parent zone (`acme.nullapps.io`) and the child zone (`staging.acme.nullapps.io`)
+
+This is common when multiple setups share the same account — the parent zone acts as a delegation hub.
+
+**If nested subzone**, before proceeding:
+
+1. Check if the parent zone already exists:
+   ```bash
+   dig NS {parent}.nullapps.io +short
+   ```
+2. **If parent zone does NOT exist** → The `main.tf` must include two public DNS zone modules: one for the parent zone and one for the child zone. The parent zone must be created and delegated first.
+3. **If parent zone already exists** → Only the child zone module is needed, but an NS record delegating the child must be added to the parent zone.
+
+When two zones are needed, the `main.tf` should have two DNS module blocks (e.g., `module.dns_parent` and `module.dns`). The child zone depends on the parent zone existing. Create and delegate the parent zone first (steps 5.2–5.5), then repeat for the child zone.
+
+#### 5.2 Verify existing delegation
 
 ```bash
-dig NS {slug}.nullapps.io +short
+dig NS {domain}.nullapps.io +short
 ```
 
 - **If it returns NS records** → Continue with step 6
-- **If empty** → Continue with 5.2
+- **If empty** → Continue with 5.3
 
-#### 5.2 Create only the DNS Zone
+#### 5.3 Create only the DNS Zone
 
 Find the DNS module name in `infrastructure/{cloud}/main.tf` (could be `module.dns`, `module.route53`, `module.cloud_dns`, etc. depending on the cloud).
 
@@ -114,21 +135,23 @@ tofu init
 tofu apply -target=module.{dns_module_name}
 ```
 
-#### 5.3 Get NS records
+If there are two zones (parent + child), apply the parent first: `tofu apply -target=module.dns_parent`, delegate it, then apply the child.
+
+#### 5.4 Get NS records
 
 Use the corresponding cloud command (AWS: `aws route53`, Azure: `az network dns zone show`, GCP: `gcloud dns`, OCI: `oci dns zone get`).
 
-#### 5.4 Request delegation from Nullplatform
+#### 5.5 Request delegation from Nullplatform
 
-Generate message with: subzone (`{slug}.nullapps.io`), destination account, NS records to add.
+Generate message with: subzone (`{domain}.nullapps.io`), destination account, NS records to add.
 
-#### 5.5 Verify delegation
+#### 5.6 Verify delegation
 
 ```bash
-dig NS {slug}.nullapps.io +short
+dig NS {domain}.nullapps.io +short
 ```
 
-- **If it returns NS records** → Continue with step 6
+- **If it returns NS records** → Continue with step 6 (or repeat 5.2–5.6 for the child zone if two zones are needed)
 - **If empty** → Wait for DNS propagation (usually minutes, max 48h)
 
 ### 6. Validate cloud session
@@ -161,7 +184,12 @@ tofu apply -var-file="../../common.tfvars" -var-file="terraform.tfvars"
 
 ## Post-Apply
 
-Validation and troubleshooting: see [references/troubleshooting.md](references/troubleshooting.md).
+After `tofu apply` completes, ask the user if they want to run cluster-level validations (highly recommended). Use AskUserQuestion:
+
+- **Run post-apply validations (Recommended)** → Follow the complete flow in [references/post-apply-validation.md](references/post-apply-validation.md). Checks kubectl access, nodes, pods, certificates, DNS resolution, gateways, and agent health.
+- **Skip and continue** → Go to Next Step
+
+For troubleshooting specific failures: see [references/troubleshooting.md](references/troubleshooting.md).
 
 ## Next Step
 
