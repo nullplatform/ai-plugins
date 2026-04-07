@@ -79,10 +79,12 @@ ls -la ~/.np/<org>/<repo-name>/
 - `-command-executor-command-folders /path/to/parent/folder` — adds search paths without symlinks
 - `-command-executor-git-command-repos "https://TOKEN@github.com/org/repo.git#main"` — automatic clone (for CI, not dev)
 
-### Step 3: Verify port 8080 is free
+### Step 3: Verify port 8181 is free
+
+Port 8080 is commonly used by web servers, dev tools, and application frameworks (Spring Boot, Tomcat, webpack-dev-server). The agent defaults to 8080, but we use **8181** to avoid conflicts.
 
 ```bash
-lsof -i :8080
+lsof -i :8181
 ```
 
 If the port is occupied, inform the user and ask them to free it before continuing.
@@ -112,6 +114,7 @@ np-agent \
   -command-executor-env "NP_API_KEY=\"$NP_API_KEY\"" \
   -command-executor-debug \
   -webserver-enabled \
+  -webserver-port 8181 \
   -log-level DEBUG \
   -log-pretty-print \
   2>&1 | tee /tmp/np-agent.log
@@ -203,7 +206,8 @@ To find the notification ID:
 | `-command-executor-disable-known-commands-validate` | `false` | Disables path validation (security bypass) |
 | `-log-level` | `ERROR` | `DEBUG`, `INFO`, `WARNING`, `ERROR` |
 | `-log-pretty-print` | `false` | Colored logs |
-| `-webserver-enabled` | `false` | Enables HTTP health check on :8080 |
+| `-webserver-enabled` | `false` | Enables HTTP health check |
+| `-webserver-port` | `8080` | Health check port. Use **8181** for local dev (8080 is often taken by IDEs) |
 | `-heartbeat-interval` | `60` | Seconds between heartbeats |
 
 **Note**: `np-agent` uses Go-style flags with **single dash** (`-api-key`), not double dash (`--api-key`). Both work but the canonical style is single dash.
@@ -268,7 +272,7 @@ Symlinks are valid but the target must resolve within the basepaths.
 
 | Problem | Cause | Solution |
 |---------|-------|----------|
-| FATAL "bind: address already in use" | Port 8080 occupied by another instance | Ask the user to free the port |
+| FATAL "bind: address already in use" | Port occupied by another process (8080 is commonly used by IDEs/dev servers) | Use `-webserver-port 8181` or another free port |
 | Agent prints help and exits | Missing `-runtime host` | Add the flag |
 | "Malformed API key" | Key doesn't have `base64.base64` format | Verify the key in the UI |
 | "command not found in any allowed paths" | Script not in basepath | Verify symlink/clone in `~/.np/` |

@@ -13,6 +13,28 @@ yaml_value() {
 }
 ```
 
+## Instance Name Sanitization
+
+Many AWS resource names (S3 buckets, RDS instances, ElastiCache clusters) require lowercase alphanumeric characters with hyphens. `.service.name` may be empty or contain characters that sanitize to nothing, producing an invalid name like `np-`.
+
+**Always include a fallback to `SERVICE_ID`** so the name is never empty:
+
+```bash
+SERVICE_NAME=$(echo "$CONTEXT" | jq -r '.service.name // ""')
+# Truncate to 55 chars; with "np-" prefix, total <= 58. Respects S3 (63) and RDS (63) limits.
+# For services with shorter limits (e.g., ElastiCache 40), adjust cut length accordingly.
+SANITIZED=$(echo "$SERVICE_NAME" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | cut -c1-55 | sed 's/^-*//;s/-*$//')
+INSTANCE_NAME="np-${SANITIZED:-$SERVICE_ID}"
+```
+
+If the service has a user-provided name parameter (e.g., `bucket_name_suffix` for S3), prefer that over `SERVICE_NAME` for the resource name. `SERVICE_ATTRS` is the merged attributes+parameters object (see "Merge Attributes with Parameters" below):
+
+```bash
+USER_SUFFIX=$(echo "$SERVICE_ATTRS" | jq -r '.bucket_name_suffix // ""')
+SANITIZED=$(echo "$USER_SUFFIX" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | cut -c1-55 | sed 's/^-*//;s/-*$//')
+INSTANCE_NAME="np-${SANITIZED:-$SERVICE_ID}"
+```
+
 ## Merge Attributes with Parameters
 
 On the first `create` action, `.service.attributes` may be empty. User values come in `.parameters`:
