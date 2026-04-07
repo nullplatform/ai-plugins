@@ -80,6 +80,8 @@ The user only says "yes" or tweaks what they need. They don't have to design any
 
 With the confirmed proposal, generate all files using `np-service-specs` and `np-service-workflows` for conventions. Use the reference service as a base for templates (workflows, scripts, entrypoint) adapting to the specific provider and resources.
 
+**Critical: Instance name fallback** — In `build_context`, the `INSTANCE_NAME` used for cloud resource naming MUST have a fallback to `SERVICE_ID` when `.service.name` sanitizes to empty. See `np-service-workflows` docs/build-context-patterns.md "Instance Name Sanitization". If the service has a user-provided name parameter (e.g., `bucket_name_suffix`), prefer that over `.service.name`.
+
 ### Phase 7: Validate
 
 ```bash
