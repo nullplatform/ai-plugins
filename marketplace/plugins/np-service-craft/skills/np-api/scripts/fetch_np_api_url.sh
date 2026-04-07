@@ -73,8 +73,8 @@ if [ "$METHOD" = "POST" ]; then
     fi
 fi
 
-# On macOS, if npcurl doesn't exist, use curl as fallback
-if [[ "$(uname)" == "Darwin" ]] && ! command -v npcurl &> /dev/null; then
+# If npcurl doesn't exist, use curl as fallback
+if ! command -v npcurl &> /dev/null; then
     npcurl() { curl "$@"; }
 fi
 
@@ -150,7 +150,15 @@ exchange_api_key_for_token() {
 # Handles precedence and caching
 get_token_cache_file() {
     local api_key="$1"
-    local key_hash=$(echo -n "$api_key" | md5 | cut -c1-8)
+    local key_hash
+    if command -v md5 &>/dev/null; then
+        key_hash=$(echo -n "$api_key" | md5 | cut -c1-8)
+    elif command -v md5sum &>/dev/null; then
+        key_hash=$(echo -n "$api_key" | md5sum | cut -c1-8)
+    else
+        echo "[auth] ERROR: Neither 'md5' nor 'md5sum' found. Install coreutils." >&2
+        return 1
+    fi
     echo "${TOKEN_CACHE_DIR}/.np-token-${key_hash}.cache"
 }
 

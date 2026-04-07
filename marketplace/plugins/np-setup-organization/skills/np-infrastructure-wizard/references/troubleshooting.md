@@ -40,12 +40,6 @@ tofu apply
 
 **Prevention**: Follow the DNS-first flow (step 5) to avoid certificate timeouts.
 
-## Post-apply validation (generic)
+## Post-apply validation
 
-```bash
-kubectl cluster-info
-kubectl get ns | grep -E "nullplatform|istio"
-kubectl get pods -n nullplatform-tools -l app=nullplatform-agent
-kubectl get pods -n istio-system
-kubectl get pods -n cert-manager
-```
+See [post-apply-validation.md](post-apply-validation.md) for the complete validation flow (pre-checks, schema detection, and all cluster-level validations).

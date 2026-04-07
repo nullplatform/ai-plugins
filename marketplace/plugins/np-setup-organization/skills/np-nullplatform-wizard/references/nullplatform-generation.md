@@ -138,7 +138,8 @@ Ask which additional modules to include:
    - **Before generating**, run `git tag --sort=-v:refname | head -1` to get the latest release from the repository
    - Use that version in all `?ref=vX.Y.Z` of the modules
 
-2. **Required providers** - Check the latest nullplatform provider version before generating:
+2. **Required providers** - This layer ONLY needs the `nullplatform` provider. Do NOT add `aws`, `kubernetes`, or `helm` providers — those belong in `infrastructure/` only.
+   Check the latest nullplatform provider version before generating:
    ```bash
    curl -s "https://registry.terraform.io/v1/providers/nullplatform/nullplatform/versions" | jq -r '[.versions[].version] | sort_by(split(".") | map(tonumber)) | last'
    ```

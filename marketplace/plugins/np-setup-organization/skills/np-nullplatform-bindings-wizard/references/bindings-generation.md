@@ -113,8 +113,8 @@ Show a table with all components and captured variables. Wait for confirmation b
 1. **Use the latest published version** in all modules
    - **Before generating**, run `git tag --sort=-v:refname | head -1` to get the latest release
 
-2. **Required providers**:
-   - AWS: `hashicorp/aws ~> 6.0`
+2. **Required providers** - This layer needs the cloud provider (`aws`, `azurerm`, or `google`) and `nullplatform`. Do NOT add `kubernetes` or `helm` providers — those belong in `infrastructure/` only.
+   - AWS: `hashicorp/aws ~> 6.0` (or equivalent for other clouds)
    - `nullplatform/nullplatform` - Check the latest version before generating:
      ```bash
      curl -s "https://registry.terraform.io/v1/providers/nullplatform/nullplatform/versions" | jq -r '[.versions[].version] | sort_by(split(".") | map(tonumber)) | last'
@@ -299,8 +299,12 @@ For each scope definition: 2 outputs (id + slug). For each service definition: 2
 
 ## Lessons learned
 
-### 1. DO NOT use depends_on with ECR module
-The `nullplatform/asset/ecr` module has local provider configurations. DO NOT use `depends_on`.
+### 1. DO NOT use depends_on with ECR module — but cloud_provider must exist first
+The `nullplatform/asset/ecr` module has local provider configurations. DO NOT use `depends_on` — it causes errors with local providers.
+
+However, `asset_repository` (ECR) has an implicit dependency on `cloud_provider`: the Nullplatform API requires the AWS provider config to exist before creating an ECR provider config. Since `depends_on` cannot be used, on the first `tofu apply` both modules run in parallel and `asset_repository` may fail with `unresolved dependencies: AWS`. This is expected — a second `tofu apply` resolves it because `cloud_provider` already exists.
+
+To inform the user: if `asset_repository` fails on the first apply with "unresolved dependencies", run `tofu apply` again. This is a known limitation of the ECR module.
 
 ### 2. Output mapping between scope_definition and scope_definition_agent_association
 Modules use different names: `service_specification_id` -> `scope_specification_id`, `service_slug` -> `scope_specification_slug`. The mapping is resolved in `nullplatform/outputs.tf`.
