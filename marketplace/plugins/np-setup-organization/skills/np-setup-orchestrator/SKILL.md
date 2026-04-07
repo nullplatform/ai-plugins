@@ -89,7 +89,7 @@ ls common.tfvars 2>/dev/null
 
 Check with `cat organization.properties`. If it doesn't exist, use AskUserQuestion:
 - **Create a new organization** → Invoke `/np-organization-create`. Generates `organization.properties` automatically.
-- **I already have an organization** → Request organization_id and create: `echo "organization_id={ORG_ID}" > organization.properties`
+- **I already have an organization** → Request the NRN (found in Nullplatform UI). Extract the organization_id from the NRN (format: `organization=XXXX`) and create: `echo "organization_id={ORG_ID}" > organization.properties`
 
 ### Step 2: Configure authentication for skills
 
@@ -99,10 +99,10 @@ A **single API Key** is used for everything (skills + Terraform). It's saved in 
 
 **IMPORTANT:** Do not use root API Keys or keys from other organizations. The key must belong to this organization.
 
-1. Nullplatform UI → Settings → API Keys
+1. Nullplatform UI → Platform Settings → API Keys
 2. Create with:
    - **Scope:** Preferably at the **Account** level (more restrictive). Can also be at the Organization level.
-   - **Roles:** Assign **ALL** roles: Admin, Agent, Developer, Ops, SecOps, Secrets Reader
+   - **Roles:** Assign **these** roles: Admin, Agent, Developer, Ops, SecOps, Secrets Reader
 3. `echo 'YOUR_API_KEY' > np-api-skill.key`
 
 Once created, automatically generate `common.tfvars` with the key (if applicable).

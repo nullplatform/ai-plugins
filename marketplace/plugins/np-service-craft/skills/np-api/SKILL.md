@@ -38,7 +38,7 @@ Show the result to the user. If it fails, indicate the options:
 export NP_API_KEY='your-api-key'
 ```
 
-1. Go to Nullplatform UI -> Settings -> API Keys
+1. Go to Nullplatform UI -> Platform Settings -> API Keys
 2. Create new API Key for the organization
 3. Add `export NP_API_KEY='...'` to `~/.zshrc` or `~/.bashrc`
 

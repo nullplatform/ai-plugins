@@ -277,15 +277,7 @@ In addition to the general variables documented in [variables.md](variables.md),
 
 ### Additional variables by schema
 
-**If schema=Istio** (`dns_type = "external_dns"`), the agent module requires additional variables that are included in the template with placeholders (don't ask, the user fills them when deploying):
-
-| Variable | Description |
-|----------|-------------|
-| `agent_use_account_slug` | Flag to use account slug in names |
-| `agent_image_pull_secrets` | Image pull secrets (empty if not applicable) |
-| `agent_service_template` | Path to Istio service template |
-| `agent_initial_ingress_path` | Path to initial ingress template |
-| `agent_blue_green_ingress_path` | Path to blue-green ingress template |
+**If schema=Istio** (`dns_type = "external_dns"`), the agent module requires additional MANDATORY variables. See [Agent HTTPRoute Templates in resources-by-cloud.md](resources-by-cloud.md#agent-httproute-templates-istio-schema--mandatory) for the exact required values — they must not be left empty.
 
 **If schema=ACM/Ingress** (`dns_type = "route53"`): no additional agent variables are required.
 
@@ -516,26 +508,7 @@ Do not mix schemas. If you use Istio, `dns_type` MUST be `external_dns`. If you 
 
 ### Agent HTTPRoute Templates (Istio schema)
 
-When using Istio with Gateway API, the agent must create HTTPRoute (not ALB Ingress). By default the agent uses ALB Ingress templates. To make it use HTTPRoute, pass these variables to the `agent` module:
-
-```hcl
-module "agent" {
-  ...
-  service_template        = var.service_template
-  initial_ingress_path    = var.initial_ingress_path
-  blue_green_ingress_path = var.blue_green_ingress_path
-}
-```
-
-Recommended defaults in `variables.tf`:
-
-| Variable | Default |
-|----------|---------|
-| `service_template` | `/root/.np/nullplatform/scopes/k8s/deployment/templates/istio/service.yaml.tpl` |
-| `initial_ingress_path` | `/root/.np/nullplatform/scopes/k8s/deployment/templates/istio/initial-httproute.yaml.tpl` |
-| `blue_green_ingress_path` | `/root/.np/nullplatform/scopes/k8s/deployment/templates/istio/blue-green-httproute.yaml.tpl` |
-
-Without these variables, the agent creates Ingress with `ingressClassName: alb` which is not compatible with Gateway API. Result: no HTTPRoute is created, DNS doesn't resolve.
+When using Istio with Gateway API, the agent must create HTTPRoute (not ALB Ingress). See [Agent HTTPRoute Templates in resources-by-cloud.md](resources-by-cloud.md#agent-httproute-templates-istio-schema--mandatory) for the mandatory variable values that must be set in the agent module.
 
 ### Security Module and Cluster SG
 
@@ -552,6 +525,8 @@ module "security" {
 **IMPORTANT**: Use `eks_cluster_primary_security_group_id` (the SG created and managed by EKS, attached to all nodes). DO NOT use `eks_cluster_security_group_id` (additional SG created by the Terraform module, not attached to nodes by default).
 
 Without these rules, the NLB cannot reach Istio gateway pods → unhealthy targets → endpoint timeout.
+
+> **Note**: The security module's resource names are already unique per cluster because they use `cluster_name` as prefix. No additional slug-based naming is needed for security groups.
 
 ## Troubleshooting
 

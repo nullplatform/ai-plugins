@@ -11,7 +11,7 @@ Generator for the `main.tf` of the **infrastructure/** layer in Nullplatform wit
 > 4. Does `dns_type` match the chosen networking schema? (dns_type rule)
 > 5. Am I using the module instead of creating resources directly?
 > 6. Are the module blocks clean, without inline comments?
-> 7. Are schema-dependent variables included with placeholders, without asking?
+> 7. Are schema-dependent variables for Istio set with the exact required values from resources-by-cloud.md (not as placeholders)?
 
 > **EXECUTION INSTRUCTIONS**:
 > 1. Follow the question flow using `AskUserQuestion` - DO NOT assume configurations
@@ -56,6 +56,8 @@ For each component, asks whether to create or use existing:
 - **VPC/VNet**: Create -> `infrastructure/{cloud}/vpc` module | Existing -> requests `vpc_id`, uses data sources
 - **Cluster (EKS/AKS/GKE)**: Create -> `infrastructure/{cloud}/eks|aks|gke` module | Existing -> requests `cluster_name`, uses data sources for endpoint, CA, OIDC
 - **DNS Zones**: Create -> `infrastructure/{cloud}/route53|cloud-dns|azure-dns` module | Existing -> requests `public_zone_id`, `private_zone_id`
+
+**Nested subzones**: If the domain follows the pattern `{child}.{parent}.nullapps.io` (e.g., `staging.acme.nullapps.io`), two public DNS zone modules are needed: one for the parent zone (`acme.nullapps.io`) and one for the child zone (`staging.acme.nullapps.io`). The parent zone acts as delegation hub. Include both in `main.tf` (e.g., `module.dns_parent` and `module.dns`). See step 5 in SKILL.md for the full delegation flow.
 
 **When a resource is existing**: declare variable + data source in `data.tf`. Modules that depend on the resource use the data source instead of `module.X.output`.
 
@@ -384,11 +386,10 @@ The `dns_type` variable of the agent module **has NO default value**, and its va
 | **ACM + Ingress** | `route53` | None |
 
 - Do not mix schemas
-- DO NOT infer values for Istio variables - ALWAYS ask the user
 
-### 33. Schema-dependent variables are NOT asked
+### 33. Schema-dependent variables for Istio are MANDATORY
 
-When the user selects Istio, derived variables (`agent_use_account_slug`, `agent_service_template`, etc.) are automatically added in `variables.tf` and `terraform.tfvars.example` with placeholders. The generator asks for the CONFIGURATION (schema), but derived VARIABLES are included for the user to complete when deploying.
+When the user selects Istio, the agent HTTPRoute template variables MUST be set with the exact values defined in [resources-by-cloud.md — Agent HTTPRoute Templates](resources-by-cloud.md#agent-httproute-templates-istio-schema--mandatory). These variables MUST NOT be left empty or as placeholders — set them with their required values directly in `variables.tf` and `terraform.tfvars`.
 
 ### 34. agent_image_tag depends on cloud provider
 

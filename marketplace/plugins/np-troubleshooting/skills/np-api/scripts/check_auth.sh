@@ -225,7 +225,7 @@ else
     echo "    export NP_TOKEN='eyJ...'"
     echo ""
     echo "  To get an API Key:"
-    echo "    1. Go to Nullplatform UI -> Settings -> API Keys"
+    echo "    1. Go to Nullplatform UI -> Platform Settings -> API Keys"
     echo "    2. Create new API Key with permissions for the organization"
     exit 1
 fi

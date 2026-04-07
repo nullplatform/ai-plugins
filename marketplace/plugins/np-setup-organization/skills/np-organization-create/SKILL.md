@@ -223,7 +223,7 @@ Guide the user:
 3. Configure:
    - **Name:** A descriptive name (e.g., `setup-key`)
    - **Scope:** The newly created organization
-   - **Roles:** Select **all** of these roles:
+   - **Roles:** Select **these** roles:
      - `Admin` — Manage all the resources
      - `Agent` — Role to be used by nullplatform agents
      - `Developer` — Create builds, releases, scopes, start deployments

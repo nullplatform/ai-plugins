@@ -52,6 +52,39 @@ Both schemas use **ALB Controller** as the load balancer. The difference is the 
 | GCP | Istio | - | GCP LB |
 | OCI | Istio | - | OCI LB |
 
+## Agent HTTPRoute Templates (Istio schema) — MANDATORY
+
+When using Istio (Gateway API) on any cloud, the agent module MUST include the following variables so it creates HTTPRoute resources instead of falling back to default Ingress templates. **These values are MANDATORY — they MUST NOT be left empty, omitted, or as placeholders:**
+
+| Variable | Required Value |
+|----------|----------------|
+| `use_account_slug` | `true` |
+| `image_pull_secrets` | `""` (empty string if not applicable, but must be explicitly set) |
+| `service_template` | `/root/.np/nullplatform/scopes/k8s/deployment/templates/istio/service.yaml.tpl` |
+| `initial_ingress_path` | `/root/.np/nullplatform/scopes/k8s/deployment/templates/istio/initial-httproute.yaml.tpl` |
+| `blue_green_ingress_path` | `/root/.np/nullplatform/scopes/k8s/deployment/templates/istio/blue-green-httproute.yaml.tpl` |
+
+> **CRITICAL**: Without these variables, the agent creates default Ingress resources (e.g., `ingressClassName: alb` on AWS) instead of HTTPRoute. This breaks DNS resolution and routing completely. This is the most common cause of broken routing when using Istio.
+
+These variables are additional to the rest of the agent module variables (`dns_type`, `agent_image_tag`, `nrn`, etc.) — they do not replace them. Set them in both `variables.tf` (as defaults) and `terraform.tfvars`.
+
+## Base Module — Gateway NLB Naming — MANDATORY
+
+The `base` module's gateway load balancer names MUST always include the account slug to guarantee uniqueness. The module defaults (`k8s-nullplatform-internet-facing`, `k8s-nullplatform-internal`) assume a single setup per cloud account and fail with `DuplicateLoadBalancerName` (or equivalent) when there are multiple.
+
+**Always set these variables in the `base` module using the account slug:**
+
+| Variable | Required Pattern |
+|----------|-----------------|
+| `gateway_public_aws_name` | `k8s-np-{account_slug}-public` |
+| `gateway_internal_aws_name` | `k8s-np-{account_slug}-internal` |
+
+Replace `{account_slug}` with the actual organization/account slug (e.g., `k8s-np-acme-public`).
+
+> **CRITICAL**: Never rely on the module defaults for these names. Always pass explicit values with the account slug, regardless of whether there are currently multiple setups in the same cloud account.
+
+These variables are additional to the rest of the base module variables (`nrn`, `np_api_key`, `k8s_provider`, etc.) — they do not replace them.
+
 ## Backend by Cloud
 
 | Cloud | Backend | Required Values |
