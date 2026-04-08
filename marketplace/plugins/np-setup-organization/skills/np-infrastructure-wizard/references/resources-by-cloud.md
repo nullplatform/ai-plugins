@@ -79,6 +79,8 @@ The `base` module's gateway load balancer names MUST always include the account 
 
 Replace `{account_slug}` with the actual organization/account slug (e.g., `k8s-np-acme-public`).
 
+> **CRITICAL**: AWS NLB names have a **32 character limit**. The pattern `k8s-np-{slug}-internal` uses 17 characters for the prefix/suffix, leaving **15 characters** for the slug. If the slug exceeds 15 characters, truncate it (e.g., `agustin-training-dos` -> `agustin-train`). Always verify the final name is <= 32 characters before applying.
+
 > **CRITICAL**: Never rely on the module defaults for these names. Always pass explicit values with the account slug, regardless of whether there are currently multiple setups in the same cloud account.
 
 These variables are additional to the rest of the base module variables (`nrn`, `np_api_key`, `k8s_provider`, etc.) — they do not replace them.
