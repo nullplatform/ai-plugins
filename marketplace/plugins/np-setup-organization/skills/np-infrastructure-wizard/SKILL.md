@@ -28,9 +28,34 @@ For resource details by cloud see [references/resources-by-cloud.md](references/
 
 1. Use `/np-api` to list existing accounts
 2. Show options with ID and name
-3. If there are no accounts, indicate to create one via `np` CLI
+3. Ask the user with AskUserQuestion:
+   - **Use an existing account** → Select from the list
+   - **Create a new account** → Follow the account creation flow below
+
+**Creating a new account:**
+
+Ask the user for a Bearer token. They can copy it from Nullplatform UI → Profile picture → Copy personal access token. Then create the account:
+
+```bash
+curl -s -L 'https://api.nullplatform.com/account' \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json' \
+  -H 'Authorization: Bearer <token>' \
+  -d '{
+    "name": "<account_name>",
+    "slug": "<account_slug>",
+    "organization_id": <org_id>,
+    "repository_prefix": "<prefix>",
+    "status": "active",
+    "repository_provider": "github"
+  }'
+```
+
+Ask the user for `name`, `slug`, and `repository_prefix`. The `organization_id` comes from `organization.properties`. The `repository_provider` defaults to `github` unless the user specifies otherwise.
 
 The resulting NRN will have the format: `organization={org_id}:account={account_id}`
+
+**Domain**: The default application domain is `{account_slug}.nullapps.io`. Ask the user to confirm: "The application domain will be `{account_slug}.nullapps.io`. Is this correct, or do you want to use a different domain?". Do NOT offer invented alternatives — if the user wants a different domain, let them specify it.
 
 ### 2. Detect existing structure
 
@@ -125,17 +150,19 @@ dig NS {domain}.nullapps.io +short
 - **If it returns NS records** → Continue with step 6
 - **If empty** → Continue with 5.3
 
-#### 5.3 Create only the DNS Zone
+#### 5.3 First apply: VPC + EKS + DNS
 
-Find the DNS module name in `infrastructure/{cloud}/main.tf` (could be `module.dns`, `module.route53`, `module.cloud_dns`, etc. depending on the cloud).
+Apply the base infrastructure modules first. This serves two purposes: creating the DNS zone for delegation, and resolving VPC/EKS outputs that other modules need (avoids `(known after apply)` errors in the general apply).
 
 ```bash
 cd infrastructure/{cloud}
 tofu init
-tofu apply -target=module.{dns_module_name}
+tofu apply -target=module.vpc -target=module.eks -target=module.dns -var-file="../../common.tfvars" -var-file="terraform.tfvars"
 ```
 
-If there are two zones (parent + child), apply the parent first: `tofu apply -target=module.dns_parent`, delegate it, then apply the child.
+If there are two DNS zones (parent + child), include both: `-target=module.dns_parent -target=module.dns`.
+
+After this apply, VPC, EKS, and DNS exist. The general apply (step 7) will create the remaining modules without `(known after apply)` issues.
 
 #### 5.4 Get NS records
 

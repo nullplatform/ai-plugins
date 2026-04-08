@@ -55,7 +55,7 @@ Read `main.tf` dynamically and classify:
 |--------|----------|
 | `vpc` | Do you already have a VPC? |
 | `eks` | Do you already have an EKS cluster? |
-| `route53` | Do you already have DNS zones in Route53? |
+| `dns` | Do you already have DNS zones in Route53? |
 | `security` | Do you already have Security Groups for the gateways? |
 | `alb_controller` | Do you already have AWS Load Balancer Controller? |
 
@@ -110,16 +110,16 @@ For each Cloud module, ask: **"Do you already have a {resource} or do you need i
 
 1. `vpc` (base of everything)
 2. `eks` (depends on vpc)
-3. `route53` (depends on vpc for private zone)
+3. `dns` (depends on vpc for private zone)
 4. `alb_controller` (depends on eks OIDC)
 5. `security` (depends on eks to derive VPC CIDR)
 6. If schema=ACM/Ingress:
-   - `acm` (depends on route53)
+   - `acm` (depends on dns)
    - `ingress` (depends on acm)
 7. IAM modules:
-   - `iam_external_dns` (depends on eks OIDC + route53)
-   - `iam_cert_manager` (depends on eks OIDC + route53)
-   - `iam_agent` (depends on eks OIDC + route53)
+   - `iam_external_dns` (depends on eks OIDC + dns)
+   - `iam_cert_manager` (depends on eks OIDC + dns)
+   - `iam_agent` (depends on eks OIDC + dns)
 
 > If the user creates `vpc`, don't ask about its dependencies in other modules.
 > If the user creates `eks`, IAM modules can use its OIDC provider directly.
@@ -334,6 +334,8 @@ provider "helm" {
 > Helm v3: see [tofu-modules-patterns.md](tofu-modules-patterns.md#helm-v3-syntax).
 > aws_profile: conditional to avoid passing `--profile null`.
 
+> **EKS: `endpoint_public_access_cidrs` is required** when `endpoint_public_access = true` (which is the default). The variable has `default = []` but a `validation` block that enforces at least one CIDR when public access is enabled. Always ask the user for the CIDRs to allow (e.g., `["0.0.0.0/0"]` for open access, or specific IPs for restricted access).
+
 ### Existing cluster (data sources)
 
 ```hcl
@@ -387,7 +389,7 @@ module "external_dns_public" {
   aws_region        = var.aws_region
   aws_iam_role_arn  = module.external_dns_iam.nullplatform_external_dns_role_arn
   domain_filters    = var.domain_name
-  zone_id_filter    = module.route53.public_zone_id
+  zone_id_filter    = module.dns.public_zone_id
   zone_type         = "public"
   type              = "public"
   depends_on        = [module.alb_controller]
@@ -399,7 +401,7 @@ module "external_dns_private" {
   aws_region        = var.aws_region
   aws_iam_role_arn  = module.external_dns_iam.nullplatform_external_dns_role_arn
   domain_filters    = var.domain_name
-  zone_id_filter    = module.route53.private_zone_id
+  zone_id_filter    = module.dns.private_zone_id
   zone_type         = "private"
   type              = "private"
   create_namespace  = false
@@ -418,8 +420,8 @@ module "cert_manager" {
   cloud_provider      = "aws"
   aws_region          = var.aws_region
   aws_sa_arn          = module.cert_manager_iam.nullplatform_cert_manager_role_arn
-  private_domain_name = module.route53.private_zone_name
-  hosted_zone_name    = module.route53.public_zone_name
+  private_domain_name = module.dns.private_zone_name
+  hosted_zone_name    = module.dns.public_zone_name
   account_slug        = var.account
   depends_on          = [module.alb_controller]
 }

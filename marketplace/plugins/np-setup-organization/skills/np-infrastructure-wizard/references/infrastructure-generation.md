@@ -34,7 +34,7 @@ infrastructure/{cloud}/
 ├── locals.tf
 ├── data.tf                 # Data sources for existing resources
 ├── outputs.tf
-└── terraform.tfvars.example
+└── terraform.tfvars
 ```
 
 ---
@@ -56,7 +56,7 @@ For each component, asks whether to create or use existing:
 
 - **VPC/VNet**: Create -> `infrastructure/{cloud}/vpc` module | Existing -> requests `vpc_id`, uses data sources
 - **Cluster (EKS/AKS/GKE)**: Create -> `infrastructure/{cloud}/eks|aks|gke` module | Existing -> requests `cluster_name`, uses data sources for endpoint, CA, OIDC
-- **DNS Zones**: Create -> `infrastructure/{cloud}/route53|cloud-dns|azure-dns` module | Existing -> requests `public_zone_id`, `private_zone_id`
+- **DNS Zones**: Create -> `infrastructure/{cloud}/dns` module | Existing -> requests `public_zone_id`, `private_zone_id`
 
 **Nested subzones**: If the domain follows the pattern `{child}.{parent}.nullapps.io` (e.g., `staging.acme.nullapps.io`), two public DNS zone modules are needed: one for the parent zone (`acme.nullapps.io`) and one for the child zone (`staging.acme.nullapps.io`). The parent zone acts as delegation hub. Include both in `main.tf` (e.g., `module.dns_parent` and `module.dns`). See step 5 in SKILL.md for the full delegation flow.
 
@@ -230,15 +230,6 @@ The `kubernetes` and `helm` providers are ONLY needed in `infrastructure/` — d
         {"label": "Other region", "description": "Specify manually"}
       ],
       "multiSelect": false
-    },
-    {
-      "question": "Use example values or real ones?",
-      "header": "Values",
-      "options": [
-        {"label": "Example values", "description": "Generate with placeholders"},
-        {"label": "Real values", "description": "I'll provide specific values"}
-      ],
-      "multiSelect": false
     }
   ]
 }
@@ -264,7 +255,7 @@ The `kubernetes` and `helm` providers are ONLY needed in `infrastructure/` — d
 
 1. **`common.tfvars`** (in root): Variables shared between layers
    - `aws_region`, `organization`, `account`, `domain_name`, `np_api_key`, `nrn`, `tags_selectors`, `backend_bucket`
-2. **`terraform.tfvars.example`** (in infrastructure/{cloud}/): Only infrastructure-specific variables
+2. **`terraform.tfvars`** (in infrastructure/{cloud}/): Only infrastructure-specific variables
    - Include header: `# Usage: tofu plan -var-file=../../common.tfvars -var-file=./terraform.tfvars`
    - DO NOT duplicate variables from common.tfvars
 
@@ -282,7 +273,7 @@ The `{path}` is the comment next to each module below. The `{version}` is a git 
 # Cloud infrastructure
 module "vpc" { }           # infrastructure/{cloud}/vpc
 module "eks" { }           # infrastructure/{cloud}/eks (or aks/gke)
-module "dns" { }           # infrastructure/{cloud}/route53 (or cloud-dns/azure-dns)
+module "dns" { }           # infrastructure/{cloud}/dns
 
 # ALB Controller
 module "alb_controller" { }                    # infrastructure/{cloud}/aws_load_balancer_controller
@@ -462,7 +453,7 @@ Available types: `agent`, `scope_notification`, `service_notification`, `custom`
 ## Lessons learned (gotchas)
 
 ### 1. Duplicate variables in tfvars
-Shared variables (`aws_region`, `np_api_key`, etc.) go only in `common.tfvars`, not in each `terraform.tfvars.example`.
+Shared variables (`aws_region`, `np_api_key`, etc.) go only in `common.tfvars`, not in each `terraform.tfvars`.
 
 ### 2. Module outputs can change between versions
 Always verify `outputs.tf` of the downloaded module. DO NOT assume output names.
@@ -495,7 +486,7 @@ NEVER create `aws_iam_policy` or `aws_iam_role` directly. Use modules from `infr
 Every value in a module must come from a variable. `dns_type = var.dns_type`, NOT `dns_type = "route53"`.
 
 ### 12. Consistent variable structure
-For each variable in main.tf: declare it in `variables.tf` + add it to `terraform.tfvars.example` + if shared, to `common.tfvars.example`.
+For each variable in main.tf: declare it in `variables.tf` + add it to `terraform.tfvars` + if shared, to `common.tfvars`.
 
 ### 13. Module location
 `base`, `agent`, and `agent_api_key` go in `infrastructure/`, NOT in `nullplatform-bindings/`.
