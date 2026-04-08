@@ -24,38 +24,11 @@ For resource details by cloud see [references/resources-by-cloud.md](references/
 
 ## Workflow
 
-### 1. Select Nullplatform Account
+### 1. Read Nullplatform Account
 
-1. Use `/np-api` to list existing accounts
-2. Show options with ID and name
-3. Ask the user with AskUserQuestion:
-   - **Use an existing account** → Select from the list
-   - **Create a new account** → Follow the account creation flow below
+Read `organization.properties` to get `organization_id` and `account_id`. Both should already exist from `/np-setup-orchestrator` (Steps 1 and 1b). If `account_id` is missing, run the account selection/creation flow from `/np-setup-orchestrator` Step 1b (select or create account using Bearer token + curl).
 
-**Creating a new account:**
-
-Ask the user for a Bearer token. They can copy it from Nullplatform UI → Profile picture → Copy personal access token. Then create the account:
-
-```bash
-curl -s -L 'https://api.nullplatform.com/account' \
-  -H 'Content-Type: application/json' \
-  -H 'Accept: application/json' \
-  -H 'Authorization: Bearer <token>' \
-  -d '{
-    "name": "<account_name>",
-    "slug": "<account_slug>",
-    "organization_id": <org_id>,
-    "repository_prefix": "<prefix>",
-    "status": "active",
-    "repository_provider": "github"
-  }'
-```
-
-Ask the user for `name`, `slug`, and `repository_prefix`. The `organization_id` comes from `organization.properties`. The `repository_provider` defaults to `github` unless the user specifies otherwise.
-
-The resulting NRN will have the format: `organization={org_id}:account={account_id}`
-
-**Domain**: The default application domain is `{account_slug}.nullapps.io`. Ask the user to confirm: "The application domain will be `{account_slug}.nullapps.io`. Is this correct, or do you want to use a different domain?". Do NOT offer invented alternatives — if the user wants a different domain, let them specify it.
+Build the NRN from the values: `organization={org_id}:account={account_id}`. When generating `common.tfvars`, use this inferred NRN and ask the user to confirm: "The NRN will be `organization=XXXX:account=YYYY`. Is this correct?". Do NOT ask the user to type the NRN manually if it can be inferred.
 
 ### 2. Detect existing structure
 
@@ -150,19 +123,19 @@ dig NS {domain}.nullapps.io +short
 - **If it returns NS records** → Continue with step 6
 - **If empty** → Continue with 5.3
 
-#### 5.3 First apply: VPC + EKS + DNS
+#### 5.3 First apply: VPC + DNS
 
-Apply the base infrastructure modules first. This serves two purposes: creating the DNS zone for delegation, and resolving VPC/EKS outputs that other modules need (avoids `(known after apply)` errors in the general apply).
+Apply VPC and DNS first. This creates the DNS zone needed for delegation and the VPC that other modules depend on.
 
 ```bash
 cd infrastructure/{cloud}
 tofu init
-tofu apply -target=module.vpc -target=module.eks -target=module.dns -var-file="../../common.tfvars" -var-file="terraform.tfvars"
+tofu apply -target=module.vpc -target=module.dns -var-file="../../common.tfvars" -var-file="terraform.tfvars"
 ```
 
 If there are two DNS zones (parent + child), include both: `-target=module.dns_parent -target=module.dns`.
 
-After this apply, VPC, EKS, and DNS exist. The general apply (step 7) will create the remaining modules without `(known after apply)` issues.
+After this apply, VPC and DNS exist. The general apply (step 7) will create EKS and the remaining modules.
 
 #### 5.4 Get NS records
 

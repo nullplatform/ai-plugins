@@ -56,7 +56,6 @@ Read `main.tf` dynamically and classify:
 | `vpc` | Do you already have a VPC? |
 | `eks` | Do you already have an EKS cluster? |
 | `dns` | Do you already have DNS zones in Route53? |
-| `security` | Do you already have Security Groups for the gateways? |
 | `alb_controller` | Do you already have AWS Load Balancer Controller? |
 
 **If schema=ACM/Ingress**, add:
@@ -112,7 +111,6 @@ For each Cloud module, ask: **"Do you already have a {resource} or do you need i
 2. `eks` (depends on vpc)
 3. `dns` (depends on vpc for private zone)
 4. `alb_controller` (depends on eks OIDC)
-5. `security` (depends on eks to derive VPC CIDR)
 6. If schema=ACM/Ingress:
    - `acm` (depends on dns)
    - `ingress` (depends on acm)
@@ -445,15 +443,11 @@ module "base" {
   prometheus_enabled        = true
   metrics_server_enabled    = true
 
-  gateway_public_aws_security_group_id  = module.security.public_gateway_security_group_id
-  gateway_private_aws_security_group_id = module.security.private_gateway_security_group_id
-
   depends_on = [module.alb_controller]
 }
 ```
 
 > `metrics_server_enabled = true` installs Kubernetes metrics-server (needed for HPA and `kubectl top`).
-> `gateway_*_aws_security_group_id` come from the `security` module and are used to annotate NLBs with the correct SGs.
 > `gateway_security_enabled` is `false` by default. Only if enabled are Azure/GCP provider stubs needed.
 
 ## Critical AWS Patterns
@@ -511,24 +505,6 @@ Do not mix schemas. If you use Istio, `dns_type` MUST be `external_dns`. If you 
 ### Agent HTTPRoute Templates (Istio schema)
 
 When using Istio with Gateway API, the agent must create HTTPRoute (not ALB Ingress). See [Agent HTTPRoute Templates in resources-by-cloud.md](resources-by-cloud.md#agent-httproute-templates-istio-schema--mandatory) for the mandatory variable values that must be set in the agent module.
-
-### Security Module and Cluster SG
-
-The `security` module creates SGs for the gateways (NLB) and optionally adds ingress rules to the EKS cluster SG. Pass `cluster_security_group_id` with the **primary SG** (EKS-managed):
-
-```hcl
-module "security" {
-  ...
-  cluster_name              = module.eks.eks_cluster_name
-  cluster_security_group_id = module.eks.eks_cluster_primary_security_group_id
-}
-```
-
-**IMPORTANT**: Use `eks_cluster_primary_security_group_id` (the SG created and managed by EKS, attached to all nodes). DO NOT use `eks_cluster_security_group_id` (additional SG created by the Terraform module, not attached to nodes by default).
-
-Without these rules, the NLB cannot reach Istio gateway pods → unhealthy targets → endpoint timeout.
-
-> **Note**: The security module's resource names are already unique per cluster because they use `cluster_name` as prefix. No additional slug-based naming is needed for security groups.
 
 ## Troubleshooting
 
