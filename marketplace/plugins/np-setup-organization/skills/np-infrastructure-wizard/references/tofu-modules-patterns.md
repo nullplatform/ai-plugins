@@ -10,6 +10,7 @@
 4. [Generic provider versions](#generic-provider-versions)
 5. [Helm v3 syntax](#helm-v3-syntax)
 6. [Agent API Key module](#agent-api-key-module)
+7. [Running tofu commands](#running-tofu-commands)
 
 ## How to read module variables
 
@@ -89,3 +90,13 @@ module "agent_api_key" {
 ```
 
 Then use `module.agent_api_key.api_key` only in the `agent` module (instead of `var.np_api_key` directly). The `base` module still uses `var.np_api_key`.
+
+## Running tofu commands
+
+`tofu plan` and `tofu apply` produce very long output that gets truncated in Claude Code. Always pipe to a log file and read the tail to ensure you see the final result:
+
+```bash
+tofu apply [args] 2>&1 | tee /tmp/tofu-output.log; echo "---EXIT CODE: $?---"; tail -50 /tmp/tofu-output.log
+```
+
+This applies to all tofu commands across all layers (infrastructure, nullplatform, nullplatform-bindings). If something fails, the full log is in `/tmp/tofu-output.log`.

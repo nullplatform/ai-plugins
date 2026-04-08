@@ -91,6 +91,33 @@ Check with `cat organization.properties`. If it doesn't exist, use AskUserQuesti
 - **Create a new organization** → Invoke `/np-organization-create`. Generates `organization.properties` automatically.
 - **I already have an organization** → Request the NRN (found in Nullplatform UI). Extract the organization_id from the NRN (format: `organization=XXXX`) and create: `echo "organization_id={ORG_ID}" > organization.properties`
 
+### Step 1b: Select or create Nullplatform Account
+
+After having the organization, ask with AskUserQuestion:
+- **I already have an account** → Ask for the account ID or NRN
+- **I need to create a new account** → Ask for a Bearer token (Nullplatform UI → Profile picture → Copy personal access token), then ask for `name`, `slug`, and `repository_prefix`:
+
+```bash
+curl -s -L 'https://api.nullplatform.com/account' \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json' \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "name": "<account_name>",
+    "slug": "<account_slug>",
+    "organization_id": '"$ORG_ID"',
+    "repository_prefix": "<prefix>",
+    "status": "active",
+    "repository_provider": "github"
+  }'
+```
+
+The `repository_provider` defaults to `github` unless the user specifies otherwise.
+
+**Domain**: The default application domain is `{account_slug}.nullapps.io`. Ask the user to confirm: "The application domain will be `{account_slug}.nullapps.io`. Is this correct, or do you want to use a different domain?". Do NOT offer invented alternatives.
+
+Save the account info: `echo "account_id={ACCOUNT_ID}" >> organization.properties`
+
 ### Step 2: Configure authentication for skills
 
 Check with `ls np-api-skill.key np-api-skill.token`. If it doesn't exist, guide:
@@ -104,6 +131,10 @@ A **single API Key** is used for everything (skills + Terraform). It's saved in 
    - **Scope:** Preferably at the **Account** level (more restrictive). Can also be at the Organization level.
    - **Roles:** Assign **these** roles: Admin, Agent, Developer, Ops, SecOps, Secrets Reader
 3. `echo 'YOUR_API_KEY' > np-api-skill.key`
+4. Export it for the current session so np-api and other skills can use it:
+   ```bash
+   export NP_API_KEY=$(cat np-api-skill.key)
+   ```
 
 Once created, automatically generate `common.tfvars` with the key (if applicable).
 

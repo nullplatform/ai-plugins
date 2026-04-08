@@ -13,6 +13,10 @@ Generator for the `main.tf` of the **infrastructure/** layer in Nullplatform wit
 > 6. Are the module blocks clean, without inline comments?
 > 7. Are schema-dependent variables for Istio set with the exact required values from resources-by-cloud.md (not as placeholders)?
 > 8. Am I passing variables with their existing default value? If so, remove them — only pass variables that override the default.
+>
+> **EXAMPLE — what NOT to do**: The `base` module has `gateway_public_aws_security_group_id` (default `""`) and `gateway_private_aws_security_group_id` (default `""`). Do NOT pass these unless you have specific SG IDs to assign — the module works without them.
+>
+> **The rule**: if a variable has a default AND the module works correctly with that default (or derives the value internally via data sources), do NOT pass it. Read the module's `main.tf` to understand what it derives before deciding to include a variable.
 
 > **EXECUTION INSTRUCTIONS**:
 > 1. Follow the question flow using `AskUserQuestion` - DO NOT assume configurations
@@ -259,6 +263,18 @@ The `kubernetes` and `helm` providers are ONLY needed in `infrastructure/` — d
    - Include header: `# Usage: tofu plan -var-file=../../common.tfvars -var-file=./terraform.tfvars`
    - DO NOT duplicate variables from common.tfvars
 
+## Cluster name
+
+The cluster name defaults to the account slug from the previous steps. Define it as a local in `locals.tf`:
+
+```hcl
+locals {
+  cluster_name = var.account  # account slug from common.tfvars
+}
+```
+
+The cluster name must be **32 characters or less** (AWS EKS limit). If the account slug exceeds 32 characters, truncate it. Always verify before generating.
+
 ---
 
 ## Correct module structure in infrastructure/
@@ -293,10 +309,9 @@ module "external_dns_public" { }   # infrastructure/commons/external_dns (type =
 module "external_dns_private" { }  # infrastructure/commons/external_dns (type = "private", create_namespace = false)
 module "cert_manager" { }          # infrastructure/commons/cert_manager
 
-# Security + Nullplatform (GO IN INFRASTRUCTURE, NOT IN BINDINGS)
-module "security" { }  # infrastructure/{cloud}/security
+# Nullplatform (GO IN INFRASTRUCTURE, NOT IN BINDINGS)
 module "agent_api_key" { }  # nullplatform/api_key (type = "agent")
-module "base" { }            # nullplatform/base (receives security_group_ids from security)
+module "base" { }            # nullplatform/base
 module "agent" { }           # nullplatform/agent
 
 # Optional (without Istio)
@@ -326,13 +341,11 @@ vpc
  │                                      │
  │                                external_dns_private
  │
- ├──► security
- │         │
- │         ▼
- │       base (receives security_group_ids from security)
- │         │
- │         ▼
- │       agent
+ │
+ ├──► base
+ │      │
+ │      ▼
+ │    agent
  │
  └──► (schema without Istio)
        dns ──► acm ──► ingress
@@ -350,7 +363,6 @@ vpc
 | `external_dns_public` | `[module.alb_controller]` |
 | `external_dns_private` | `[module.alb_controller, module.external_dns_public]` |
 | `cert_manager` | `[module.alb_controller]` |
-| `security` | `[module.eks]` |
 | `base` | `[module.alb_controller]` |
 | `agent` | `[module.base]` |
 | `prometheus` | (no explicit depends_on) |
@@ -358,9 +370,9 @@ vpc
 | `acm` (without Istio) | `[module.dns]` |
 | `ingress` (without Istio) | `[module.alb_controller, module.acm]` |
 
-### Security module
+### Base module gateway SGs
 
-The `infrastructure/{cloud}/security` module creates security groups for gateways. Its outputs are passed to the `base` module. Read security's `outputs.tf` and base's `variables.tf` from downloaded modules to know exact output and input names.
+The `base` module has optional `gateway_public_aws_security_group_id` and `gateway_private_aws_security_group_id` variables (both default to `""`). These are NOT required — the gateways work without custom security groups.
 
 ### Why does external_dns_private depend on external_dns_public?
 

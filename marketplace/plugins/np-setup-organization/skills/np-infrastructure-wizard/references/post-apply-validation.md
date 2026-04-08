@@ -203,7 +203,7 @@ else
 fi
 ```
 
-If targets are `unhealthy`, check security group rules (see [aws.md — Security Module](aws.md#security-module-and-cluster-sg)).
+If targets are `unhealthy`, check that the EKS cluster security groups allow traffic on the gateway port (443) and health check port (15021).
 
 ### 8. Agent
 
