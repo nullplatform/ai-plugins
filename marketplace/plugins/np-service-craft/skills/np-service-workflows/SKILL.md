@@ -15,6 +15,7 @@ Conventions for YAML workflows, build_context/do_tofu scripts, and service entry
 4. **Entrypoint MUST bridge** `NP_API_KEY` → `NULLPLATFORM_API_KEY`
 5. **$SERVICE_PATH must be absolute** — resolve relative paths with fallback to `~/.np/`
 6. **Derive names from `$CONTEXT`** — scope slug, app slug, tags, and role names are in `$LINK`. Do NOT call the API to resolve them. See `docs/build-context-patterns.md`
+7. **Truncate ALL resource names** with `sanitize_name()` — IAM User max 64, IAM Policy max 128, S3/RDS max 63, ElastiCache max 40. See Resource Name Limits table in `docs/build-context-patterns.md`
 
 ## Workflow YAML Structure
 

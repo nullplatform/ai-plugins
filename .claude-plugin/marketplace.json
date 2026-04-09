@@ -11,7 +11,7 @@
       "name": "np-setup-organization",
       "source": "./marketplace/plugins/np-setup-organization",
       "description": "Setup a new nullplatform organization: create org, configure cloud provider, infrastructure, and troubleshooting",
-      "version": "1.1.14",
+      "version": "1.1.15",
       "author": {
         "name": "Nullplatform"
       }
@@ -20,7 +20,7 @@
       "name": "np-service-craft",
       "source": "./marketplace/plugins/np-service-craft",
       "description": "Tools for developing nullplatform services",
-      "version": "1.1.14",
+      "version": "1.1.15",
       "author": {
         "name": "Nullplatform"
       }
@@ -29,7 +29,7 @@
       "name": "np-troubleshooting",
       "source": "./marketplace/plugins/np-troubleshooting",
       "description": "Investigation and diagnosis of nullplatform issues",
-      "version": "1.1.14",
+      "version": "1.1.15",
       "author": {
         "name": "Nullplatform"
       }
@@ -38,7 +38,7 @@
       "name": "np-developer",
       "source": "./marketplace/plugins/np-developer",
       "description": "Day-to-day tools for developers using nullplatform: query, operate, and diagnose",
-      "version": "1.1.14",
+      "version": "1.1.15",
       "author": {
         "name": "Nullplatform"
       }
