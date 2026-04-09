@@ -167,13 +167,42 @@ If pings respond OK, the agent is ready. Inform the user:
 - Registered tags
 - That the agent is ready to receive notifications
 
+### Step 7: Guide the user to trigger the first action
+
+**MANDATORY** — After confirming the agent is running, guide the user to create the entity and trigger the action. The agent receives notifications when actions are created through the platform (UI or API).
+
+**Recommended: use the UI for the first trigger** — it handles the two-step flow (create entity + create action) transparently.
+
+Tell the user:
+
+> Your agent is running and ready. Now trigger the first action:
+>
+> **If testing a service:**
+> 1. Go to the **Nullplatform UI** (https://app.nullplatform.com)
+> 2. Navigate to your application → **Services** → **Add Service**
+> 3. Select the service you registered (e.g., "AWS S3")
+> 4. Fill in the attributes and create it
+>
+> **If testing a scope:**
+> 1. Go to the **Nullplatform UI** (https://app.nullplatform.com)
+> 2. Navigate to your application → **Create Scope**
+> 3. Select the scope type and configure dimensions
+>
+> The platform will send a notification to the local agent, which will execute the workflow.
+>
+> Monitor the agent logs with: `tail -f /tmp/np-agent.log`
+>
+> When you see the agent executing scripts (build_context, do_tofu), let me know — I can help troubleshoot if anything fails.
+
+**API/CLI alternative:** Creating via API requires two calls — first create the entity (`POST /service` or `POST /scope`), then create the action instance (`POST /service/{id}/action` or `POST /scope/{id}/action`). Without the second call, the entity stays in `pending` and no notification reaches the agent. See `np-developer-actions` docs/services.md for the full API flow.
+
 ### Post-setup: Iterative testing cycle
 
-Once the agent is running, the development cycle is:
+Once the agent is running and an action has been triggered, the development cycle is:
 
 ```
 1. Edit script/workflow
-2. Trigger action (create service, create scope, or resend notification)
+2. Trigger action (from UI, API, or resend notification for retesting)
 3. View agent logs: tail -f /tmp/np-agent.log
 4. If it fails: fix -> resend notification (without recreating the resource)
 5. Repeat until it works
