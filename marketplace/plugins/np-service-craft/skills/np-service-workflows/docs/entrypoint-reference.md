@@ -98,6 +98,7 @@ ACTION_TO_EXECUTE="$SERVICE_ACTION_TYPE"
 case "$SERVICE_ACTION_TYPE" in
   "custom") ACTION_TO_EXECUTE="$SERVICE_ACTION" ;;
   "create") ACTION_TO_EXECUTE="link" ;;
+  "update") ACTION_TO_EXECUTE="link-update" ;;
   "delete") ACTION_TO_EXECUTE="unlink" ;;
 esac
 

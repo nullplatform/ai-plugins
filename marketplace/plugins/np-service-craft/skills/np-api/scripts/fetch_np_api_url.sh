@@ -20,6 +20,29 @@ set -e
 BASE_URL="https://api.nullplatform.com"
 TOKEN_CACHE_DIR="$HOME/.claude"
 
+# Endpoints (after stripping leading "/" and query string) where modifying
+# methods (POST/PUT/PATCH/DELETE) are allowed. Each entry is a bash case glob.
+# Add new entries here when exposing new mutable endpoints to skills.
+ALLOWED_MODIFY=(
+    "controlplane/agent_command"
+    "notification/*/resend"
+    "governance/action_item"
+    "governance/action_item/*"
+    "governance/action_item_category"
+    "governance/action_item_category/*"
+)
+
+is_modify_allowed() {
+    local path="$1"
+    for allowed in "${ALLOWED_MODIFY[@]}"; do
+        # shellcheck disable=SC2254
+        case "$path" in
+            $allowed) return 0 ;;
+        esac
+    done
+    return 1
+}
+
 # Parse arguments
 METHOD="GET"
 DATA=""
@@ -50,28 +73,36 @@ done
 # Check if endpoint is provided
 if [ -z "$ENDPOINT" ]; then
     echo "Error: endpoint required"
-    echo "Usage: $0 <endpoint> [output_file]"
+    echo "Usage: $0 [--method GET|POST|PUT|PATCH|DELETE] [--data <json>] <endpoint> [output_file]"
     echo "Example: $0 /application/441069822"
+    echo "Example: $0 --method PATCH --data '{\"status\":\"resolved\"}' /governance/action_item/abc123"
     exit 1
 fi
 
-# Validate POST is only allowed for specific endpoints (security restriction)
-if [ "$METHOD" = "POST" ]; then
-    ENDPOINT_PATH="${ENDPOINT#/}"
-    ENDPOINT_PATH="${ENDPOINT_PATH%%\?*}"  # Remove query string
-    case "$ENDPOINT_PATH" in
-        controlplane/agent_command|notification/*/resend)
-            ;; # allowed
-        *)
-            echo "Error: POST method is only allowed for: /controlplane/agent_command, /notification/{id}/resend"
+# Validate method + endpoint
+case "$METHOD" in
+    GET|HEAD)
+        ;; # always allowed
+    POST|PUT|PATCH|DELETE)
+        ENDPOINT_PATH="${ENDPOINT#/}"
+        ENDPOINT_PATH="${ENDPOINT_PATH%%\?*}"  # Remove query string
+        if ! is_modify_allowed "$ENDPOINT_PATH"; then
+            echo "Error: $METHOD method is only allowed for endpoints matching:" >&2
+            for allowed in "${ALLOWED_MODIFY[@]}"; do
+                echo "  /${allowed}" >&2
+            done
             exit 1
-            ;;
-    esac
-    if [ -z "$DATA" ]; then
-        echo "Error: --data is required for POST requests"
+        fi
+        if [ "$METHOD" != "DELETE" ] && [ -z "$DATA" ]; then
+            echo "Error: --data is required for $METHOD requests" >&2
+            exit 1
+        fi
+        ;;
+    *)
+        echo "Error: unsupported method: $METHOD" >&2
         exit 1
-    fi
-fi
+        ;;
+esac
 
 # If npcurl doesn't exist, use curl as fallback
 if ! command -v npcurl &> /dev/null; then
@@ -224,18 +255,23 @@ else
 fi
 
 # Make request
-if [ "$METHOD" = "POST" ]; then
-    if [ -n "$OUTPUT_FILE" ]; then
-        npcurl -s -X POST -H "Authorization: Bearer $BEARER_TOKEN" -H "Content-Type: application/json" -d "$DATA" "$URL" > "$OUTPUT_FILE"
-        echo "Response saved to: $OUTPUT_FILE"
-    else
-        npcurl -s -X POST -H "Authorization: Bearer $BEARER_TOKEN" -H "Content-Type: application/json" -d "$DATA" "$URL"
-    fi
+CURL_ARGS=(-s -X "$METHOD" -H "Authorization: Bearer $BEARER_TOKEN")
+
+case "$METHOD" in
+    POST|PUT|PATCH)
+        CURL_ARGS+=(-H "Content-Type: application/json" -d "$DATA")
+        ;;
+    DELETE)
+        # DELETE may or may not carry a body; forward if provided
+        if [ -n "$DATA" ]; then
+            CURL_ARGS+=(-H "Content-Type: application/json" -d "$DATA")
+        fi
+        ;;
+esac
+
+if [ -n "$OUTPUT_FILE" ]; then
+    npcurl "${CURL_ARGS[@]}" "$URL" > "$OUTPUT_FILE"
+    echo "Response saved to: $OUTPUT_FILE"
 else
-    if [ -n "$OUTPUT_FILE" ]; then
-        npcurl -s -H "Authorization: Bearer $BEARER_TOKEN" "$URL" > "$OUTPUT_FILE"
-        echo "Response saved to: $OUTPUT_FILE"
-    else
-        npcurl -s -H "Authorization: Bearer $BEARER_TOKEN" "$URL"
-    fi
+    npcurl "${CURL_ARGS[@]}" "$URL"
 fi

@@ -43,3 +43,14 @@ Reason: `.service.attributes` may not contain the ARN as a direct field.
 ## IAM Policy: MalformedPolicyDocument
 
 If you see `"Resource must be in ARN format"`, an ARN is empty. Verify that `build_permissions_context` derives the ARNs correctly.
+
+## IRSA Prerequisites
+
+IAM Roles for Service Accounts (IRSA) only works if:
+1. The EKS cluster has an OIDC provider configured
+2. The **scope infrastructure creates a dedicated K8s ServiceAccount per app** with an associated IAM role
+3. The `app_role_name` attribute is populated in the scope/entity attributes
+
+If the scope doesn't manage per-app ServiceAccounts, IRSA will fail silently (the `app_role_name` will be empty and the `count = var.app_role_name != "" ? 1 : 0` guard will skip the attachment).
+
+Default to **IAM User + Access Keys** for link credential strategy unless the user confirms their scope creates dedicated SAs.

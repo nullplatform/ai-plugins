@@ -22,6 +22,7 @@ services/<service-name>/
 |   +-- delete.yaml                 # Steps: build_context -> do_tofu destroy
 |   +-- update.yaml                 # Steps: build_context -> do_tofu apply [-> write_service_outputs]
 |   +-- link.yaml                   # Steps: build_context -> build_permissions_context -> do_tofu [-> write_link_outputs]
+|   +-- link-update.yaml            # Steps: build_context -> build_permissions_context -> do_tofu apply [-> write_link_outputs]
 |   +-- unlink.yaml                 # Steps: build_context -> build_permissions_context -> do_tofu destroy
 |   +-- read.yaml                   # (optional) Read current state
 +-- scripts/<provider>/
@@ -33,7 +34,7 @@ services/<service-name>/
 +-- entrypoint/
 |   +-- entrypoint                  # Main router: bridges NP_API_KEY, dispatches to service/link
 |   +-- service                     # Maps action type to workflow, calls np service workflow exec
-|   +-- link                        # Maps create->link, delete->unlink, calls np service workflow exec
+|   +-- link                        # Maps create->link, update->link-update, delete->unlink
 +-- values.yaml                     # Static config: region, profiles, resource names (not in UI)
 ```
 

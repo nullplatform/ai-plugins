@@ -77,8 +77,13 @@ export LINK_ID=$(echo "$LINK" | jq -r '.id // ""')
 export LINK_NAME=$(echo "$LINK" | jq -r '.name // ""')
 export SCOPE_ID=$(echo "$LINK" | jq -r '.scope.id // ""')
 export SCOPE_NRN=$(echo "$LINK" | jq -r '.scope.nrn // ""')
+export SCOPE_SLUG=$(echo "$LINK" | jq -r '.scope.slug // ""')
+export APP_SLUG=$(echo "$LINK" | jq -r '.entity.slug // ""')
+export APP_NRN=$(echo "$LINK" | jq -r '.entity.nrn // ""')
 export LINK_ACCESS_LEVEL=$(echo "$LINK" | jq -r '.attributes.accessLevel // "read-write"')
 ```
+
+These fields come pre-populated in the notification payload. **Do NOT call the API** (e.g., `/np-api fetch-api "/scope/$SCOPE_ID"`) to resolve slugs, NRNs, or tags — they are already in `$LINK`.
 
 Link attributes vs parameters: on first link action, `.link.attributes` may be empty. Fallback to `.parameters`:
 
@@ -90,14 +95,23 @@ fi
 
 ## build_permissions_context
 
-Separate script for link.yaml (step 2). Key differences from build_context:
+Separate script for link.yaml and link-update.yaml (step 2). Key differences from build_context:
 
 1. **Has its own `yaml_value()`** — NOT inherited from build_context (separate script execution)
-2. **Derives ARNs from names** — don't read ARNs from `.service.attributes`:
+2. **Derive ALL names from `$CONTEXT` data** — scope slug, app slug, and tags are in `$LINK`. Do NOT call the API to resolve them:
    ```bash
-   BUCKET_ARN="arn:aws:s3:::${BUCKET_NAME}"  # Deterministic
+   SCOPE_SLUG=$(echo "$LINK" | jq -r '.scope.slug // ""')
+   APP_SLUG=$(echo "$LINK" | jq -r '.entity.slug // ""')
+   APP_NRN=$(echo "$LINK" | jq -r '.entity.nrn // ""')
    ```
-3. **app_role_name fallback chain**:
+   Use these to build deterministic resource names:
+   ```bash
+   # IAM policy name from slugs (no API calls needed)
+   POLICY_NAME="np-${SERVICE_NAME}-${SCOPE_SLUG}-${APP_SLUG}"
+   # ARNs from names (don't read from .service.attributes)
+   BUCKET_ARN="arn:aws:s3:::${BUCKET_NAME}"
+   ```
+3. **app_role_name fallback chain** (also from `$LINK`, not API):
    ```bash
    APP_ROLE_NAME=$(echo "$LINK" | jq -r '.entity.attributes.role_name // .scope.attributes.role_name // ""')
    if [ -z "$APP_ROLE_NAME" ]; then
@@ -113,7 +127,28 @@ Separate script for link.yaml (step 2). Key differences from build_context:
 
 ## Permissions Module Pattern
 
-Make `app_role_name` optional for local testing (no deployed app with IAM role):
+### IAM User (default for AWS)
+
+Creates a dedicated IAM user per link with access keys exported to the app:
+
+```hcl
+resource "aws_iam_user" "link" {
+  name = "np-${var.service_name}-${var.link_id}"
+}
+
+resource "aws_iam_access_key" "link" {
+  user = aws_iam_user.link.name
+}
+
+resource "aws_iam_user_policy_attachment" "access" {
+  user       = aws_iam_user.link.name
+  policy_arn = aws_iam_policy.access.arn
+}
+```
+
+### IAM Role (IRSA) — only if scope creates per-app ServiceAccounts
+
+Make `app_role_name` optional — it will be empty if the scope doesn't create dedicated SAs:
 
 ```hcl
 resource "aws_iam_role_policy_attachment" "access" {

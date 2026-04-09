@@ -14,6 +14,7 @@ Conventions for YAML workflows, build_context/do_tofu scripts, and service entry
 3. **Merge parameters with attributes** — `(.service.attributes // {}) * (.parameters // {})`
 4. **Entrypoint MUST bridge** `NP_API_KEY` → `NULLPLATFORM_API_KEY`
 5. **$SERVICE_PATH must be absolute** — resolve relative paths with fallback to `~/.np/`
+6. **Derive names from `$CONTEXT`** — scope slug, app slug, tags, and role names are in `$LINK`. Do NOT call the API to resolve them. See `docs/build-context-patterns.md`
 
 ## Workflow YAML Structure
 
@@ -53,8 +54,9 @@ Optional post-tofu step for services with export fields:
 | create.yaml | Provision resource | apply | write_service_outputs (if export fields) |
 | delete.yaml | Destroy resource | destroy | - |
 | update.yaml | Update resource | apply | write_service_outputs (if export fields) |
-| link.yaml | Connect app | apply (permissions) | build_permissions_context + write_link_outputs |
-| unlink.yaml | Disconnect app | destroy (permissions) | build_permissions_context |
+| link.yaml | Connect app (create) | apply (permissions) | build_permissions_context + write_link_outputs |
+| link-update.yaml | Update link | apply (permissions) | build_permissions_context + write_link_outputs |
+| unlink.yaml | Disconnect app (delete) | destroy (permissions) | build_permissions_context |
 
 ## Environment Variables by Stage
 
