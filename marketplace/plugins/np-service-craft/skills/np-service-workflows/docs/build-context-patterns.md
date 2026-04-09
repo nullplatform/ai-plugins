@@ -13,26 +13,50 @@ yaml_value() {
 }
 ```
 
+## Resource Name Limits
+
+Cloud providers enforce character limits on resource names. **ALL generated names MUST be truncated** to respect these limits:
+
+| Resource | Max chars | Prefix budget | Available for name |
+|----------|-----------|---------------|-------------------|
+| S3 bucket | 63 | `np-` (3) | 60 |
+| RDS instance | 63 | `np-` (3) | 60 |
+| IAM User | 64 | `np-` (3) | 61 |
+| IAM Policy | 128 | `np-` (3) | 125 |
+| IAM Role | 64 | `np-` (3) | 61 |
+| ElastiCache | 40 | `np-` (3) | 37 |
+
+## sanitize_name() Function
+
+Reusable function for all resource name construction. Takes raw input and max total length:
+
+```bash
+sanitize_name() {
+  local input="$1" max_len="${2:-64}" fallback="$3"
+  local prefix="np-"
+  local available=$((max_len - ${#prefix}))
+  local sanitized
+  sanitized=$(echo "$input" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | cut -c1-"$available" | sed 's/^-*//;s/-*$//')
+  echo "${prefix}${sanitized:-$fallback}"
+}
+```
+
 ## Instance Name Sanitization
 
-Many AWS resource names (S3 buckets, RDS instances, ElastiCache clusters) require lowercase alphanumeric characters with hyphens. `.service.name` may be empty or contain characters that sanitize to nothing, producing an invalid name like `np-`.
+`.service.name` may be empty or contain characters that sanitize to nothing, producing an invalid name like `np-`.
 
 **Always include a fallback to `SERVICE_ID`** so the name is never empty:
 
 ```bash
 SERVICE_NAME=$(echo "$CONTEXT" | jq -r '.service.name // ""')
-# Truncate to 55 chars; with "np-" prefix, total <= 58. Respects S3 (63) and RDS (63) limits.
-# For services with shorter limits (e.g., ElastiCache 40), adjust cut length accordingly.
-SANITIZED=$(echo "$SERVICE_NAME" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | cut -c1-55 | sed 's/^-*//;s/-*$//')
-INSTANCE_NAME="np-${SANITIZED:-$SERVICE_ID}"
+INSTANCE_NAME=$(sanitize_name "$SERVICE_NAME" 63 "$SERVICE_ID")
 ```
 
 If the service has a user-provided name parameter (e.g., `bucket_name_suffix` for S3), prefer that over `SERVICE_NAME` for the resource name. `SERVICE_ATTRS` is the merged attributes+parameters object (see "Merge Attributes with Parameters" below):
 
 ```bash
 USER_SUFFIX=$(echo "$SERVICE_ATTRS" | jq -r '.bucket_name_suffix // ""')
-SANITIZED=$(echo "$USER_SUFFIX" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | cut -c1-55 | sed 's/^-*//;s/-*$//')
-INSTANCE_NAME="np-${SANITIZED:-$SERVICE_ID}"
+INSTANCE_NAME=$(sanitize_name "$USER_SUFFIX" 63 "$SERVICE_ID")
 ```
 
 ## Merge Attributes with Parameters
@@ -104,10 +128,12 @@ Separate script for link.yaml and link-update.yaml (step 2). Key differences fro
    APP_SLUG=$(echo "$LINK" | jq -r '.entity.slug // ""')
    APP_NRN=$(echo "$LINK" | jq -r '.entity.nrn // ""')
    ```
-   Use these to build deterministic resource names:
+   Use these to build deterministic resource names — **always truncate** (see Resource Name Limits):
    ```bash
-   # IAM policy name from slugs (no API calls needed)
-   POLICY_NAME="np-${SERVICE_NAME}-${SCOPE_SLUG}-${APP_SLUG}"
+   # IAM user name (max 64 chars)
+   IAM_USER_NAME=$(sanitize_name "${SERVICE_NAME}-${LINK_ID}" 64 "$LINK_ID")
+   # IAM policy name (max 128 chars)
+   POLICY_NAME=$(sanitize_name "${SERVICE_NAME}-${SCOPE_SLUG}-${APP_SLUG}" 128 "$LINK_ID")
    # ARNs from names (don't read from .service.attributes)
    BUCKET_ARN="arn:aws:s3:::${BUCKET_NAME}"
    ```
@@ -129,11 +155,16 @@ Separate script for link.yaml and link-update.yaml (step 2). Key differences fro
 
 ### IAM User (default for AWS)
 
-Creates a dedicated IAM user per link with access keys exported to the app:
+Creates a dedicated IAM user per link with access keys exported to the app. Truncate the name via `sanitize_name()` — it only cuts if the name exceeds the limit:
+
+```bash
+# In build_permissions_context:
+export IAM_USER_NAME=$(sanitize_name "${SERVICE_NAME}-${LINK_ID}" 64 "$LINK_ID")
+```
 
 ```hcl
 resource "aws_iam_user" "link" {
-  name = "np-${var.service_name}-${var.link_id}"
+  name = var.iam_user_name
 }
 
 resource "aws_iam_access_key" "link" {

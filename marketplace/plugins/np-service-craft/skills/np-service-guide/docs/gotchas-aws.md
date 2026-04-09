@@ -40,6 +40,18 @@ DB_ARN="arn:aws:rds:${REGION}:${ACCOUNT_ID}:db:${DB_INSTANCE_NAME}"
 
 Reason: `.service.attributes` may not contain the ARN as a direct field.
 
+## IAM Name Length Limits
+
+IAM resources have strict character limits. **Always use `sanitize_name()`** to truncate:
+
+| Resource | Max chars | Common pattern |
+|----------|-----------|----------------|
+| IAM User | 64 | `sanitize_name "${SERVICE_NAME}-${LINK_ID}" 64` |
+| IAM Policy | 128 | `sanitize_name "${SERVICE_NAME}-${SCOPE_SLUG}-${APP_SLUG}" 128` |
+| IAM Role | 64 | `sanitize_name "${SERVICE_NAME}-${SCOPE_SLUG}" 64` |
+
+If you see `"Value at 'userName' failed to satisfy constraint: Member must have length less than or equal to 64"`, the name was not truncated.
+
 ## IAM Policy: MalformedPolicyDocument
 
 If you see `"Resource must be in ARN format"`, an ARN is empty. Verify that `build_permissions_context` derives the ARNs correctly.

@@ -57,9 +57,10 @@ APP_SLUG=$(echo "$LINK" | jq -r '.entity.slug // ""')
 APP_NRN=$(echo "$LINK" | jq -r '.entity.nrn // ""')
 ```
 
-Build resource names from these fields:
+Build resource names from these fields — **always use `sanitize_name()`** to truncate (see `np-service-workflows` docs/build-context-patterns.md):
 ```bash
-POLICY_NAME="np-${SERVICE_NAME}-${SCOPE_SLUG}-${APP_SLUG}"
+IAM_USER_NAME=$(sanitize_name "${SERVICE_NAME}-${LINK_ID}" 64 "$LINK_ID")
+POLICY_NAME=$(sanitize_name "${SERVICE_NAME}-${SCOPE_SLUG}-${APP_SLUG}" 128 "$LINK_ID")
 BUCKET_ARN="arn:aws:s3:::${BUCKET_NAME}"  # ARN from name, not from .service.attributes
 ```
 
