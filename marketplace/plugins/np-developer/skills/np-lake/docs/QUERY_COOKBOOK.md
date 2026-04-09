@@ -5,12 +5,13 @@ Pre-built queries for the nullplatform data lake.
 ## Important Notes
 
 1. **Organization filter is automatic**: The server filters by org via the Bearer token. Never add `WHERE organization_id = ...`.
-2. **Always use `WHERE _deleted = 0`**: Exclude soft-deleted records. Exception: `audit_events`, `scm_code_commits`, `scm_code_repositories` don't have this column.
-3. **Always use `FINAL`**: Deduplicates `ReplacingMergeTree` rows. Syntax: `FROM table AS alias FINAL` (alias BEFORE `FINAL`).
+2. **Always use `WHERE _deleted = 0`**: Exclude soft-deleted records. Exceptions: `audit_events`, `scm_code_commits`, `scm_code_repositories`, and the view `auth_resource_grants_expanded` don't have this column.
+3. **Always use `FINAL`**: Deduplicates `ReplacingMergeTree` rows. Syntax: `FROM table AS alias FINAL` (alias BEFORE `FINAL`). **Exception:** views (e.g. `auth_resource_grants_expanded`) do not take `FINAL`.
 4. **Always use `LIMIT`**: Cap exploratory query results.
 5. **Select specific columns**: Avoid `SELECT *` in production.
 6. **JOINs work with correct syntax**: `FROM table AS alias FINAL JOIN table2 AS alias2 FINAL ON ...`. Do NOT use `FROM table FINAL AS alias` (syntax error).
 7. **Column names vary by table**: See SCHEMA.md for the correct column names per table. Key examples: `app_id`/`app_name` (applications), `account_id`/`account_name` (accounts), `namespace_id`/`namespace_name` (namespaces), `org_id`/`org_name` (organizations).
+8. **Services tables** have **both** `_deleted` (sync) and `deleted_at` (application-level). Use `WHERE _deleted = 0 AND deleted_at IS NULL` for the strict "truly live" view.
 
 ---
 
@@ -495,4 +496,148 @@ SELECT
 FROM core_entities_deployment FINAL
 WHERE _deleted = 0
 AND created_at >= now() - INTERVAL 7 DAY
+```
+
+---
+
+## Auth
+
+### Find a user by email
+
+```sql
+SELECT id, email, first_name, last_name, status, user_type, provider, nrn
+FROM auth_user FINAL
+WHERE _deleted = 0
+AND email ILIKE '%{search:String}%'
+LIMIT 20
+```
+
+### List every role a user has, with the NRN it applies to
+
+Use the **view** `auth_resource_grants_expanded` for this — it pre-joins the role metadata so you don't need an extra join. Do **not** use `FINAL` or `WHERE _deleted = 0` on the view.
+
+```sql
+SELECT g.nrn, g.role_name, g.role_slug, g.role_level, g.status, g.created_at
+FROM auth_resource_grants_expanded AS g
+WHERE g.user_id = {user_id:Int32}
+AND g.status = 'active'
+ORDER BY g.created_at DESC
+LIMIT 100
+```
+
+### Count active users per role
+
+```sql
+SELECT g.role_name, g.role_slug, count(DISTINCT g.user_id) AS users
+FROM auth_resource_grants_expanded AS g
+WHERE g.status = 'active'
+GROUP BY g.role_name, g.role_slug
+ORDER BY users DESC
+LIMIT 50
+```
+
+### API keys touched in the last N days
+
+```sql
+SELECT id, name, masked_api_key, owner_id, used_at, nrn
+FROM auth_apikey FINAL
+WHERE _deleted = 0
+AND used_at >= now() - INTERVAL 7 DAY
+ORDER BY used_at DESC
+LIMIT 50
+```
+
+### API keys that have never been used
+
+```sql
+SELECT id, name, masked_api_key, owner_id, created_at, nrn
+FROM auth_apikey FINAL
+WHERE _deleted = 0
+AND used_at IS NULL
+ORDER BY created_at DESC
+LIMIT 100
+```
+
+---
+
+## Services
+
+### List all service instances, most recently updated first
+
+```sql
+SELECT id, name, slug, type, status, specification_id, entity_nrn, updated_at
+FROM services_services FINAL
+WHERE _deleted = 0
+AND deleted_at IS NULL
+ORDER BY updated_at DESC
+LIMIT 50
+```
+
+### Find services attached to a specific entity (e.g., an application NRN)
+
+```sql
+SELECT id, name, slug, status, type, specification_id, nrn
+FROM services_services FINAL
+WHERE _deleted = 0
+AND deleted_at IS NULL
+AND entity_nrn = {entity_nrn:String}
+ORDER BY name
+```
+
+### Count services per specification type
+
+```sql
+SELECT s.type, count() AS instances
+FROM services_services AS s FINAL
+WHERE s._deleted = 0 AND s.deleted_at IS NULL
+GROUP BY s.type
+ORDER BY instances DESC
+LIMIT 50
+```
+
+### List all links for a given service (with spec names)
+
+```sql
+SELECT l.id, l.name, l.slug, l.status, l.entity_nrn, sp.name AS link_spec_name
+FROM services_links AS l FINAL
+LEFT JOIN services_link_specifications AS sp FINAL
+       ON l.specification_id = sp.id
+WHERE l._deleted = 0 AND l.deleted_at IS NULL
+AND l.service_id = {service_id:UUID}
+ORDER BY l.updated_at DESC
+LIMIT 100
+```
+
+### Recent action invocations (with outcome)
+
+```sql
+SELECT id, name, slug, status, service_id, link_id, created_by, created_at
+FROM services_actions FINAL
+WHERE _deleted = 0 AND deleted_at IS NULL
+AND created_at >= now() - INTERVAL 24 HOUR
+ORDER BY created_at DESC
+LIMIT 100
+```
+
+### Action success/failure breakdown for the last 7 days
+
+```sql
+SELECT
+    countIf(status = 'success') AS succeeded,
+    countIf(status = 'failed')  AS failed,
+    countIf(status = 'running') AS running,
+    count() AS total
+FROM services_actions FINAL
+WHERE _deleted = 0 AND deleted_at IS NULL
+AND created_at >= now() - INTERVAL 7 DAY
+```
+
+### Parameter wiring for a service instance
+
+```sql
+SELECT id, entity_nrn, type, target, parameter_id
+FROM services_parameters FINAL
+WHERE _deleted = 0 AND deleted_at IS NULL
+AND service_id = {service_id:UUID}
+LIMIT 100
 ```

@@ -7,8 +7,8 @@ UI/API creates link: POST /link -> status: pending
   -> UI/API creates action instance: POST /link/{id}/action
   -> Service API -> SNS/SQS -> Lambda -> Notification API -> agents-api -> agent
   -> np-agent: entrypoint detects IS_LINK_ACTION=true, ACTION_SOURCE=link
-  -> handler "link" maps create->link, delete->unlink
-  -> np service workflow exec --workflow link.yaml
+  -> handler "link" maps create->link, update->link-update, delete->unlink
+  -> np service workflow exec --workflow <link|link-update|unlink>.yaml
      Step 1: build_context (extract service + link data)
      Step 2: build_permissions_context (derive ARNs, set permissions module)
      Step 3: do_tofu (apply permissions/)
@@ -41,20 +41,29 @@ Same pattern for services: `POST /service/{id}/action`.
 |--------|---------|------|
 | Notification source | `service` | `service` (same!) |
 | Handler | `./service` | `./link` |
-| Workflow | `create.yaml` | `link.yaml` |
+| Workflow | `create.yaml` | `link.yaml` / `link-update.yaml` / `unlink.yaml` |
 | Terraform module | `deployment/` | `permissions/` |
 | Outputs | write_service_outputs | write_link_outputs |
 
 ## Permissions Patterns
 
-### Derive ARNs from names
+### Derive names from $CONTEXT — no API calls
 
-Don't read ARNs from `service.attributes` — they may not be there:
+The `$LINK` object contains scope slug, app slug, and entity attributes. Use them to build deterministic names without calling the API:
+
 ```bash
-BUCKET_ARN="arn:aws:s3:::${BUCKET_NAME}"  # Deterministic
+SCOPE_SLUG=$(echo "$LINK" | jq -r '.scope.slug // ""')
+APP_SLUG=$(echo "$LINK" | jq -r '.entity.slug // ""')
+APP_NRN=$(echo "$LINK" | jq -r '.entity.nrn // ""')
 ```
 
-### app_role_name fallback
+Build resource names from these fields:
+```bash
+POLICY_NAME="np-${SERVICE_NAME}-${SCOPE_SLUG}-${APP_SLUG}"
+BUCKET_ARN="arn:aws:s3:::${BUCKET_NAME}"  # ARN from name, not from .service.attributes
+```
+
+### app_role_name fallback (from $LINK, not API)
 
 ```bash
 APP_ROLE_NAME=$(echo "$LINK" | jq -r '.entity.attributes.role_name // .scope.attributes.role_name // ""')

@@ -83,7 +83,7 @@ services/<service-name>/
 |   +-- locals.tf, variables.tf
 +-- workflows/<provider>/
 |   +-- create.yaml, delete.yaml, update.yaml
-|   +-- link.yaml, unlink.yaml, read.yaml
+|   +-- link.yaml, link-update.yaml, unlink.yaml, read.yaml
 +-- scripts/<provider>/
 |   +-- build_context               # Parses context -> env vars
 |   +-- do_tofu                     # Runs tofu init + apply/destroy

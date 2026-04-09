@@ -1,6 +1,6 @@
 ---
 name: np-lake
-description: Query nullplatform Customer Lake. Use for cross-entity relationship queries, bulk entity state analysis, approval workflow investigation, parameter configuration audit, and complex SQL queries across 52 tables in 6 domains (Approvals, Audit, Core Entities, Governance, Parameters, SCM). Use when users need current state of multiple entities, joins across tables, or analytical queries. PREFERRED over individual API calls for data retrieval — a single SQL query replaces multiple API requests.
+description: Query nullplatform Customer Lake. Use for cross-entity relationship queries, bulk entity state analysis, approval workflow investigation, parameter configuration audit, auth/RBAC audits, service & link inventory, and complex SQL queries across 64 tables in 8 domains (Approvals, Audit, Auth, Core Entities, Governance, Parameters, SCM, Services). Use when users need current state of multiple entities, joins across tables, or analytical queries. PREFERRED over individual API calls for data retrieval — a single SQL query replaces multiple API requests.
 allowed-tools: Bash(${CLAUDE_PLUGIN_ROOT}/skills/np-lake/scripts/*.sh)
 ---
 
@@ -75,7 +75,7 @@ The user may see some entities but not others (e.g., they have access to one acc
 
 | Document | Content |
 |----------|---------|
-| [docs/SCHEMA.md](docs/SCHEMA.md) | Full schema for all 52 tables, organized by domain |
+| [docs/SCHEMA.md](docs/SCHEMA.md) | Full schema for all 64 tables, organized by domain |
 | [docs/QUERY_COOKBOOK.md](docs/QUERY_COOKBOOK.md) | Pre-built queries by use case |
 | [docs/SQL_GUIDE.md](docs/SQL_GUIDE.md) | SQL tips, formats, date functions, and performance best practices |
 
@@ -108,7 +108,16 @@ The user may see some entities but not others (e.g., they have access to one acc
 |-------|-------------|
 | `audit_events` | Audit events with native JSON columns (NO `_deleted` column) |
 
-### Core Entities (21 tables)
+### Auth (5 tables)
+| Table | ID Column | Description |
+|-------|-----------|-------------|
+| `auth_user` | `id` | Users (email, first_name, last_name, status, user_type, provider, avatar, organization_id) |
+| `auth_role` | `id` | Roles (name, slug, description, level, assignment_restriction, organization_id) |
+| `auth_resource_grants` | `id` | User ↔ role grants scoped by `nrn`. Flat table, needs joins to enrich. |
+| `auth_resource_grants_expanded` | `id` | **VIEW** over `auth_resource_grants` ⨝ `auth_role`. Pre-joined with `role_name`, `role_slug`, `role_level`. **NO `_version`, `_deleted`, `_synced_at`** — don't use `FINAL` or `WHERE _deleted = 0`. |
+| `auth_apikey` | `id` | API keys (name, masked_api_key, roles, owner_id, user_id, account_id, organization_id, used_at, internal, status, tags) |
+
+### Core Entities (22 tables)
 | Table | ID Column | Name Column | Description |
 |-------|-----------|-------------|-------------|
 | `core_entities_organization` | `org_id` | `org_name` | Organizations |
@@ -157,6 +166,19 @@ The user may see some entities but not others (e.g., they have access to one acc
 | `scm_code_commits` | Git commits (NO `_deleted` column) |
 | `scm_code_repositories` | Code repositories (NO `_deleted` column) |
 
+### Services (7 tables)
+| Table | ID Column | Description |
+|-------|-----------|-------------|
+| `services_services` | `id` (UUID) | Service instances (name, slug, status, type, specification_id, desired_specification_id, entity_nrn, attributes, selectors, dimensions, linkable_to, messages) |
+| `services_service_specifications` | `id` (UUID) | Service templates (name, slug, type, attributes, selectors, visible_to, dimensions, assignable_to, scopes, use_default_actions) |
+| `services_links` | `id` (UUID) | Service ↔ entity bindings (service_id, specification_id, desired_specification_id, entity_nrn, status, attributes, selectors, dimensions, messages) |
+| `services_link_specifications` | `id` (UUID) | Link templates (name, slug, specification_id, attributes, selectors, dimensions, visible_to, assignable_to, scopes, unique, use_default_actions, external) |
+| `services_actions` | `id` (UUID) | Service / link action invocations (name, slug, status, service_id, link_id, specification_id, desired_specification_id, parameters, results, is_test, created_by) |
+| `services_action_specifications` | `id` (UUID) | Action templates (name, slug, type, service_specification_id, link_specification_id, parameters, results, retryable, parallelize, enabled_when, icon, annotations, external) |
+| `services_parameters` | `id` (UUID) | Parameter mappings for services / links (entity_nrn, service_id, type, target, parameter_id) |
+
+Services tables have **both** `_deleted` (sync-level soft delete, use `WHERE _deleted = 0`) and a separate `deleted_at` (nullable DateTime, app-level logical delete). Filter on both if you need a strict "truly live" view.
+
 ## Available Scripts
 
 | Script | Purpose | Example |
@@ -190,7 +212,7 @@ ${CLAUDE_PLUGIN_ROOT}/skills/np-lake/scripts/ch_query.sh \
 | Field | Value |
 |-------|-------|
 | Database | `customers_lake` |
-| Tables | 52 tables in 6 domains |
+| Tables | 64 tables in 8 domains |
 | Engine | Customer Lake (HTTP interface) |
 
 ### Common Columns Across All Tables
@@ -204,7 +226,7 @@ ${CLAUDE_PLUGIN_ROOT}/skills/np-lake/scripts/ch_query.sh \
 
 ### Critical Query Rules
 
-1. **ALWAYS use `WHERE _deleted = 0`** — Exclude soft-deleted records. **Exception:** `audit_events`, `scm_code_commits`, `scm_code_repositories` don't have this column.
+1. **ALWAYS use `WHERE _deleted = 0`** — Exclude soft-deleted records. **Exceptions:** `audit_events`, `scm_code_commits`, `scm_code_repositories`, and the view `auth_resource_grants_expanded` don't have this column.
 2. **ALWAYS use `LIMIT`** — For exploratory queries, cap results
 3. **Avoid `SELECT *`** — Select only needed columns
 4. **Organization filter is automatic** — Never add `WHERE organization_id = ...`

@@ -1,6 +1,6 @@
 # Customer Lake Schema
 
-Database: `customers_lake` — 52 tables in 6 domains.
+Database: `customers_lake` — 64 tables in 8 domains.
 
 **Source of truth:** Generated from `system.columns WHERE database = 'customers_lake'`.
 
@@ -15,7 +15,12 @@ Most tables share these system columns (exceptions noted per table):
 | `_deleted` | UInt8 | Soft-delete flag: `0` = active, `1` = deleted |
 | `_synced_at` | DateTime64(6) | Last sync timestamp to the data lake |
 
-**Tables WITHOUT `_version` and `_deleted`:** `audit_events`, `scm_code_commits`, `scm_code_repositories`, `core_entities_metadata` (has `_deleted` but no `_version`).
+**Tables WITHOUT `_version` and `_deleted`:**
+- `audit_events`, `scm_code_commits`, `scm_code_repositories`
+- `core_entities_metadata` (has `_deleted` but no `_version`)
+- `auth_resource_grants_expanded` — this is a **VIEW** (not a table) over `auth_resource_grants` ⨝ `auth_role`. It has no system columns at all and does not support `FINAL`.
+
+**Services tables** (`services_*`) also carry a separate `deleted_at` (nullable DateTime) application-level column alongside the standard `_deleted` sync flag. Use `WHERE _deleted = 0` for the normal case; filter additionally on `deleted_at IS NULL` if you need the strict "not logically deleted" view.
 
 ### NRN Format
 
@@ -874,9 +879,301 @@ FROM core_entities_deployment FINAL AS d
 
 ---
 
+## Auth Domain (5 tables)
+
+### auth_user
+
+| Column | Type |
+|--------|------|
+| `id` | Int32 |
+| `email` | Nullable(String) |
+| `organization_id` | Nullable(Int32) |
+| `first_name` | Nullable(String) |
+| `last_name` | Nullable(String) |
+| `status` | Nullable(String) |
+| `user_type` | Nullable(String) |
+| `provider` | Nullable(String) |
+| `avatar` | Nullable(String) |
+| `created_at` | Nullable(DateTime64(6)) |
+| `updated_at` | Nullable(DateTime64(6)) |
+| `nrn` | String |
+| `_version` | UInt64 |
+| `_deleted` | UInt8 |
+| `_synced_at` | DateTime64(6) |
+
+### auth_role
+
+| Column | Type |
+|--------|------|
+| `id` | Int32 |
+| `name` | Nullable(String) |
+| `description` | Nullable(String) |
+| `status` | Nullable(String) |
+| `slug` | Nullable(String) |
+| `level` | Nullable(String) |
+| `assignment_restriction` | Nullable(String) |
+| `organization_id` | Nullable(Int32) |
+| `created_at` | Nullable(DateTime64(6)) |
+| `updated_at` | Nullable(DateTime64(6)) |
+| `nrn` | String |
+| `_version` | UInt64 |
+| `_deleted` | UInt8 |
+| `_synced_at` | DateTime64(6) |
+
+### auth_resource_grants
+
+Flat user ↔ role grant scoped to an `nrn`. Use `auth_resource_grants_expanded` (view) when you want the role metadata pre-joined.
+
+| Column | Type |
+|--------|------|
+| `id` | Int32 |
+| `user_id` | Nullable(Int32) |
+| `role_id` | Nullable(Int32) |
+| `status` | Nullable(String) |
+| `created_at` | Nullable(DateTime64(6)) |
+| `updated_at` | Nullable(DateTime64(6)) |
+| `nrn` | String |
+| `_version` | UInt64 |
+| `_deleted` | UInt8 |
+| `_synced_at` | DateTime64(6) |
+
+### auth_resource_grants_expanded (VIEW)
+
+**This is a VIEW**, not a table. It joins `auth_resource_grants` with `auth_role` and exposes the role metadata flattened. Query semantics:
+
+- **No `FINAL`** — views do not support it.
+- **No `WHERE _deleted = 0`** — the column does not exist. The view already filters to live rows.
+- No `_version`, no `_synced_at`, no `nrn` column exposed in the view columns beyond `nrn` itself.
+
+| Column | Type |
+|--------|------|
+| `id` | Int32 |
+| `nrn` | String |
+| `user_id` | Nullable(Int32) |
+| `role_id` | Nullable(Int32) |
+| `role_name` | Nullable(String) |
+| `role_slug` | Nullable(String) |
+| `role_level` | Nullable(String) |
+| `status` | Nullable(String) |
+| `created_at` | Nullable(DateTime64(6)) |
+| `updated_at` | Nullable(DateTime64(6)) |
+
+### auth_apikey
+
+| Column | Type |
+|--------|------|
+| `id` | Int32 |
+| `name` | Nullable(String) |
+| `organization_id` | Nullable(Int32) |
+| `account_id` | Nullable(Int32) |
+| `user_id` | Nullable(Int32) |
+| `owner_id` | Nullable(Int32) |
+| `masked_api_key` | Nullable(String) |
+| `tags` | Nullable(String) |
+| `roles` | Nullable(String) |
+| `status` | Nullable(String) |
+| `internal` | Nullable(UInt8) |
+| `used_at` | Nullable(DateTime64(6)) |
+| `created_at` | Nullable(DateTime64(6)) |
+| `updated_at` | Nullable(DateTime64(6)) |
+| `nrn` | String |
+| `_version` | UInt64 |
+| `_deleted` | UInt8 |
+| `_synced_at` | DateTime64(6) |
+
+---
+
+## Services Domain (7 tables)
+
+**Services tables carry two delete flags:**
+- `_deleted` (UInt8) — sync-level soft delete. Standard `WHERE _deleted = 0`.
+- `deleted_at` (Nullable(DateTime64(6))) — application-level logical delete. Add `AND deleted_at IS NULL` for strict "live" queries.
+
+### services_services
+
+Concrete service instance (an addon linked to an entity).
+
+| Column | Type |
+|--------|------|
+| `id` | UUID |
+| `name` | Nullable(String) |
+| `slug` | Nullable(String) |
+| `status` | Nullable(String) |
+| `type` | Nullable(String) |
+| `specification_id` | Nullable(UUID) — current spec |
+| `desired_specification_id` | Nullable(UUID) — requested spec |
+| `entity_nrn` | Nullable(String) — the entity this service is attached to |
+| `attributes` | Nullable(String) — JSON-as-string |
+| `selectors` | Nullable(String) — JSON |
+| `dimensions` | Nullable(String) — JSON |
+| `linkable_to` | Nullable(String) |
+| `messages` | Nullable(String) |
+| `created_at` | Nullable(DateTime64(6)) |
+| `updated_at` | Nullable(DateTime64(6)) |
+| `deleted_at` | Nullable(DateTime64(6)) |
+| `nrn` | String |
+| `_version` | UInt64 |
+| `_deleted` | UInt8 |
+| `_synced_at` | DateTime64(6) |
+
+### services_service_specifications
+
+Template that describes a service type.
+
+| Column | Type |
+|--------|------|
+| `id` | UUID |
+| `name` | Nullable(String) |
+| `slug` | Nullable(String) |
+| `type` | Nullable(String) |
+| `attributes` | Nullable(String) |
+| `selectors` | Nullable(String) |
+| `visible_to` | Nullable(String) |
+| `dimensions` | Nullable(String) |
+| `assignable_to` | Nullable(String) |
+| `use_default_actions` | Nullable(UInt8) |
+| `scopes` | Nullable(String) |
+| `created_at` | Nullable(DateTime64(6)) |
+| `updated_at` | Nullable(DateTime64(6)) |
+| `deleted_at` | Nullable(DateTime64(6)) |
+| `nrn` | String |
+| `_version` | UInt64 |
+| `_deleted` | UInt8 |
+| `_synced_at` | DateTime64(6) |
+
+### services_links
+
+A binding between a `services_services` instance and a target `entity_nrn`.
+
+| Column | Type |
+|--------|------|
+| `id` | UUID |
+| `name` | Nullable(String) |
+| `slug` | Nullable(String) |
+| `status` | Nullable(String) |
+| `service_id` | Nullable(UUID) |
+| `specification_id` | Nullable(UUID) |
+| `desired_specification_id` | Nullable(UUID) |
+| `entity_nrn` | Nullable(String) |
+| `attributes` | Nullable(String) |
+| `selectors` | Nullable(String) |
+| `dimensions` | Nullable(String) |
+| `messages` | Nullable(String) |
+| `parameter_slug_algorithm_version` | Nullable(String) |
+| `created_at` | Nullable(DateTime64(6)) |
+| `updated_at` | Nullable(DateTime64(6)) |
+| `deleted_at` | Nullable(DateTime64(6)) |
+| `nrn` | String |
+| `_version` | UInt64 |
+| `_deleted` | UInt8 |
+| `_synced_at` | DateTime64(6) |
+
+### services_link_specifications
+
+Template that describes a link type.
+
+| Column | Type |
+|--------|------|
+| `id` | UUID |
+| `name` | Nullable(String) |
+| `slug` | Nullable(String) |
+| `specification_id` | Nullable(UUID) |
+| `attributes` | Nullable(String) |
+| `selectors` | Nullable(String) |
+| `dimensions` | Nullable(String) |
+| `visible_to` | Nullable(String) |
+| `assignable_to` | Nullable(String) |
+| `scopes` | Nullable(String) |
+| `unique` | Nullable(UInt8) |
+| `use_default_actions` | Nullable(UInt8) |
+| `external` | Nullable(String) |
+| `created_at` | Nullable(DateTime64(6)) |
+| `updated_at` | Nullable(DateTime64(6)) |
+| `deleted_at` | Nullable(DateTime64(6)) |
+| `nrn` | String |
+| `_version` | UInt64 |
+| `_deleted` | UInt8 |
+| `_synced_at` | DateTime64(6) |
+
+### services_actions
+
+An action invocation (one per call) on a service or a link.
+
+| Column | Type |
+|--------|------|
+| `id` | UUID |
+| `name` | Nullable(String) |
+| `slug` | Nullable(String) |
+| `status` | Nullable(String) |
+| `specification_id` | Nullable(UUID) |
+| `desired_specification_id` | Nullable(UUID) |
+| `service_id` | Nullable(UUID) |
+| `link_id` | Nullable(UUID) |
+| `parameters` | Nullable(String) — input JSON |
+| `results` | Nullable(String) — output JSON |
+| `is_test` | Nullable(UInt8) |
+| `created_by` | Nullable(String) |
+| `created_at` | Nullable(DateTime64(6)) |
+| `updated_at` | Nullable(DateTime64(6)) |
+| `deleted_at` | Nullable(DateTime64(6)) |
+| `nrn` | String |
+| `_version` | UInt64 |
+| `_deleted` | UInt8 |
+| `_synced_at` | DateTime64(6) |
+
+### services_action_specifications
+
+Template that describes an action type, attached to either a service spec or a link spec.
+
+| Column | Type |
+|--------|------|
+| `id` | UUID |
+| `name` | Nullable(String) |
+| `slug` | Nullable(String) |
+| `type` | Nullable(String) |
+| `service_specification_id` | Nullable(UUID) |
+| `link_specification_id` | Nullable(UUID) |
+| `parameters` | Nullable(String) |
+| `results` | Nullable(String) |
+| `retryable` | Nullable(UInt8) |
+| `parallelize` | Nullable(UInt8) |
+| `enabled_when` | Nullable(String) |
+| `icon` | Nullable(String) |
+| `annotations` | Nullable(String) |
+| `external` | Nullable(String) |
+| `created_at` | Nullable(DateTime64(6)) |
+| `updated_at` | Nullable(DateTime64(6)) |
+| `deleted_at` | Nullable(DateTime64(6)) |
+| `nrn` | String |
+| `_version` | UInt64 |
+| `_deleted` | UInt8 |
+| `_synced_at` | DateTime64(6) |
+
+### services_parameters
+
+Parameter wiring between service/link instances and `parameters_parameter` entries.
+
+| Column | Type |
+|--------|------|
+| `id` | UUID |
+| `entity_nrn` | Nullable(String) |
+| `service_id` | Nullable(UUID) |
+| `type` | Nullable(String) |
+| `target` | Nullable(String) |
+| `parameter_id` | Nullable(String) |
+| `created_at` | Nullable(DateTime64(6)) |
+| `updated_at` | Nullable(DateTime64(6)) |
+| `deleted_at` | Nullable(DateTime64(6)) |
+| `nrn` | String |
+| `_version` | UInt64 |
+| `_deleted` | UInt8 |
+| `_synced_at` | DateTime64(6) |
+
+---
+
 ## Table Engines & Sorting Keys (Query Optimization)
 
-All tables use **ReplicatedReplacingMergeTree** (deduplicates rows by `_version`) except `audit_events` which uses **ReplicatedMergeTree** (append-only, no dedup).
+All tables use **ReplicatedReplacingMergeTree** (deduplicates rows by `_version`) except `audit_events` which uses **ReplicatedMergeTree** (append-only, no dedup), and `auth_resource_grants_expanded` which is a **View** (no storage; queries are rewritten against the underlying tables and do not use / support `FINAL`).
 
 **Sorting key = Primary key** in all tables. Queries that filter on sorting key columns (especially the leftmost) are significantly faster because ClickHouse can skip data granules.
 
@@ -895,6 +1192,9 @@ All tables use **ReplicatedReplacingMergeTree** (deduplicates rows by `_version`
 | `governance_action_items_categories` | `category_id` |
 | `governance_action_items_suggestions` | `suggestion_id` |
 | `governance_action_items_units` | `unit_id` |
+| `auth_user`, `auth_role`, `auth_apikey`, `auth_resource_grants` | `id` |
+| `auth_resource_grants_expanded` | (view — no sorting key) |
+| All `services_*` tables | `id` (UUID) |
 | All other tables | `id` |
 
 **Optimization tips:**
@@ -923,3 +1223,33 @@ organization (org_id)
                  ├── deployment_group (FK: application_id)
                  └── technology_template (template_id)
 ```
+
+### Auth
+
+```
+auth_user (id)
+auth_role (id)
+auth_apikey (id) — links back to user_id / owner_id / account_id / organization_id
+auth_resource_grants (id, FK: user_id → auth_user.id, FK: role_id → auth_role.id, scoped by nrn)
+  └── auth_resource_grants_expanded (VIEW) — pre-joined with role_name / role_slug / role_level
+```
+
+### Services
+
+```
+services_service_specifications (id: UUID)  ◄─── template
+  └── services_services (id, FK: specification_id, attached via entity_nrn)
+       └── services_links (id, FK: service_id, target via entity_nrn)
+            ├── services_link_specifications (id, FK via specification_id)   ◄─── template
+            └── services_actions (id, FK: link_id OR service_id)
+                 └── services_action_specifications (id, FK via specification_id) ◄─── template
+
+services_parameters (id, FK: service_id, target via entity_nrn)
+  └── points to parameters_parameter entries by parameter_id
+```
+
+**Key patterns:**
+- A concrete `services_services` row is typed by `specification_id` pointing to `services_service_specifications`.
+- A `services_links` row binds a service to another nullplatform entity via `entity_nrn` (e.g. an application or scope).
+- Actions (`services_actions`) are invocations, **one row per call**, and carry `parameters` / `results` as JSON strings. They reference either a `service_id` or a `link_id` depending on whether the action is service-level or link-level.
+- `services_parameters` wires service/link instances to parameter store entries so that their values resolve correctly at execution time.
