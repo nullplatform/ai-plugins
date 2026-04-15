@@ -1,6 +1,7 @@
 ---
 name: np-organization-create
-description: This skill should be used when the user asks to "create an organization", "new nullplatform org", "onboard a new client", "initialize organization", or needs to create a new nullplatform organization via the onboarding API. This is an irreversible operation.
+description: This skill should be used when the user asks to "create an organization", "new nullplatform org", "onboard a new client", "initialize organization", "bootstrap nullplatform", "first-time setup", "set up a new client", "I need to create an org", "setting up nullplatform from scratch", or needs to create a new nullplatform organization via the onboarding API. This is an irreversible operation.
+allowed-tools: AskUserQuestion
 ---
 
 # Nullplatform Organization Create
@@ -21,15 +22,19 @@ Creates a new Nullplatform organization via the onboarding API.
 3. **ALWAYS** ask if the organization name was validated with stakeholders
 4. **ALWAYS** verify each owner email with the user before sending (real invitations are sent)
 5. **NEVER** execute the POST without all the above confirmations
+6. **ALWAYS** use AskUserQuestion for confirmations and data gathering (batch up to 4 questions per call)
+7. **ALWAYS** create and update the state file (`organization-{name}.md`) to survive context compaction
+8. The onboarding POST uses `curl` directly — this is the **one exception** to the "never use curl" rule, because `/np-api` authenticates via `NP_API_KEY` env var against `api.nullplatform.com` and cannot exchange a root API key against the onboarding API (`*.nullapps.io`)
 
 ## Prerequisites
 
-1. File `organization-create-api.key` in the project root
+1. `jq` installed (used for token extraction in Step 6)
+2. File `organization-create-api.key` in the project root
    - Contains an API Key with `organization:create` grant on `organization=0` (root)
    - This file is **highly sensitive** and must be in `.gitignore`
    - To obtain it: contact the Nullplatform team
-2. Verify that `organization-create-api.key` is in `.gitignore`
-3. VPN connectivity (required for `*.nullapps.io`)
+3. Verify that `organization-create-api.key` is in `.gitignore`
+4. VPN connectivity (required for `*.nullapps.io`)
 
 ## Endpoint
 
@@ -60,9 +65,11 @@ Creates a new Nullplatform organization via the onboarding API.
 
 ## Workflow
 
-### Step 0: Check if the organization already exists
+### Step 0: Check existing state
 
-Before starting the creation flow, check if `organization.properties` already contains an `organization_id`.
+**First**, check if a state file `organization-*.md` exists in the working directory. If it does and phase is not `complete`, resume from the current phase instead of starting over.
+
+**Then**, check if `organization.properties` already contains an `organization_id`.
 
 If it exists:
 1. Ask the user if the org was already created or if they need to create a new one
@@ -101,26 +108,21 @@ If `organization-create-api.key` doesn't exist, indicate:
 
 If it's not in `.gitignore`, add it before continuing.
 
-### Step 2: Gather data
+### Step 2: Gather data (batch 1 — org details)
 
-Ask the user using AskUserQuestion:
+Use AskUserQuestion (up to 4 questions per call):
 
-1. **Organization name** (will be the permanent identifier)
-2. **First account name** (e.g., "playground", "production")
-3. **Owners** (email, first name, and last name for each one)
+1. **Organization name** — will be the permanent identifier
+2. **First account name** — e.g., "playground", "production"
+3. **Stakeholder validation** — "Has this org name been validated with stakeholders? This name is PERMANENT and cannot be changed."
 
-### Step 3: Stakeholder validation
+If stakeholder validation is "No" → pause and wait for the user to confirm before continuing.
 
-**MANDATORY** - Use AskUserQuestion:
+### Step 3: Gather data (batch 2 — owners)
 
-> The organization name will be `{organization_name}`.
-> This name is PERMANENT and cannot be changed afterwards.
->
-> Has this name been validated with stakeholders?
+Use AskUserQuestion:
 
-Options:
-- **Yes, it's validated** → Continue
-- **No, I need to validate it first** → Pause and wait
+1. **Owners** — email, first name, and last name for each one (at least 1)
 
 ### Step 4: Verify owners
 
@@ -167,14 +169,27 @@ Options:
 
 ### Step 6: Execute
 
-Use `/np-api fetch-api` with `--key-file`:
+**Do NOT use `/np-api fetch-api` here** — np-api authenticates via `NP_API_KEY` env var against `api.nullplatform.com`. It cannot exchange a root API key against the onboarding API (`*.nullapps.io`). Use `curl` directly with token exchange:
 
 ```bash
-/np-api fetch-api \
-  --key-file organization-create-api.key \
-  --method POST \
-  --data '{"organization_name":"...","account_name":"...","owners":[...]}' \
-  "https://onboarding-onboarding-api-production-lmhky.prod.nullapps.io/organization"
+# 1. Exchange the API key for a bearer token
+# NOTE: The onboarding API uses "apiKey" (camelCase), unlike the public API which uses "api_key" (snake_case)
+API_KEY=$(cat organization-create-api.key)
+TOKEN=$(curl -s -X POST "https://onboarding-onboarding-api-production-lmhky.prod.nullapps.io/token" \
+  -H "Content-Type: application/json" \
+  -d "{\"apiKey\": \"$API_KEY\"}" | jq -r '.access_token')
+
+# 2. Validate token before proceeding (this is an IRREVERSIBLE operation)
+if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
+  echo "ERROR: Token exchange failed. Verify organization-create-api.key and VPN connectivity."
+  exit 1
+fi
+
+# 3. Create the organization
+curl -s -X POST "https://onboarding-onboarding-api-production-lmhky.prod.nullapps.io/organization" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"organization_name":"...","account_name":"...","owners":[...]}'
 ```
 
 ### Step 7: Process result
@@ -198,19 +213,19 @@ Use `/np-api fetch-api` with `--key-file`:
    | Invited owners | {count} |
 
    File `organization.properties` created.
-
-   **Next step:** Post-creation verification (Step 8).
    ```
 
-### Step 8: Post-creation verification
+4. Create the state file `organization-{name}.md` (see `docs/state-file.md` for template):
+   - Record org id, name, account name, owners, creation timestamp
+   - Set phase to `org-created`
 
-**NOTE:** This step is executed ONLY after creating a new organization (Steps 6-7). If the org already existed and creation was skipped (Step 0), DO NOT execute this verification.
+**Next step:** API key creation (Step 8).
 
-**IMPORTANT:** The root API key (`organization-create-api.key` with `organization:create` grant on `organization=0`) **only works against the onboarding API** (`*.nullapps.io`). The public API (`api.nullplatform.com`) rejects root tokens with 403. To verify the newly created org, a token from the new organization is needed.
+### Step 8: Create API key for the new organization
 
-#### 8.1 Create API key for the new organization
+**NOTE:** This step is executed ONLY after creating a new organization (Steps 6-7). If the org already existed and creation was skipped (Step 0), DO NOT execute this step or the verification.
 
-The root API key (`organization-create-api.key`) **only works against the onboarding API** (`*.nullapps.io`). To operate with the public API (`api.nullplatform.com`), an API key from the new organization is needed.
+**IMPORTANT:** The root API key (`organization-create-api.key`) **only works against the onboarding API** (`*.nullapps.io`). The public API (`api.nullplatform.com`) rejects root tokens with 403. An API key from the new organization is needed.
 
 Guide the user:
 
@@ -247,8 +262,10 @@ Use AskUserQuestion:
 > When you have it saved in `np-api.key`, let me know to continue with verification.
 
 Options:
-- **I already have the API key in np-api.key** → Continue with verification
-- **Skip verification** → Go directly to the next step
+- **I already have the API key in np-api.key** → Continue with verification (Step 9)
+- **Skip verification** → Go directly to `/np-setup-orchestrator`
+
+Update the state file phase to `api-key-created`.
 
 **IMPORTANT:** This API key is reused in the subsequent setup steps (`/np-setup-orchestrator`, infrastructure wizard, bindings, etc.). Assigning only `Admin` is not enough — subsequent skills validate that the key has the specific roles listed above.
 
@@ -268,43 +285,41 @@ Options:
 
 For the initial setup, **Admin** is recommended. For later use, create keys with the minimum required permissions.
 
-#### 8.2 Verify the organization exists
+### Step 9: Post-creation verification
+
+**Before starting:** set `NP_API_KEY` from the org-scoped key so `/np-api` can authenticate:
 
 ```bash
-/np-api fetch-api \
-  --key-file np-api.key \
-  "/organization/{id}"
+export NP_API_KEY=$(cat np-api.key)
 ```
+
+**Note:** Each `/np-api fetch-api` call below is a **Claude skill invocation**, not a bash command. Do not run it inside a bash code block. The `NP_API_KEY` env var must be set in the shell environment before invoking the skill. If context compaction occurred, re-export it.
+
+#### 9.1 Verify the organization exists
+
+Invoke: `/np-api fetch-api "/organization/{id}"`
 
 Verify that the response contains:
 - `id` matches the one returned during creation
 - `name` matches `organization_name`
 - `status` is `active`
 
-#### 8.3 Verify the account was created (only if `account_name` was provided)
+#### 9.2 Verify the account was created (only if `account_name` was provided)
 
 **This step is executed ONLY if the user provided `account_name` in the creation body.**
 If `account_name` was not provided, skip this step.
 
-```bash
-/np-api fetch-api \
-  --key-file np-api.key \
-  "/account?organization_id={id}"
-```
+Invoke: `/np-api fetch-api "/account?organization_id={id}"`
 
 Verify that the response contains at least one account with the expected name.
 
-#### 8.4 Verify users/owners were created
+#### 9.3 Verify users/owners were created
 
-```bash
-/np-api fetch-api \
-  --key-file np-api.key \
-  "/user?organization_id={id}"
-```
+Invoke: `/np-api fetch-api "/user?organization_id={id}"`
 
 Compare the returned emails with the owners sent in the creation body.
 
-#### 8.5 Show verification result
+#### 9.4 Show verification result
 
 ```markdown
 ## Post-creation verification
@@ -316,7 +331,7 @@ Compare the returned emails with the owners sent in the creation body.
 | Users created | OK/ERROR | {count}/{total} owners found |
 ```
 
-If everything is OK:
+If everything is OK, update the state file phase to `complete` and show:
 
 ```markdown
 Organization verified successfully.
@@ -339,44 +354,16 @@ Show the error and possible causes:
 
 ## Troubleshooting
 
-### Organization creation
-
-#### "Invalid token provided"
-
-- Verify that `organization-create-api.key` contains a valid API key
-- Verify that the API key has `organization:create` grant on `organization=0`
-
-#### "Forbidden" / 403 on creation POST
-
-- The API key is not root level
-- Contact the Nullplatform team to verify permissions
-
-#### Connection refused / DNS error
-
-- Verify you are connected to the VPN
-- Endpoints `*.nullapps.io` require VPN
-
-#### "must have required property 'last_name'"
-
-- The body uses `snake_case`: `last_name`, NOT `lastName`
-
-### Post-creation verification
-
-#### 403 on verification (api.nullplatform.com)
-
-- **Cause:** The root API key (`organization-create-api.key`) is being used against `api.nullplatform.com`. This key only works against the onboarding API (`*.nullapps.io`).
-- **Solution:** Create an API key with Admin role in the new organization (see Step 8.1) and save it in `np-api.key`.
-
-#### Owner didn't receive invitation
-
-- Verify the email is correct
-- Check the spam folder
-- Contact the Nullplatform team if the email doesn't arrive after 15 minutes
-
-#### New org API key returns 401
-
-- Verify that `np-api.key` contains the correct key (not the root one)
-- Verify that the key scope is the new organization (not `organization=0`)
+| Error | Phase | Cause | Fix |
+|-------|-------|-------|-----|
+| "Invalid token provided" | Creation | `organization-create-api.key` is invalid or expired | Verify key has `organization:create` grant on `organization=0` |
+| 403 Forbidden on creation POST | Creation | API key is not root level | Contact Nullplatform team to verify permissions |
+| Connection refused / DNS error | Creation | VPN not connected | Connect to VPN — `*.nullapps.io` endpoints require it |
+| "must have required property 'last_name'" | Creation | Body uses camelCase | Use `snake_case`: `last_name`, NOT `lastName` |
+| TOKEN is null/empty after exchange | Creation | Wrong API key, VPN dropped, or wrong field name in token request | Run the token exchange curl manually and inspect the raw response |
+| 403 on `api.nullplatform.com` | Verification | Using root key (`organization-create-api.key`) against public API | Create org-scoped API key (Step 8) and use `np-api.key` instead |
+| Owner didn't receive invitation | Post-creation | Email incorrect or in spam | Verify email, check spam. Contact Nullplatform if no email after 15 min |
+| 401 with org API key | Verification | Wrong key in `np-api.key` or wrong scope | Verify `np-api.key` has org-scoped key (not root `organization=0`) |
 
 ## Next Step
 

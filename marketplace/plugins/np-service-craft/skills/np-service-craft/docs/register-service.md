@@ -39,11 +39,41 @@ Also read `main.tf` and `locals.tf` to understand how resources are built intern
 jq '{name, slug, selectors}' services/<name>/specs/service-spec.json.tpl
 ```
 
-### 2. Check not already registered
+### 2. Check for duplicates and collisions
+
+**2a. Check not already registered in terraform:**
 
 ```bash
 grep -c "service_definition_<slug>" nullplatform/main.tf
 ```
+
+**2b. Check for name/slug collisions in the remote repository** (Remote mode only):
+
+Before pushing or registering, verify that no existing service in the remote repo uses the same slug or directory path. This prevents accidental overwrites and confusing slug collisions in nullplatform.
+
+```bash
+# Check if the service path already exists in the remote repo
+git ls-remote --exit-code origin HEAD -- "services/<slug>/" 2>/dev/null
+# Or if repo is already cloned:
+git fetch origin main && git ls-tree -r --name-only origin/main | grep "^services/<slug>/"
+```
+
+If a collision is found:
+- **Same slug exists in remote**: Inform the user that `services/<slug>/` already exists in the remote repository. Ask with AskUserQuestion whether they want to:
+  - **Overwrite**: Replace the existing service (confirm this is intentional — the previous version will be lost)
+  - **Rename**: Choose a different slug (suggest alternatives like `<slug>-v2`, `<provider>-<slug>`, etc.)
+  - **Cancel**: Abort the registration
+
+- **Same service name but different slug**: Warn the user that another service with the same `name` field already exists under a different slug. This can cause confusion in the UI. Ask the user to disambiguate by either renaming the new service or confirming the duplicate name is intentional.
+
+**2c. Check for slug collisions in nullplatform** (both modes):
+
+```bash
+# Query existing service specifications to check for slug conflicts
+/np-api fetch-api "/service_specification?nrn=<nrn>&show_descendants=true" | jq '[.[] | {slug, name}]'
+```
+
+If a service specification with the same slug already exists in nullplatform, inform the user and ask them to disambiguate before proceeding.
 
 ### 3. Ask user: local or remote
 
@@ -58,6 +88,24 @@ grep -c "service_definition_<slug>" nullplatform/main.tf
 This decision determines the module's `git_provider`:
 - **Local** → `git_provider = "local"` + `local_specs_path` pointing to the service directory
 - **Remote** → `git_provider = "github"` (default) + `repository_org`, `repository_name`, `repository_branch`. If the repo is private, also `repository_token`.
+
+### 3b. If Remote: Repository visibility (default: Private)
+
+When the user selects **Remote**, the repository **MUST be private by default**. Present the AskUserQuestion with **Private as the first option and marked as Recommended**:
+
+> The repository will be created/used as **private** (recommended). Do you want to change this?
+>
+> **Private (Recommended)**: Service specs are only accessible with a token. You will need to provide a GitHub/GitLab access token with read permissions. The module passes this token to fetch spec files securely. This is the safe default.
+>
+> **Public**: Service specs are publicly accessible on the internet. **Warning**: anyone can read your service definitions, attribute schemas, and link configurations. Only use this for open-source services or non-sensitive specs.
+
+**Default behavior**: If the user does not explicitly choose Public, always proceed with Private. Never create or assume a public repository.
+
+Based on the answer:
+- **Private (default)** → `repository_token` is **required**. Ask the user for a GitHub Personal Access Token (or GitLab PAT with `read_api` scope). Warn that without the token, tofu apply will fail with a 404 error. If the agent needs to create the repo on behalf of the user (e.g., via GitHub API), always set `"private": true`.
+- **Public** → `repository_token` can be omitted (set to `null`). Explicitly confirm with the user: _"Your service specs will be publicly readable by anyone on the internet. Are you sure?"_. Require explicit confirmation before proceeding.
+
+**Important**: If the user needs to push specs to a new repository, remind them to set the repository visibility to **private before pushing**. If the repo was accidentally created as public, immediately help them change it to private via the GitHub/GitLab API or UI before continuing.
 
 For the binding (`service_definition_agent_association`):
 - **Local** → `base_clone_path = pathexpand("~/.np")` (points to the local symlink)

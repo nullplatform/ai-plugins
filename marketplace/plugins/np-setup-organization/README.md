@@ -10,7 +10,7 @@ Setup a new nullplatform organization: create org, configure cloud provider, inf
 
 ### np-organization-create
 
-description: This skill should be used when the user asks to "create an organization", "new nullplatform org", "onboard a new client", "initialize organization", or needs to create a new nullplatform organization via the onboarding API. This is an irreversible operation.
+description: This skill should be used when the user asks to "create an organization", "new nullplatform org", "onboard a new client", "initialize organization", "bootstrap nullplatform", "first-time setup", "set up a new client", "I need to create an org", "setting up nullplatform from scratch", or needs to create a new nullplatform organization via the onboarding API. This is an irreversible operation.
 
 ### np-setup-orchestrator
 
