@@ -1,6 +1,6 @@
 ---
 name: np-lake
-description: Query nullplatform Customer Lake. Use for cross-entity relationship queries, bulk entity state analysis, approval workflow investigation, parameter configuration audit, auth/RBAC audits, service & link inventory, and complex SQL queries across 64 tables in 8 domains (Approvals, Audit, Auth, Core Entities, Governance, Parameters, SCM, Services). Use when users need current state of multiple entities, joins across tables, or analytical queries. PREFERRED over individual API calls for data retrieval — a single SQL query replaces multiple API requests.
+description: Query nullplatform Customer Lake. Use for cross-entity relationship queries, bulk entity state analysis, approval workflow investigation, parameter configuration audit, auth/RBAC audits, service & link inventory, and complex SQL queries across 62 tables in 8 domains (Approvals, Audit, Auth, Core Entities, Governance, Parameters, SCM, Services). Use when users need current state of multiple entities, joins across tables, or analytical queries. PREFERRED over individual API calls for data retrieval — a single SQL query replaces multiple API requests.
 allowed-tools: Bash(${CLAUDE_PLUGIN_ROOT}/skills/np-lake/scripts/*.sh)
 ---
 
@@ -31,12 +31,13 @@ If the script fails (exit code 1), **DO NOT stop**. Use `AskUserQuestion` to off
 
 **Based on the response:**
 
-- **Option 1 (token)**: Ask for the token. Configure `export NP_TOKEN="<token>"`. Re-run `check_ch_auth.sh` to confirm.
+- **Option 1 (token)**: Ask whether they have an API key or a personal token. Configure `export NP_API_KEY="<key>"` (preferred) or `export NP_TOKEN="<token>"`. Re-run `check_ch_auth.sh` to confirm.
 - **Option 2 (skip)**: Inform the user that the data lake will not be available and continue using the REST API as fallback.
 
-Token lookup priority:
-1. `NP_TOKEN` environment variable
-2. `NP_API_KEY` environment variable
+Authentication is delegated to the `np-api` skill. Token lookup priority (handled by np-api):
+
+1. `NP_API_KEY` environment variable (recommended — exchanged for a JWT and cached in `~/.claude/`)
+2. `NP_TOKEN` environment variable (personal JWT, ~24h expiry)
 
 ## Organization Filter (Server-Side)
 
@@ -75,9 +76,23 @@ The user may see some entities but not others (e.g., they have access to one acc
 
 | Document | Content |
 |----------|---------|
-| [docs/SCHEMA.md](docs/SCHEMA.md) | Full schema for all 64 tables, organized by domain |
+| [docs/SCHEMA.md](docs/SCHEMA.md) | Full schema for all 62 tables, organized by domain |
 | [docs/QUERY_COOKBOOK.md](docs/QUERY_COOKBOOK.md) | Pre-built queries by use case |
 | [docs/SQL_GUIDE.md](docs/SQL_GUIDE.md) | SQL tips, formats, date functions, and performance best practices |
+
+## Inspecting Table Schemas (DO THIS BEFORE QUERYING UNFAMILIAR COLUMNS)
+
+`ch_query.sh` accepts read-only introspection statements as well as SELECT: `DESCRIBE` (alias `DESC`), `SHOW`, and `EXPLAIN`. Use them before writing a query whose columns you don't know for sure — do NOT guess field names from the table name, since the static schema in this skill can drift from the live lake.
+
+| Goal | Command |
+|------|---------|
+| List all tables in the lake | `ch_query.sh --format tsv "SHOW TABLES FROM customers_lake"` |
+| Inspect columns + types of a table | `ch_query.sh --format pretty "DESCRIBE TABLE customers_lake.core_entities_scope"` |
+| Alternate — machine-readable columns | `ch_query.sh "SELECT name, type FROM system.columns WHERE database='customers_lake' AND table='core_entities_scope'"` |
+| See the CREATE TABLE of a table | `ch_query.sh --format pretty "SHOW CREATE TABLE customers_lake.core_entities_scope"` |
+| Explain a query plan | `ch_query.sh --format pretty "EXPLAIN SELECT count() FROM core_entities_scope"` |
+
+**Rule:** if you're about to filter, project, or JOIN on a column that isn't listed in the Quick Reference below, `DESCRIBE` the table first. This is cheap (one round-trip) and avoids inventing fields that don't exist.
 
 ## Domains and Main Tables (Quick Reference)
 
@@ -143,14 +158,12 @@ The user may see some entities but not others (e.g., they have access to one acc
 | `core_entities_scope_type` | `id` | `name` | Scope types |
 | `core_entities_technology_template` | `template_id` | `name` | Technology templates |
 
-### Parameters (5 tables)
+### Parameters (3 tables)
 | Table | Description |
 |-------|-------------|
 | `parameters_parameter` | Parameter definitions (name, type, secret, handle) |
 | `parameters_parameter_value` | Parameter values (FK: parameter_id, parameter_version) |
 | `parameters_parameter_version` | Parameter versions (FK: parameter_id, user_id) |
-| `parameters_crypto_strategy` | Encryption strategies |
-| `parameters_external_storage_configuration` | External storage (Vault, etc.) |
 
 ### Governance (4 tables)
 | Table | Description |
@@ -212,7 +225,7 @@ ${CLAUDE_PLUGIN_ROOT}/skills/np-lake/scripts/ch_query.sh \
 | Field | Value |
 |-------|-------|
 | Database | `customers_lake` |
-| Tables | 64 tables in 8 domains |
+| Tables | 62 tables in 8 domains |
 | Engine | Customer Lake (HTTP interface) |
 
 ### Common Columns Across All Tables

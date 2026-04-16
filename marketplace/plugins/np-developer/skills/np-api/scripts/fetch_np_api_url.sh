@@ -30,6 +30,7 @@ ALLOWED_MODIFY=(
     "governance/action_item/*"
     "governance/action_item_category"
     "governance/action_item_category/*"
+    "data/lake/query"
 )
 
 is_modify_allowed() {
@@ -48,6 +49,8 @@ METHOD="GET"
 DATA=""
 ENDPOINT=""
 OUTPUT_FILE=""
+CONTENT_TYPE=""
+DATA_BINARY=false
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -58,6 +61,14 @@ while [[ $# -gt 0 ]]; do
         --data)
             DATA="$2"
             shift 2
+            ;;
+        --content-type)
+            CONTENT_TYPE="$2"
+            shift 2
+            ;;
+        --data-binary)
+            DATA_BINARY=true
+            shift
             ;;
         *)
             if [ -z "$ENDPOINT" ]; then
@@ -95,6 +106,10 @@ case "$METHOD" in
         fi
         if [ "$METHOD" != "DELETE" ] && [ -z "$DATA" ]; then
             echo "Error: --data is required for $METHOD requests" >&2
+            exit 1
+        fi
+        if [ "$DATA_BINARY" = true ] && [ -z "$DATA" ]; then
+            echo "Error: --data-binary requires --data" >&2
             exit 1
         fi
         ;;
@@ -257,14 +272,23 @@ fi
 # Make request
 CURL_ARGS=(-s -X "$METHOD" -H "Authorization: Bearer $BEARER_TOKEN")
 
+# Resolve Content-Type: explicit override wins, else JSON default for bodies
+EFFECTIVE_CT="${CONTENT_TYPE:-application/json}"
+
+if [ "$DATA_BINARY" = true ]; then
+    DATA_FLAG="--data-binary"
+else
+    DATA_FLAG="-d"
+fi
+
 case "$METHOD" in
     POST|PUT|PATCH)
-        CURL_ARGS+=(-H "Content-Type: application/json" -d "$DATA")
+        CURL_ARGS+=(-H "Content-Type: $EFFECTIVE_CT" "$DATA_FLAG" "$DATA")
         ;;
     DELETE)
         # DELETE may or may not carry a body; forward if provided
         if [ -n "$DATA" ]; then
-            CURL_ARGS+=(-H "Content-Type: application/json" -d "$DATA")
+            CURL_ARGS+=(-H "Content-Type: $EFFECTIVE_CT" "$DATA_FLAG" "$DATA")
         fi
         ;;
 esac
