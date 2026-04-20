@@ -55,7 +55,7 @@ ejecutar accion, run action, correr accion, custom action, accion custom, operar
 
 **IMPORTANTE**: Cada operacion tiene su propio flujo documentado en `docs/`. Leer la doc
 correspondiente ANTES de ejecutar. Los flujos incluyen consultas previas obligatorias via
-`/np-api fetch-api`.
+`/np-lake` y/o `/np-api fetch-api`.
 
 ---
 
@@ -68,10 +68,37 @@ correspondiente ANTES de ejecutar. Los flujos incluyen consultas previas obligat
 Ejemplo: "Voy a ejecutar `POST /scope` con body `{...}` para crear un scope 'staging' en la
 aplicacion <app_id> con dimension environment=staging. Procedo?"
 
-## REGLA IMPORTANTE: Lectura via np-api
+## REGLA IMPORTANTE: Fuentes de lectura
 
-**Este skill NO hace consultas de lectura.**
-Para obtener IDs, verificar estado, o consultar entidades, usar siempre `/np-api fetch-api "<endpoint>"`.
+Este skill usa DOS fuentes de lectura complementarias:
+
+| Necesidad | Usar | Motivo |
+|-----------|------|--------|
+| Buscar entidad por nombre/patron | `/np-lake` | API no soporta busqueda por nombre |
+| Listar entidades con contexto cruzado | `/np-lake` | Una query con JOINs reemplaza N+1 API calls |
+| Audit (quien creo/modifico algo) | `/np-lake` | `audit_events` solo disponible en el lake |
+| Verificar estado actual antes de escribir | `/np-api` | Dato transaccional, real-time |
+| Schemas dinamicos (capabilities, action specs, metadata specs) | `/np-api` | No disponibles en el lake |
+| Obtener NRN completo de una entidad | `/np-api` o `/np-lake` | Ambos lo tienen |
+
+**Fallback**: Si np-lake no esta disponible, TODOS los flujos siguen funcionando
+usando exclusivamente np-api (comportamiento actual).
+
+### Como invocar np-lake
+
+Las queries se ejecutan via el skill `/np-lake`:
+
+```
+np-lake "SELECT ... FROM ... FINAL WHERE _deleted = 0 AND ... LIMIT N"
+```
+
+Reglas SQL del lake:
+- SIEMPRE usar `FINAL` en tablas (deduplica por `_version`)
+- SIEMPRE usar `WHERE _deleted = 0` (excepto `audit_events` que no tiene este campo)
+- SIEMPRE usar `LIMIT`
+- En JOINs: `FROM tabla AS alias FINAL` (alias ANTES de FINAL)
+- Filtro de organizacion es automatico (no agregar `WHERE organization_id = ...`)
+- Tablas de services usan UUID como ID (comparar como string)
 
 ---
 
@@ -148,7 +175,7 @@ Muestra documentacion completa: campos requeridos, body tipico, consultas previa
 **ANTES de ejecutar, SIEMPRE:**
 
 1. Haber leido la doc del flujo correspondiente en `docs/`
-2. Haber ejecutado las consultas previas via `/np-api fetch-api`
+2. Haber ejecutado las consultas previas via `/np-lake` y/o `/np-api fetch-api`
 3. Haber mostrado al usuario QUE + POR QUE y recibido confirmacion
 
 Ejecutar:
@@ -175,7 +202,7 @@ NO es necesario pasar por search-action/describe-action si la operacion ya esta 
 
 ## Flujo general de una operacion
 
-1. **Discovery**: Consultar la API para obtener IDs, opciones disponibles, schemas
+1. **Discovery**: Buscar en np-lake por nombre/patron/contexto cruzado. Complementar con np-api para schemas dinamicos y verificacion real-time.
 2. **Preguntar**: Usar `AskUserQuestion` para que el usuario elija opciones
 3. **Confirmar**: Mostrar el body completo y pedir confirmacion
 4. **Ejecutar**: `exec-api` con el body confirmado
@@ -187,11 +214,13 @@ NO es necesario pasar por search-action/describe-action si la operacion ya esta 
 
 | Mal | Por que | Bien |
 |-----|---------|------|
-| Ejecutar sin discovery | No conoces las opciones disponibles | Consultar API primero |
-| Asumir IDs o valores | Pueden ser incorrectos | Consultar con `/np-api fetch-api` |
+| Ejecutar sin discovery | No conoces las opciones disponibles | Consultar np-lake y/o np-api primero |
+| Asumir IDs o valores | Pueden ser incorrectos | Consultar con `/np-lake` o `/np-api fetch-api` |
 | Ejecutar sin confirmar | El usuario debe aprobar cada escritura | Siempre confirmar antes |
-| Usar exec-api para leer | Este skill es solo escritura | Usar `/np-api fetch-api` para lectura |
+| Usar exec-api para leer | Este skill es solo escritura | Usar `/np-lake` o `/np-api fetch-api` para lectura |
 | No verificar post-ejecucion | La operacion puede fallar silenciosamente | Siempre verificar status |
+| Usar np-api para buscar por nombre | API no soporta busqueda, requiere fetch-all + filtrar | Usar np-lake con ILIKE |
+| Hacer N+1 API calls para datos cruzados | Lento y fragil | Usar np-lake con JOINs |
 
 ---
 
@@ -217,8 +246,8 @@ Pasos de discovery, preguntas al usuario, ejecucion y verificacion.
 ### Body tipico
 {...}
 
-### Consultas previas (via /np-api)
-- Descripcion: `np-api fetch-api "/endpoint"`
+### Consultas previas (via /np-lake y/o /np-api)
+- Descripcion: `np-lake "SELECT ..."` o `np-api fetch-api "/endpoint"`
 
 ### Verificar resultado
 - Como verificar que la operacion fue exitosa
@@ -229,3 +258,27 @@ action-api.sh exec-api --method METHOD --data '{...}' "/endpoint"
 ```
 
 El CLI detecta `## @action` como marcador y extrae la documentacion automaticamente.
+
+---
+
+## Links a la UI de Nullplatform
+
+Base URL: `https://{org_slug}.app.nullplatform.io`
+
+El `org_slug` se obtiene de la organizacion (ej: `kwik-e-mart`). Los IDs se extraen del NRN.
+
+| Entidad | URL |
+|---------|-----|
+| Aplicacion | `/account/{account_id}/namespace/{namespace_id}/application/{app_id}` |
+| Servicios de una app | `.../application/{app_id}/service?services-tab=ownedByApp` |
+| Detalle de servicio | `.../application/{app_id}/service/{service_uuid}/details` |
+| Parametro | `.../application/{app_id}/parameter/{param_id}/edit` |
+| Build | `.../application/{app_id}/build/{build_id}` |
+| Release | `.../application/{app_id}/release/{release_id}` |
+| Logs | `.../application/{app_id}/log` |
+| Performance | `.../application/{app_id}/performance` |
+
+Dado un NRN `organization=1255165411:account=95118862:namespace=463208973:application=1730423309`:
+→ `https://kwik-e-mart.app.nullplatform.io/account/95118862/namespace/463208973/application/1730423309`
+
+**Siempre incluir el link a la UI** cuando se muestre informacion de una entidad al usuario.
