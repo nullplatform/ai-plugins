@@ -15,6 +15,19 @@ Seguir estos pasos en orden:
 > y `/np-developer-actions exec-api` para ESCRITURA (paso 8). NUNCA usar `curl` ni
 > `/np-api` para operaciones POST/PUT/DELETE.
 
+#### Paso 0: Resolver app_id por nombre (np-lake)
+
+Si el usuario proporciona un nombre de aplicacion en lugar de un ID:
+
+```sql
+SELECT app_id, app_name, application_slug, status, nrn
+FROM core_entities_application FINAL
+WHERE _deleted = 0 AND app_name ILIKE '%termino%'
+LIMIT 10
+```
+
+Ejecutar via `/np-lake`. Si np-lake no esta disponible, el usuario debe proporcionar el app_id directamente.
+
 #### Paso 1: Obtener datos de la aplicación
 
 ```bash
@@ -27,6 +40,19 @@ El NRN completo de la aplicación se usa en los pasos siguientes (URL-encoded).
 
 Formato NRN: `organization=<org_id>:account=<acc_id>:namespace=<ns_id>:application=<app_id>`
 URL-encoded: `organization%3D<org_id>%3Aaccount%3D<acc_id>%3Anamespace%3D<ns_id>%3Aapplication%3D<app_id>`
+
+#### Paso 1b: Verificar scopes existentes (np-lake)
+
+Antes de crear, verificar que no exista un scope similar (evitar duplicados):
+
+```sql
+SELECT id, name, scope_slug, type, status, provider, tier
+FROM core_entities_scope FINAL
+WHERE _deleted = 0 AND application_id = {app_id}
+ORDER BY name
+```
+
+Ejecutar via `/np-lake`. Mostrar al usuario los scopes existentes antes de proceder con la creacion.
 
 #### Paso 2: Descubrir tipos de scope disponibles (scope_type)
 
@@ -295,6 +321,15 @@ np-api fetch-api "/controlplane/agent?organization_id=<org_id>&account_id=<accou
 ```
 
 #### Paso 9b: Manejar approvals
+
+> **np-lake**: Verificar approvals pendientes:
+> ```sql
+> SELECT id, status, execution_status, created_at
+> FROM approvals_approval_request FINAL
+> WHERE _deleted = 0 AND status = 'pending'
+> AND nrn LIKE '%application={app_id}%'
+> ORDER BY created_at DESC LIMIT 10
+> ```
 
 Si el scope cae en `pending_approval` o cualquier estado de approval, consultar:
 

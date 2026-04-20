@@ -32,9 +32,24 @@ Ejecuta una custom action sobre un servicio.
 
 ### Flujo obligatorio
 
-> **IMPORTANTE**: Este flujo usa `/np-api fetch-api` para LECTURA (discovery, pasos 1-3)
+> **IMPORTANTE**: Este flujo usa `/np-lake` y `/np-api fetch-api` para LECTURA (discovery, pasos 0-3)
 > y `/np-developer-actions exec-api` para ESCRITURA (paso 6). NUNCA usar `curl` ni
 > `/np-api` para operaciones POST.
+
+#### Paso 0: Buscar servicio por nombre (np-lake)
+
+Si el usuario dice "ejecutar query en mi postgres" o da un nombre en lugar de un ID:
+
+```sql
+SELECT s.id, s.name, s.status, ss.name AS spec_name
+FROM services_services AS s FINAL
+JOIN services_service_specifications AS ss FINAL ON s.specification_id = ss.id
+WHERE s._deleted = 0 AND s.deleted_at IS NULL
+AND (s.name ILIKE '%postgres%' OR ss.name ILIKE '%postgres%')
+LIMIT 10
+```
+
+Ejecutar via `/np-lake`. Si np-lake no esta disponible, el usuario debe proporcionar el service_id.
 
 #### Paso 1: Obtener datos del servicio
 
@@ -188,3 +203,19 @@ action-api.sh exec-api --method POST --data '{
 
 - No todas las link specifications tienen custom actions
 - Si no hay custom actions, el boton "Run action" del link aparece deshabilitado en la UI
+
+---
+
+### Historial de acciones ejecutadas (np-lake)
+
+Ver acciones previas sobre un servicio o link:
+
+```sql
+SELECT id, name, slug, status, created_at
+FROM services_actions FINAL
+WHERE _deleted = 0 AND deleted_at IS NULL
+AND service_id = '{service_uuid}'
+ORDER BY created_at DESC LIMIT 10
+```
+
+Para acciones sobre un link, reemplazar `service_id` por `link_id = '{link_uuid}'`.

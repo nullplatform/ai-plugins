@@ -25,7 +25,7 @@ Linkea un servicio existente y disponible a una aplicacion.
 **IMPORTANTE**: Linkear un servicio requiere un proceso de discovery previo para identificar
 servicios disponibles y sus caracteristicas. NO asumir service IDs ni dimensions.
 
-> **IMPORTANTE**: Este flujo usa `/np-api fetch-api` para LECTURA (discovery, pasos 1-5)
+> **IMPORTANTE**: Este flujo usa `/np-lake` y `/np-api fetch-api` para LECTURA (discovery, pasos 1-5)
 > y `/np-developer-actions exec-api` para ESCRITURA (paso 8). NUNCA usar `curl` ni
 > `/np-api` para operaciones POST/PUT/DELETE.
 
@@ -40,7 +40,24 @@ El NRN completo de la aplicacion se usara como `entity_nrn` del link.
 
 #### Paso 2: Obtener servicios disponibles (con priorizacion)
 
-Ejecutar dos consultas en paralelo:
+> **Alternativa np-lake (preferida)**: Una sola query que combina servicios + links existentes:
+> ```sql
+> SELECT s.id AS service_id, s.name, s.slug, s.status,
+>        ss.name AS spec_name,
+>        l.id AS link_id, l.status AS link_status
+> FROM services_services AS s FINAL
+> JOIN services_service_specifications AS ss FINAL ON s.specification_id = ss.id
+> LEFT JOIN services_links AS l FINAL ON l.service_id = s.id
+>   AND l._deleted = 0 AND l.deleted_at IS NULL
+>   AND l.entity_nrn LIKE '%application={app_id}%'
+> WHERE s._deleted = 0 AND s.deleted_at IS NULL
+> AND s.nrn LIKE '%account={account_id}%'
+> ORDER BY s.name LIMIT 50
+> ```
+> Servicios con `link_id` vacio = disponibles para linkear. Con `link_id` = ya linkeados.
+> Ejecutar via `/np-lake`.
+
+**Fallback via np-api** — ejecutar dos consultas en paralelo:
 
 ```bash
 # Todos los servicios disponibles para esta aplicacion (type=dependency)

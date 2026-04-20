@@ -78,6 +78,7 @@ This plugin requires the following permissions:
   "Bash(./.claude/skills/np-api/scripts/check_auth.sh:*)",
   "Bash(./.claude/skills/np-api/scripts/fetch_np_api_url.sh:*)",
   "Bash(./.claude/skills/np-api/scripts/np-api.sh:*)",
+  "Bash(./.claude/skills/np-infrastructure-wizard/scripts/delegate-dns.sh:*)",
   "Bash(./.claude/skills/np-setup-orchestrator/scripts/check-tf-api-key.sh:*)",
   "Skill(np-api)",
   "Skill(np-api:*)",

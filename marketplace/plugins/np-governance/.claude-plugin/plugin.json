@@ -1,6 +1,6 @@
 {
   "name": "np-governance",
-  "version": "1.1.21",
+  "version": "1.2.4",
   "description": "Governance Action Items: query and operate on action items, categories and suggestions; build new detector/executor agents with a guided wizard",
   "author": {
     "name": "Nullplatform",

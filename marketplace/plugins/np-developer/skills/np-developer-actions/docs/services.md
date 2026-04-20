@@ -11,9 +11,28 @@ Crea un nuevo servicio de infraestructura en una aplicacion.
 **IMPORTANTE**: Crear un servicio requiere un proceso de discovery previo para identificar
 los tipos de servicio disponibles y sus schemas de configuracion. NO asumir service specification IDs ni schemas.
 
-> **IMPORTANTE**: Este flujo usa `/np-api fetch-api` para LECTURA (discovery, pasos 1-4)
+> **IMPORTANTE**: Este flujo usa `/np-lake` y `/np-api fetch-api` para LECTURA (discovery, pasos 0-4)
 > y `/np-developer-actions exec-api` para ESCRITURA (paso 7). NUNCA usar `curl` ni
 > `/np-api` para operaciones POST/PUT/DELETE.
+
+#### Paso 0: Buscar servicios existentes por nombre (np-lake)
+
+Antes de crear, verificar si ya existe un servicio similar (evitar duplicados):
+
+```sql
+SELECT s.id, s.name, s.slug, s.status, s.type,
+       ss.name AS spec_name
+FROM services_services AS s FINAL
+JOIN services_service_specifications AS ss FINAL ON s.specification_id = ss.id
+WHERE s._deleted = 0 AND s.deleted_at IS NULL
+AND s.entity_nrn LIKE '%application={app_id}%'
+ORDER BY s.name
+LIMIT 20
+```
+
+Filtrar por nombre o tipo: `AND (s.name ILIKE '%postgres%' OR ss.name ILIKE '%postgres%')`
+
+Ejecutar via `/np-lake`. Si np-lake no esta disponible, continuar con Paso 1.
 
 #### Paso 1: Obtener datos de la aplicacion
 
@@ -32,6 +51,17 @@ Se descubren consultando service_specifications filtradas por NRN a nivel de apl
 ```bash
 np-api fetch-api "/service_specification?nrn=organization%3D<org_id>%3Aaccount%3D<acc_id>%3Anamespace%3D<ns_id>%3Aapplication%3D<app_id>&type=dependency&limit=100"
 ```
+
+> **np-lake**: Buscar service specification por nombre:
+> ```sql
+> SELECT id, name, slug, type
+> FROM services_service_specifications FINAL
+> WHERE _deleted = 0 AND deleted_at IS NULL
+> AND name ILIKE '%postgres%'
+> LIMIT 20
+> ```
+> Nota: np-lake tiene specs pero NO tiene `action_specification` con schemas de parametros.
+> El Paso 4 (get action schema) sigue con np-api.
 
 **NOTA**: El filtro `type=dependency` excluye specifications de tipo `scope` (que son para crear scopes, no servicios de infraestructura). El NRN a nivel de aplicacion es el que usa el frontend.
 
@@ -344,3 +374,19 @@ Devuelve el objeto completo del template con los campos actualizados.
 - Requiere permisos elevados en la API key.
 - `PUT /template/{id}` **no existe** (devuelve 404). Solo PATCH.
 - Para encontrar el template_id, usar `np-api fetch-api "/template?limit=200&target_nrn=<nrn_encoded>&global_templates=true"` y buscar por nombre o repository URL.
+
+---
+
+### Historial de acciones sobre un servicio (np-lake)
+
+Ver acciones ejecutadas sobre un servicio (provisioning, updates, custom actions):
+
+```sql
+SELECT id, name, slug, status, created_at
+FROM services_actions FINAL
+WHERE _deleted = 0 AND deleted_at IS NULL
+AND service_id = '{service_uuid}'
+ORDER BY created_at DESC LIMIT 10
+```
+
+`audit_events` no tiene `_deleted` ni necesita `FINAL` (tabla append-only).
