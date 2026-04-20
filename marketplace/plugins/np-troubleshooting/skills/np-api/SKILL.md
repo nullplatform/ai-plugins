@@ -155,6 +155,7 @@ To explore the API safely:
 | `${CLAUDE_PLUGIN_ROOT}/skills/np-api/scripts/fetch_np_api_url.sh <url>` | Direct API fetch |
 | `${CLAUDE_PLUGIN_ROOT}/skills/np-api/scripts/deploy-agent-dump.sh <deployment_id>` | K8s dump of deployment |
 | `${CLAUDE_PLUGIN_ROOT}/skills/np-api/scripts/scope-agent-dump.sh <scope_id>` | K8s dump of scope |
+| `${CLAUDE_PLUGIN_ROOT}/skills/np-api/scripts/agent-kubectl.sh <get\|logs> -- <args>` | Read-only kubectl get/logs via agent |
 
 ---
 
