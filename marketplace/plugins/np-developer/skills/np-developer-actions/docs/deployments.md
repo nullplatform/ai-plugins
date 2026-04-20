@@ -11,6 +11,19 @@ Crea un nuevo deployment en un scope.
 **IMPORTANTE**: Un deployment requiere un proceso de discovery previo. NO asumir valores.
 Seguir estos pasos en orden:
 
+#### Paso 0: Resolver app_id por nombre (np-lake)
+
+Si el usuario proporciona un nombre de aplicacion en lugar de un ID:
+
+```sql
+SELECT app_id, app_name, application_slug, status, nrn
+FROM core_entities_application FINAL
+WHERE _deleted = 0 AND app_name ILIKE '%termino%'
+LIMIT 10
+```
+
+Ejecutar via `/np-lake`. Si np-lake no esta disponible, el usuario debe proporcionar el app_id directamente.
+
 #### Paso 1: Obtener datos de la aplicacion
 
 ```bash
@@ -36,6 +49,14 @@ Mostrar al usuario los scopes disponibles:
 
 **Preguntar al usuario en que scope quiere desplegar.**
 
+> **Alternativa np-lake (preferida)**: Incluye `asset_name` que se necesita en pasos posteriores:
+> ```sql
+> SELECT id, name, scope_slug, status, type, provider, asset_name
+> FROM core_entities_scope FINAL
+> WHERE _deleted = 0 AND application_id = {app_id} AND status = 'active'
+> ORDER BY name
+> ```
+
 #### Paso 3: Obtener builds disponibles
 
 ```bash
@@ -52,6 +73,15 @@ Mostrar al usuario los builds disponibles:
 
 **Preguntar al usuario que build quiere desplegar.**
 
+> **Alternativa np-lake**: Permite buscar por branch:
+> ```sql
+> SELECT id, status, branch, commit, description, created_at
+> FROM core_entities_build FINAL
+> WHERE _deleted = 0 AND app_id = {app_id} AND status = 'successful'
+> ORDER BY created_at DESC LIMIT 10
+> ```
+> Filtrar por branch: `AND branch ILIKE '%feature%'`
+
 #### Paso 4: Obtener releases del build elegido
 
 ```bash
@@ -60,6 +90,14 @@ np-api fetch-api "/release?application_id=<app_id>&build_id=<build_id>"
 
 Si el build tiene un release existente, usarlo. Si no tiene release, crear uno primero
 (ver seccion `## @action POST /release` mas abajo).
+
+> **Alternativa np-lake**:
+> ```sql
+> SELECT id, semver, build_id, status, created_at
+> FROM core_entities_release FINAL
+> WHERE _deleted = 0 AND app_id = {app_id}
+> ORDER BY created_at DESC LIMIT 10
+> ```
 
 #### Paso 5: Verificar asset_name del scope
 
@@ -695,3 +733,38 @@ Si el deployment anterior esta en status `running` con trafico al 100%, finaliza
 siempre y cuando la nueva version ya este lista para desplegar. La finalizacion destruye las
 instancias de la version vieja, asi que asegurarse de que el usuario entiende que pierde la
 posibilidad de rollback instantaneo
+
+---
+
+### Contexto cross-entity (np-lake)
+
+Query unico que muestra el estado completo de deployments con scope, release y build:
+
+```sql
+SELECT d.id AS deploy_id, d.status AS deploy_status, d.created_at,
+       s.name AS scope_name, s.status AS scope_status,
+       r.semver, b.branch, b.commit
+FROM core_entities_deployment AS d FINAL
+JOIN core_entities_scope AS s FINAL ON d.scope_id = s.id
+LEFT JOIN core_entities_release AS r FINAL ON d.release_id = r.id
+LEFT JOIN core_entities_build AS b FINAL ON r.build_id = b.id
+WHERE d._deleted = 0 AND s._deleted = 0
+AND d.nrn LIKE '%application={app_id}%'
+ORDER BY d.created_at DESC LIMIT 10
+```
+
+Este query reemplaza 4+ API calls secuenciales (deployment → scope → release → build).
+
+### Audit de deployments (np-lake)
+
+Quien creo o modifico deployments:
+
+```sql
+SELECT entity_id, user_email, method, url, date
+FROM audit_events
+WHERE entity = 'deployment' AND method = 'POST'
+AND nrn LIKE '%application={app_id}%'
+ORDER BY date DESC LIMIT 20
+```
+
+`audit_events` no tiene `_deleted` ni necesita `FINAL` (tabla append-only).

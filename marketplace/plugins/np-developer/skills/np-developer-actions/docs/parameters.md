@@ -33,6 +33,19 @@ Del NRN extraer `organization_id`, `account_id`, `namespace_id`.
 
 #### Paso 2: Consultar parametros existentes
 
+> **Alternativa np-lake (preferida)**:
+> ```sql
+> SELECT id, name, type, secret, encoding, read_only, nrn
+> FROM parameters_parameter FINAL
+> WHERE _deleted = 0
+> AND nrn LIKE '%application={app_id}%'
+> ORDER BY name LIMIT 100
+> ```
+> Buscar por nombre: `AND name ILIKE '%DATABASE_URL%'`
+> Ejecutar via `/np-lake`.
+
+**Fallback via np-api**:
+
 ```bash
 # Parametros a nivel de aplicacion
 np-api fetch-api "/parameter?nrn=organization=<org_id>:account=<acc_id>:namespace=<ns_id>:application=<app_id>"
@@ -502,3 +515,19 @@ np-api fetch-api "/approval?nrn=<nrn_url_encoded>&entity=parameter&action=read-s
 - Las policies de la organizacion determinan si el acceso es automatico o requiere aprobacion
 - Este mecanismo aplica a la UI y a la API por igual
 - Los parametros de tipo `linked_service` tambien pueden ser secretos
+
+---
+
+### Audit de cambios en parametros (np-lake)
+
+Ver quien creo o modifico parametros de una aplicacion:
+
+```sql
+SELECT entity_id, user_email, method, url, date
+FROM audit_events
+WHERE entity = 'parameter'
+AND nrn LIKE '%application={app_id}%'
+ORDER BY date DESC LIMIT 20
+```
+
+`audit_events` no tiene `_deleted` ni necesita `FINAL` (tabla append-only).

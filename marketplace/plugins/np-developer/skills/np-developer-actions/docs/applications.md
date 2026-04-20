@@ -41,6 +41,28 @@ Crea una nueva aplicacion en un namespace.
 > y `/np-developer-actions exec-api` para ESCRITURA (paso 7). NUNCA usar `curl` ni
 > `/np-api` para operaciones POST.
 
+#### Paso 0: Resolver entidades por nombre (np-lake)
+
+Si el usuario proporciona un nombre en lugar de un ID, buscar en np-lake:
+
+```sql
+-- Buscar aplicacion por nombre
+SELECT app_id, app_name, application_slug, status, nrn
+FROM core_entities_application FINAL
+WHERE _deleted = 0 AND app_name ILIKE '%termino%'
+LIMIT 10
+```
+
+```sql
+-- Buscar namespace por nombre
+SELECT namespace_id, namespace_name, namespace_slug, status, nrn
+FROM core_entities_namespace FINAL
+WHERE _deleted = 0 AND namespace_name ILIKE '%termino%'
+LIMIT 10
+```
+
+Ejecutar via `/np-lake`. Si np-lake no esta disponible, usar los pasos siguientes con np-api.
+
 #### Paso 1: Descubrir la jerarquia y elegir el namespace
 
 El unico dato garantizado al inicio es el `organization_id`, que se extrae del JWT token.
@@ -64,6 +86,17 @@ np-api fetch-api "/namespace?account_id=<account_id>&status=active&limit=50"
 Del response de namespaces obtener `id`, `name`, `slug` y `nrn` del namespace elegido.
 El `nrn` del namespace se necesita para el paso 2 (templates).
 
+> **Alternativa np-lake (preferida)**: Una sola query resuelve la jerarquia completa (reemplaza los pasos 1a-1c):
+> ```sql
+> SELECT a.account_id, a.account_name, n.namespace_id, n.namespace_name, n.namespace_slug, n.nrn
+> FROM core_entities_account AS a FINAL
+> JOIN core_entities_namespace AS n FINAL ON a.account_id = n.account_id
+> WHERE a._deleted = 0 AND n._deleted = 0
+> AND a.status = 'active' AND n.status = 'active'
+> ORDER BY a.account_name, n.namespace_name
+> LIMIT 50
+> ```
+
 #### Paso 2: Obtener templates disponibles
 
 ```bash
@@ -82,6 +115,15 @@ Notas:
 - Templates con `status: "inactive"` NO deben mostrarse
 - Templates con `organization` y `account` son especificas de la org
 - Templates con `organization: null` son globales de Nullplatform
+
+> **np-lake**: Buscar template por nombre:
+> ```sql
+> SELECT template_id, name, status
+> FROM core_entities_technology_template FINAL
+> WHERE _deleted = 0 AND status = 'active' AND name ILIKE '%termino%'
+> LIMIT 20
+> ```
+> Nota: np-lake no tiene filtro de visibilidad `target_nrn`. Validar disponibilidad con np-api despues.
 
 #### Paso 3: Obtener metadata specification
 

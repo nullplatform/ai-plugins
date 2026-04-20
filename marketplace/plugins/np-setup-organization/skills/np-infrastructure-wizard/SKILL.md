@@ -1,7 +1,7 @@
 ---
 name: np-infrastructure-wizard
 description: Creates cloud infrastructure for Nullplatform. Use when you need to configure VPC/VNet, Kubernetes clusters (EKS/AKS/GKE/OKE/ARO), ingress (Istio/ALB), DNS zones, tfstate backend, and deploy the Nullplatform agent. Supports AWS, Azure, Azure ARO, GCP, and OCI.
-allowed-tools: AskUserQuestion
+allowed-tools: AskUserQuestion, Bash(${CLAUDE_PLUGIN_ROOT}/skills/np-infrastructure-wizard/scripts/*.sh:*)
 ---
 
 # Nullplatform Infrastructure Wizard
@@ -141,7 +141,84 @@ After this apply, VPC and DNS exist. The general apply (step 7) will create EKS 
 
 Use the corresponding cloud command (AWS: `aws route53`, Azure: `az network dns zone show`, GCP: `gcloud dns`, OCI: `oci dns zone get`).
 
-#### 5.5 Request delegation from Nullplatform
+#### 5.5 Delegate parent→child NS records
+
+This step creates the NS record in the parent zone that delegates authority to the child zone. Two paths: **automated via script** (AWS only, if the user has access to both accounts) or **manual request to Nullplatform** (fallback for every other case).
+
+##### 5.5.a Pre-check (analysis)
+
+Only if the cloud detected in step 2 is **AWS**, evaluate:
+
+1. `which aws` — AWS CLI installed.
+2. The script exists at `${CLAUDE_PLUGIN_ROOT}/skills/np-infrastructure-wizard/scripts/delegate-dns.sh`.
+
+If the cloud is **not AWS**, or any check fails → jump directly to `5.5.c Manual request` (the existing flow).
+
+> Profiles are not checked here: the script accepts default credentials (env vars, SSO, EC2 IAM role). Real credential validation happens in 5.5.b with `aws sts get-caller-identity` after the user picks which profile (or default) to use.
+
+##### 5.5.b Automated delegation via script
+
+**Before the question**, show this notice so the user has a chance to log in:
+
+> *"La delegación automática requiere credenciales AWS activas para la cuenta de la zona padre y la de la hija. Si usás SSO, ejecutá `aws sso login --profile <name>` antes de continuar. Si usás env vars / IAM role, verificá que la sesión siga activa."*
+
+Then ask the single question with AskUserQuestion:
+
+> **"¿Querés delegar la zona (ej: `{slug}.playground.nullapps.io` → `playground.nullapps.io`) automáticamente vía script? Requiere acceso AWS a ambas cuentas (pueden ser la misma)."**
+>
+> Options:
+> - **Sí, automatizar** → continue below
+> - **No, pedir a Nullplatform** → jump to 5.5.c
+
+If the user chooses automatic, ask for the variables with a single AskUserQuestion that has two **optional** free-text inputs. Use the **literal** text below — do not paraphrase:
+
+> **Profile AWS de la zona hija (child_profile)**
+>
+> *Nombre del profile AWS configurado localmente que apunta a la cuenta donde vive la zona hija — la misma que acaba de crearse en el `tofu apply` del step 5.3.*
+>
+> *Dejar vacío si usás credenciales AWS default (env vars `AWS_ACCESS_KEY_ID`, SSO sin profile named, o IAM role del EC2/workstation).*
+>
+> Ejemplo: `my-training-account` — o vacío.
+
+> **Profile AWS de la zona padre (parent_profile)**
+>
+> *Nombre del profile AWS que apunta a la cuenta donde vive la zona padre `playground.nullapps.io`. Es la cuenta que tiene autoridad sobre el dominio padre y donde se va a crear el NS record que hace la delegación.*
+>
+> *Dejar vacío si usás credenciales AWS default.*
+>
+> *Si la zona padre y la hija están en la **misma cuenta AWS**: repetir el mismo valor que en `child_profile`, o dejar ambos vacíos.*
+>
+> Ejemplo: `nullplatform-playground` — o vacío.
+
+> **Derivación automática de la parent zone**: the script calculates the parent zone by cutting the first label of the subdomain (`cut -d. -f2-`). Example: if the subdomain is `grupo-4.playground.nullapps.io`, the parent is `playground.nullapps.io`. This derivation is fixed and **is not exposed as an editable question**. If the real parent zone does not match the one derived from the subdomain, automatic delegation will not work and you must fall back to 5.5.c.
+
+Validate before running. Omit the `--profile` flag when the value is empty:
+
+```bash
+aws sts get-caller-identity [--profile <child_profile>]
+aws sts get-caller-identity [--profile <parent_profile>]
+aws route53 list-hosted-zones [--profile <child_profile>]  --query "HostedZones[?Name=='{subdomain}.']"
+aws route53 list-hosted-zones [--profile <parent_profile>] --query "HostedZones[?Name=='{parent_zone}.']"
+```
+
+Failure rules:
+- Any `get-caller-identity` that fails → offer 3 paths: (a) log in with `aws sso login --profile <name>` and retry, (b) retry with a different profile, (c) fall back to 5.5.c manual.
+- Child zone not found with child credentials → hard error (the `tofu apply` in 5.3 did not put the zone where those credentials point). Stop and ask the user to review.
+- Parent zone not found with parent credentials → fall back to 5.5.c (we cannot delegate automatically; Nullplatform has to do it).
+
+Execute the script:
+
+```bash
+bash ${CLAUDE_PLUGIN_ROOT}/skills/np-infrastructure-wizard/scripts/delegate-dns.sh <subdomain> \
+  --child-profile <child_profile> \
+  --parent-profile <parent_profile>
+```
+
+Where `<subdomain>` is the same one used in `dig NS` (step 5.2/5.6).
+
+The script prints `Child Zone ID`, `Parent Zone ID`, nameservers, and the status of `change-resource-record-sets`. Return that output to the user.
+
+##### 5.5.c Manual request from Nullplatform (fallback)
 
 Generate message with: subzone (`{domain}.nullapps.io`), destination account, NS records to add.
 
