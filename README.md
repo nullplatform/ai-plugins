@@ -72,7 +72,46 @@ Setup a new nullplatform organization: create org, configure cloud provider, pro
 
 ## Installation
 
-### From this marketplace
+### Kiro CLI
+
+1. Clone this repository:
+   ```bash
+   git clone https://github.com/nullplatform/ai-plugins
+   cd ai-plugins
+   ```
+
+2. Run the installer:
+   ```bash
+   # Install globally (available in any project)
+   ./install-kiro.sh --global np-developer
+
+   # Install in the current project only
+   ./install-kiro.sh np-developer
+
+   # Install multiple plugins
+   ./install-kiro.sh --global np-developer np-troubleshooting
+
+   # List available plugins
+   ./install-kiro.sh --list
+   ```
+
+3. Switch to the `nullplatform` agent in Kiro:
+   ```
+   /agent nullplatform
+   ```
+
+#### Updating
+
+```bash
+./install-kiro.sh --update           # update local installation
+./install-kiro.sh --update --global  # update global installation
+```
+
+The update command pulls the latest changes from git and reinstalls any previously installed plugins.
+
+### Claude Code
+
+#### From this marketplace
 
 Add this repository as a plugin marketplace in Claude Code:
 
@@ -119,7 +158,7 @@ claude plugin install np-setup-organization
 
 ## Requirements
 
-- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) or [Kiro CLI](https://kiro.dev) installed
 - A Nullplatform account with API access
 - For `np-lake` skill: Nullplatform Customer Lake access configured
 
