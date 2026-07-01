@@ -44,10 +44,14 @@ description: Creates cloud infrastructure for Nullplatform. Use when you need to
 
 ### From Plugin Marketplace
 
-1. Open Claude Code
-2. Go to Plugins
-3. Search for "np-setup-organization"
-4. Click Install
+Add the nullplatform marketplace once, then install this plugin:
+
+```bash
+claude plugin marketplace add https://github.com/nullplatform/ai-plugins
+claude plugin install np-setup-organization@nullplatform
+```
+
+Or do it interactively inside Claude Code: run `/plugin`, use the **Marketplaces** tab to add `https://github.com/nullplatform/ai-plugins`, then find **np-setup-organization** in the **Discover** tab and press Enter to install.
 
 ### Manual Installation
 

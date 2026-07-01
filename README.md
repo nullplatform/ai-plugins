@@ -116,21 +116,21 @@ The update command pulls the latest changes from git and reinstalls any previous
 Add this repository as a plugin marketplace in Claude Code:
 
 ```bash
-claude plugin add --marketplace https://github.com/nullplatform/ai-plugins
+claude plugin marketplace add https://github.com/nullplatform/ai-plugins
 ```
 
 Then install the plugin you need:
 
 ```bash
-claude plugin install np-developer
+claude plugin install np-developer@nullplatform
 # or
-claude plugin install np-troubleshooting
+claude plugin install np-troubleshooting@nullplatform
 # or
-claude plugin install np-governance
+claude plugin install np-governance@nullplatform
 # or
-claude plugin install np-service-craft
+claude plugin install np-service-craft@nullplatform
 # or
-claude plugin install np-setup-organization
+claude plugin install np-setup-organization@nullplatform
 ```
 
 ### Manual Installation

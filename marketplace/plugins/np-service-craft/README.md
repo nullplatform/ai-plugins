@@ -44,10 +44,14 @@ description: This skill should be used when the user asks to "create a notificat
 
 ### From Plugin Marketplace
 
-1. Open Claude Code
-2. Go to Plugins
-3. Search for "np-service-craft"
-4. Click Install
+Add the nullplatform marketplace once, then install this plugin:
+
+```bash
+claude plugin marketplace add https://github.com/nullplatform/ai-plugins
+claude plugin install np-service-craft@nullplatform
+```
+
+Or do it interactively inside Claude Code: run `/plugin`, use the **Marketplaces** tab to add `https://github.com/nullplatform/ai-plugins`, then find **np-service-craft** in the **Discover** tab and press Enter to install.
 
 ### Manual Installation
 
