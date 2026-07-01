@@ -28,10 +28,14 @@ description: Guided wizard to generate new Nullplatform Governance Action Item a
 
 ### From Plugin Marketplace
 
-1. Open Claude Code
-2. Go to Plugins
-3. Search for "np-governance"
-4. Click Install
+Add the nullplatform marketplace once, then install this plugin:
+
+```bash
+claude plugin marketplace add https://github.com/nullplatform/ai-plugins
+claude plugin install np-governance@nullplatform
+```
+
+Or do it interactively inside Claude Code: run `/plugin`, use the **Marketplaces** tab to add `https://github.com/nullplatform/ai-plugins`, then find **np-governance** in the **Discover** tab and press Enter to install.
 
 ### Manual Installation
 
