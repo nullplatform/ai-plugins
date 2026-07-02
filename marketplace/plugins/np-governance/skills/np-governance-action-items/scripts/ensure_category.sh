@@ -43,11 +43,13 @@ require_arg name "$NAME"
 
 # 1. Search by slug + nrn.
 #
-# IMPORTANT: The backend is currently known to ignore the ?slug= query
-# parameter and return all categories for the NRN (filed as a bug). We always
-# do a client-side match on the exact slug before deciding a category exists.
-# Without this, a backend that returns an unrelated category would make the
-# script either resolve to the wrong id or create a duplicate.
+# The categories list endpoint does NOT implement a ?slug= query filter.
+# Verified 2026-07-02 against the running API (PostgreSQL): only name,
+# parent_id and status are applied server-side; an unrecognized param like
+# slug is silently ignored and the endpoint returns every category in the NRN
+# hierarchy. So we always match the exact slug client-side before deciding a
+# category exists. Without this, an unrelated category would make the script
+# either resolve to the wrong id or create a duplicate.
 QS="nrn=$(urlencode "$NRN")&slug=$(urlencode "$SLUG")&limit=100"
 EXISTING=$(call_api GET "$(gov_path "action_item_category")?${QS}")
 

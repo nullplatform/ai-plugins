@@ -151,4 +151,4 @@ export NP_TOKEN='eyJ...'
 
 Verificar con: `${CLAUDE_PLUGIN_ROOT}/skills/np-api/scripts/check_auth.sh`
 
-Permisos JWT requeridos: `governance:action_item:list/read/create/update/delete/defer/reject/resolve/approve`, `governance:action_item:suggestion:create/update/delete/approve/reject/execute`, `governance:action_item:category:list/read/create/update/delete`. Ver `docs/concepts/permissions-matrix.md` para el set completo y un ejemplo de rol YAML.
+Permisos JWT requeridos: `governance:action_item:list/read/create/update/delete/defer/reject/resolve/reopen/close`, `governance:action_item:suggestion:create/update/delete/approve/reject/execute`, `governance:action_item:category:list/read/create/update/delete`. Ver `docs/concepts/permissions-matrix.md` para el set completo y un ejemplo de rol YAML.

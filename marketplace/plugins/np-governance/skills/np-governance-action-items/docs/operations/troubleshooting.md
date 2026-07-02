@@ -27,6 +27,14 @@ export NP_API_KEY='sk-...'
 
 Para obtener los claims de governance, pedí al admin de tu organización los permisos listados en `concepts/permissions-matrix.md`.
 
+### 403 al cambiar `status` por PATCH/PUT
+
+El `status` no se modifica vía `PATCH` / `PUT`: la API responde **403**, aunque el token tenga `governance:action_item:update`. Las transiciones de estado se hacen con los scripts de acción: `defer_action_item.sh` / `resolve_action_item.sh` / `reject_action_item.sh` / `close_action_item.sh` / `reopen_action_item.sh`.
+
+### 403 en reopen / close
+
+`reopen` y `close` requieren sus propios claims: `governance:action_item:reopen` y `governance:action_item:close`. El claim `governance:action_item:update` **no** alcanza para estas transiciones (solo sirve para editar campos de datos y agregar comentarios). Ver `concepts/permissions-matrix.md`.
+
 ---
 
 ## Endpoint not found (404)
@@ -51,6 +59,8 @@ Si retorna `404 Not Found` consistentemente en `/governance/*` pero otros endpoi
 
 **C. Categoría no encontrada al crear**: si pasás `--category-slug` y la categoría no existe en el NRN. Solución: crear con `ensure_category.sh` antes.
 
+**D. `/action_item/:id/approve` o `/deny` devuelven 404**: esos endpoints no existen en esta API. El flujo de aprobación lo completa el **servicio de aprobaciones de la plataforma**; esta API no expone approve/deny. Un consumidor solo pollea el status con `GET`. Ver `concepts/lifecycle.md`.
+
 ---
 
 ## Validation errors (400)
@@ -61,6 +71,13 @@ Si retorna `404 Not Found` consistentemente en `/governance/*` pero otros endpoi
 ```
 
 ### Casos comunes
+
+**Reject sin `reason`**:
+```
+"error":"Validation failed: reason"
+```
+
+`reason` es **obligatorio** al rechazar. Pasarlo siempre: `reject_action_item.sh --id <id> --reason "<justificación>"`. Un reject sin `reason` devuelve 400.
 
 **`user_metadata` con tipos no escalares**:
 ```
@@ -127,6 +144,24 @@ La fecha `--until` está más lejos de lo permitido por la categoría. Ajustar l
 
 ---
 
+## Item "atascado" en `pending_*`
+
+### Síntoma
+
+Un item quedó en `pending_deferral` / `pending_verification` / `pending_rejection` y no avanza.
+
+### Causa
+
+Hay un pedido de aprobación pendiente en el **servicio de aprobaciones de la plataforma**. La transición (`deferred` / `resolved` / `rejected`) se completa cuando el reviewer aprueba o deniega; el consumidor no puede dispararla.
+
+### Solución
+
+Esta API no destraba el item: no existen endpoints approve/deny acá. Pollear el status con `get_action_item.sh` y esperar el desenlace:
+- **Aprobado** → estado final (`deferred` / `resolved` / `rejected`).
+- **Denegado o cancelado** → vuelve a `open` con un comment automático del reviewer.
+
+---
+
 ## Suggestion lifecycle errors
 
 ### "Cannot approve: suggestion is in <state>"
@@ -161,18 +196,18 @@ Soluciones:
 
 ## Reconciliation issues
 
-### "Resolved items reappear after next scan"
+### "Closed items reappear after next scan"
 
-Si auto-resolviste un item y el scanner lo vuelve a detectar en el siguiente run, vas a crear un item nuevo (no reabrir el viejo, esa es la convención). Si estás creando duplicados:
+Si auto-cerraste un item y el scanner lo vuelve a detectar en el siguiente run, vas a crear un item nuevo (no reabrir el viejo, esa es la convención). Si estás creando duplicados:
 
 1. Verificá que el `metadata-key` realmente identifique unívocamente el problema (no usar timestamps, IDs random, etc.)
 2. Usá `--dry-run` para ver qué decisiones toma el reconciler
 
-### "Auto-resolved an item I deferred"
+### "Auto-closed an item I deferred"
 
-Bug. El reconciler debe respetar `deferred`. Verificar que:
+Bug. El reconciler debe respetar `deferred` (y `pending_*`). Verificar que:
 - El item tiene `created_by` igual al `--agent-id`
-- El `--statuses` del search incluye `deferred` (debería por default)
+- El search del reconciler incluye `deferred` en los estados vivos (debería por default)
 
 Reportar al equipo si pasa.
 

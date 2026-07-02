@@ -14,7 +14,7 @@ loop forever (or per cron tick):
        d. if success:
             - mark_suggestion_applied (with execution_result)
             - add comment with result
-            - if action resolves the problem: resolve_action_item
+            - if action resolves the problem: resolve_action_item (--resolution + --evidence-url)
        e. if failure:
             - mark_suggestion_failed (with execution_result)
             - add comment with error
@@ -69,6 +69,34 @@ done
 ```
 
 `execute_action()` es tu lógica específica: dependiendo de `metadata.action_type` (`dependency_upgrade`, `right_sizing`, `config_change`, etc.), invocás la herramienta correspondiente.
+
+> **Identidad**: los flags `--actor` / `--author` son opcionales. La API resuelve la identidad del ejecutor a partir del token; esos flags solo se honran para llamadores con derechos de delegación. Si no, se ignoran y se registra la identidad del token.
+
+## Resolver con evidencia
+
+Cuando el executor resuelve un action item después de ejecutar un fix, conviene dejar traza de qué se hizo y dónde. `resolve_action_item.sh` acepta:
+
+- `--resolution "<qué se hizo>"` — se persiste como comment y en el audit log.
+- `--evidence-url <link a PR/pipeline/scan>` — queda registrado en el audit log.
+
+```bash
+"$SCRIPTS/resolve_action_item.sh" --id "$AI_ID" \
+  --resolution "Bumped lodash 4.17.19 → 4.17.21 vía PR #456" \
+  --evidence-url "https://github.com/org/repo/pull/456"
+```
+
+Así el audit y los comments quedan con el rastro del fix, sin depender de que alguien reconstruya después qué pasó.
+
+## Aprobaciones en vuelo (`pending_*`)
+
+`resolve` / `defer` / `reject` pueden requerir aprobación según la **policy del servicio de aprobaciones de la plataforma** (no la `config` del item). Cuando eso pasa, el item no queda resuelto: pasa a `pending_verification` (o `pending_deferral` / `pending_rejection`) y se crea un pedido de aprobación.
+
+El executor **no puede aprobar ni denegar** por esta API — esos endpoints no existen. Solo puede pollear el status con `GET` (`get_action_item.sh`):
+
+- **Aprobado** → el item pasa al estado final (`resolved` / `deferred` / `rejected`).
+- **Denegado o cancelado** → vuelve a `open` con un comment automático del reviewer.
+
+**Comportamiento recomendado**: no bloquear el loop esperando la decisión. Registrar que el item quedó en `pending_*` y seguir con los demás items; en el próximo tick, re-pollear el status y actuar según el desenlace (si volvió a `open`, se puede reintentar el fix; si quedó terminal, listo). Un poll con backoff exponencial también es válido si el executor procesa un solo item por vez.
 
 ## Hold/abort detection
 
