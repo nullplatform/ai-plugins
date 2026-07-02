@@ -38,7 +38,7 @@ ensure_category.sh \
   [--icon "shield"] \
   [--unit-name "Risk Score"] \
   [--unit-symbol "R"] \
-  [--config '{"requires_approval_to_reject":true,"max_deferral_days":90}'] \
+  [--config '{"max_deferral_days":90,"max_deferral_count":3}'] \
   [--parent-id <id>]
 ```
 
@@ -110,7 +110,7 @@ SECURITY_CAT=$(ensure_category.sh \
   --description "CVEs and security issues" \
   --color "#DC2626" --icon "shield" \
   --unit-name "Risk Score" --unit-symbol "R" \
-  --config '{"requires_approval_to_reject":true,"max_deferral_days":90}' | jq -r .id)
+  --config '{"max_deferral_days":90}' | jq -r .id)
 
 COST_CAT=$(ensure_category.sh \
   --nrn "$NRN" \
@@ -118,7 +118,7 @@ COST_CAT=$(ensure_category.sh \
   --name "Cost Optimization" \
   --color "#059669" --icon "dollar" \
   --unit-name "Dollars per Month" --unit-symbol "\$" \
-  --config '{"requires_verification":true}' | jq -r .id)
+  --config '{"max_deferral_count":3}' | jq -r .id)
 
 echo "Categories ready: security=$SECURITY_CAT cost=$COST_CAT"
 ```

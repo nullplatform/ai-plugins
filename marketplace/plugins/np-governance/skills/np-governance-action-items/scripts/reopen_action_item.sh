@@ -3,7 +3,10 @@
 # reopen_action_item.sh - Reopen a deferred or rejected action item
 #
 # Usage:
-#   reopen_action_item.sh --id <id> --actor <actor>
+#   reopen_action_item.sh --id <id> [--actor <actor>]
+#
+# --actor is optional — identity is resolved from the token; only honored for
+#   callers with delegation rights.
 
 set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -20,7 +23,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 require_arg id "$ID"
-require_arg actor "$ACTOR"
 
-DATA=$(jq -n --arg actor "$ACTOR" '{actor: $actor}')
+DATA=$(jq -n --arg actor "$ACTOR" \
+    '{} + (if $actor != "" then {actor: $actor} else {} end)')
+
 call_api POST "$(gov_path "action_item/${ID}/reopen")" "$DATA"

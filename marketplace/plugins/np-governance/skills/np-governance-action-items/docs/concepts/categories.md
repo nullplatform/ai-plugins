@@ -15,9 +15,6 @@ Ver `model.md` para el schema completo. Resumen:
 
 ```json
 {
-  "requires_verification": false,
-  "requires_approval_to_defer": false,
-  "requires_approval_to_reject": false,
   "max_deferral_days": null,
   "max_deferral_count": null
 }
@@ -25,24 +22,23 @@ Ver `model.md` para el schema completo. Resumen:
 
 | Field | Effect |
 |-------|--------|
-| `requires_verification` | Action items de esta categoría no pueden marcarse `resolved` directo. Pasan por `pending_verification` y necesitan aprobación |
-| `requires_approval_to_defer` | El defer pasa por `pending_deferral` y necesita aprobación |
-| `requires_approval_to_reject` | El reject pasa por `pending_rejection` y necesita aprobación |
-| `max_deferral_days` | Máximo días que un item puede diferirse (sumado entre defers múltiples) |
-| `max_deferral_count` | Máximo de veces que un item puede diferirse |
+| `max_deferral_days` | Máximo días que un item puede diferirse (sumado entre defers múltiples). Se valida en cada defer |
+| `max_deferral_count` | Máximo de veces que un item puede diferirse. Se valida en cada defer |
 
 Estos defaults se heredan al crear el action item. Cada action item puede sobreescribir su propio `config` para casos especiales.
+
+> Que un `defer` / `reject` / `resolve` requiera aprobación lo decide la política de aprobaciones de la plataforma; `max_deferral_days` y `max_deferral_count` se validan en cada `defer`.
 
 ## Categorías recomendadas
 
 | Category | Slug | Description | Recommended config |
 |----------|------|-------------|-------------------|
-| Security Vulnerability | `security-vulnerability` | CVEs, security issues | `requires_approval_to_reject: true` |
-| Cost Optimization | `cost-optimization` | Rightsizing, unused resources | `requires_verification: true` |
-| Performance Optimization | `performance-optimization` | Slow queries, bottlenecks | `requires_verification: true` |
+| Security Vulnerability | `security-vulnerability` | CVEs, security issues | `max_deferral_days: 90` |
+| Cost Optimization | `cost-optimization` | Rightsizing, unused resources | (defaults) |
+| Performance Optimization | `performance-optimization` | Slow queries, bottlenecks | (defaults) |
 | Technical Debt | `technical-debt` | Refactoring, version upgrades | (defaults) |
-| Compliance | `compliance` | Regulatory requirements | `requires_approval_to_reject: true` |
-| Deprecation | `deprecation` | Deprecated APIs/libs | `requires_approval_to_defer: true` |
+| Compliance | `compliance` | Regulatory requirements | (defaults) |
+| Deprecation | `deprecation` | Deprecated APIs/libs | (defaults) |
 
 ## Units recomendadas
 
@@ -68,7 +64,7 @@ CATEGORY_ID=$(${CLAUDE_PLUGIN_ROOT}/skills/np-governance-action-items/scripts/en
   --icon "shield" \
   --unit-name "Risk Score" \
   --unit-symbol "R" \
-  --config '{"requires_approval_to_reject": true, "max_deferral_days": 90}')
+  --config '{"max_deferral_days": 90}')
 
 echo "Category: $CATEGORY_ID"
 ```
