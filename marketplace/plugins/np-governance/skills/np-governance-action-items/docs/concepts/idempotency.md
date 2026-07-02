@@ -81,11 +81,11 @@ Además del idempotency key, recomendado incluir:
 
 `GET /governance/action_item?metadata.<key>=<value>&nrn=...&status[]=open&status[]=deferred`
 
-El backend soporta filtros JSONB sobre `metadata.*`. Cualquier campo del JSON puede usarse como filtro.
+El backend aplica filtros JSONB sobre `metadata.*` **para valores string**. Como los valores del querystring siempre llegan como string y la comparación JSONB es sensible al tipo, los valores no-string (números, booleanos) NO matchean por querystring: p.ej. un `cve_count: 5` almacenado no matchea `metadata.cve_count=5`. Por eso conviene que el idempotency key tenga un valor string (`cve_id`, `resource_arn`, etc.). Además, `search_action_items_by_metadata.sh` re-filtra client-side sobre el match exacto (y recomputa `.count` desde los `.results` filtrados, porque `pagination.total` se calcula sin el filtro de metadata). (Verificado 2026-07-02 contra PostgreSQL.)
 
 Otros filtros útiles:
 - `created_by=agent:vuln-scanner` — solo items del agente
-- `category_id=...` o `category_slug=...`
+- `category_id=...` (único filtro real de categoría del endpoint; `category_slug` en el querystring se ignora. `list_action_items.sh --category-slug` sí funciona porque resuelve el slug a un id client-side antes de listar)
 - `priority=critical`
 - `labels.<key>=<value>` — filtros sobre el `labels` JSONB
 - `due_date_before=...` / `due_date_after=...`

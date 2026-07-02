@@ -5,14 +5,17 @@
 # Usage:
 #   create_suggestion.sh \
 #     --action-item-id <ai_id> \
-#     --created-by <agent_id> \
 #     --owner <executor_id> \
+#     [--created-by <agent_id>] \
 #     [--confidence 0.95] \
 #     [--description <text>] \
 #     [--metadata <json>] \
 #     [--user-metadata <json>] \
 #     [--user-metadata-config <json>] \
 #     [--expires-at <iso8601>]
+#
+# --created-by is optional — identity is resolved from the token; only honored
+#   for callers with delegation rights.
 
 set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -39,7 +42,6 @@ while [[ $# -gt 0 ]]; do
 done
 
 require_arg action-item-id "$AI_ID"
-require_arg created-by "$CREATED_BY"
 require_arg owner "$OWNER"
 
 DATA=$(jq -n \
@@ -51,7 +53,8 @@ DATA=$(jq -n \
     --argjson user_metadata "${USER_METADATA:-null}" \
     --argjson user_metadata_config "${USER_METADATA_CONFIG:-null}" \
     --arg expires_at "$EXPIRES_AT" \
-    '{created_by: $created_by, owner: $owner}
+    '{owner: $owner}
+    + (if $created_by != "" then {created_by: $created_by} else {} end)
     + (if $confidence != "" then {confidence: ($confidence | tonumber)} else {} end)
     + (if $description != "" then {description: $description} else {} end)
     + (if $metadata != null then {metadata: $metadata} else {} end)

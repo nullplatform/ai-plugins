@@ -6,8 +6,8 @@
 #   create_action_item.sh \
 #     --nrn <nrn> \
 #     --title <title> \
-#     --created-by <agent_id> \
 #     (--category-id <id> | --category-slug <slug>) \
+#     [--created-by <agent_id>] \
 #     [--description <text>] \
 #     [--priority critical|high|medium|low] \
 #     [--value <num>] \
@@ -17,6 +17,9 @@
 #     [--affected-resources <json>] \
 #     [--references <json>] \
 #     [--config <json>]
+#
+# --created-by is optional — identity is resolved from the token; only honored
+#   for callers with delegation rights.
 
 set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -50,7 +53,6 @@ done
 
 require_arg nrn "$NRN"
 require_arg title "$TITLE"
-require_arg created-by "$CREATED_BY"
 
 if [ -z "$CATEGORY_ID" ] && [ -z "$CATEGORY_SLUG" ]; then
     echo "Error: --category-id or --category-slug is required" >&2
@@ -75,9 +77,9 @@ DATA=$(jq -n \
     --argjson config "${CONFIG:-null}" \
     '{
         nrn: $nrn,
-        title: $title,
-        created_by: $created_by
+        title: $title
     }
+    + (if $created_by != "" then {created_by: $created_by} else {} end)
     + (if $category_id != "" then {category_id: $category_id} else {} end)
     + (if $category_slug != "" then {category_slug: $category_slug} else {} end)
     + (if $description != "" then {description: $description} else {} end)

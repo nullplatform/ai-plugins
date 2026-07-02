@@ -11,7 +11,7 @@
 #     --nrn <nrn> \
 #     --metadata-key <key> \
 #     --metadata-value <value> \
-#     [--statuses "open,deferred,pending_deferral,pending_verification"] \
+#     [--statuses "open,deferred,pending_deferral,pending_verification,pending_rejection"] \
 #     [--include-resolved]
 
 set -e
@@ -53,9 +53,19 @@ done
 
 RAW=$(call_api GET "$(gov_path "action_item")?${QS}")
 
-# IMPORTANT: The backend is currently known to ignore metadata.<key> query
-# filters. Always filter client-side on the exact (key, value) match so
-# callers (especially idempotency checks) don't act on false positives.
+# Server-side metadata.<key> filtering DOES work, but only for string values.
+# Verified 2026-07-02 against the running API (PostgreSQL): a matching
+# metadata.<key>=<string> returns the item, and a non-matching value returns
+# nothing, so the filter is genuinely applied (not ignored). Non-string values
+# (numbers, booleans) do NOT match via the querystring, because query values
+# always arrive as strings and the JSONB containment check is type-sensitive
+# (e.g. a stored 5 does not match "5"). Prefer string idempotency keys.
+#
+# We still re-filter client-side on the exact (key, value) match for two
+# reasons: (1) the list endpoint's pagination.total is computed WITHOUT the
+# metadata filter, so we recompute .count from the filtered .results; (2) it
+# guards against false positives. This client-side check is itself string-based
+# (jq: 5 == "5" is false), so it likewise will not match non-string values.
 echo "$RAW" | jq --arg key "$KEY" --arg value "$VALUE" '
     .results = ((.results // []) | map(select((.metadata // {})[$key] == $value)))
     | .count = (.results | length)

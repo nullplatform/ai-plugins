@@ -26,8 +26,8 @@ get_suggestion.sh \
 ```bash
 create_suggestion.sh \
   --action-item-id <ai_id> \
-  --created-by "agent:vuln-scanner" \
   --owner "executor:pr-creator" \
+  [--created-by "agent:vuln-scanner"] \
   [--confidence 0.95] \
   [--description "..."] \
   [--metadata '{"action_type":"...","..."}'] \
@@ -38,7 +38,7 @@ create_suggestion.sh \
 
 **Validations**:
 - `user_metadata` solo acepta scalars (string/number/boolean/null). Anidar objetos da 400.
-- `created_by` y `owner` son requeridos.
+- `owner` es requerido. `created_by` es opcional: la API resuelve la identidad a partir del token y solo lo honra para llamadores con derechos de delegación; si no, se ignora y se registra la identidad del token.
 
 ## update_suggestion.sh
 
