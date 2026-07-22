@@ -15,6 +15,8 @@ los tipos de servicio disponibles y sus schemas de configuracion. NO asumir serv
 > y `/np-developer-actions exec-api` para ESCRITURA (paso 7). NUNCA usar `curl` ni
 > `/np-api` para operaciones POST/PUT/DELETE.
 
+> **Tip:** los pasos de discovery son consultas **independientes** (service specifications, action specs, dimensions) y pueden ejecutarse **en paralelo**. Medido en uso real, paralelizar 4 queries reduce el tiempo total ~3× respecto a serie, con resultados idénticos.
+
 #### Paso 0: Buscar servicios existentes por nombre (np-lake)
 
 Antes de crear, verificar si ya existe un servicio similar (evitar duplicados):
@@ -117,6 +119,26 @@ Ejemplo para SQS Queue, la action spec `Create SQS Queue` tiene:
   }
 }
 ```
+
+#### Cómo leer un `parameters.schema` de action spec
+
+El `parameters.schema` de la CREATE action spec es un JSON Schema estándar que define los **inputs** que el cliente debe armar. Es la fuente de verdad que se mapea a preguntas al usuario (vía `AskUserQuestion`) y finalmente al body del `POST /service/{id}/action`. Los campos varían por proveedor — cada service specification tiene su propio schema, y el ejemplo de SQS arriba es sólo ilustrativo.
+
+Guía de lectura:
+
+| En el schema... | Se traduce a... |
+| --- | --- |
+| `required: ["X", "Y"]` | Los campos `X` e `Y` son preguntas obligatorias (a menos que tengan `default`) |
+| `properties.X.default: <v>` | Se puede omitir: si no se envía, el backend usa `<v>` |
+| `properties.X.enum: [a, b, c]` | Opciones válidas — presentar como pregunta con esas tres opciones |
+| `properties.X.oneOf: [{const: a, title: "T"}, ...]` | Igual que enum, pero con título amigable para la UI |
+| `properties.X.anyOf: [{const: ...}, {type: "number", minimum: ...}]` | Enum con fallback libre: opciones predefinidas o cualquier valor que respete el subschema |
+| `properties.X.description` | Texto útil para el prompt al usuario |
+| `properties.X.type: "object"` con `properties.X.properties` | Objeto anidado: repetir el mismo análisis un nivel adentro |
+
+**Regla práctica:** copiar los nombres de las keys **textualmente** desde el schema. No normalizar, no corregir ortografía, no pluralizar. Si el schema declara una property mal escrita (ej. `permisions` en lugar de `permissions`), hay que enviarla exactamente así — de lo contrario el backend la ignora silenciosamente y usa defaults, produciendo un provisioning que "pasa" pero con la configuración equivocada.
+
+Este patrón aplica tanto a CREATE action specs de servicios como a CREATE action specs de links (ver `service-links.md`).
 
 Los `results.schema` de la action spec definen lo que el agent devuelve despues del provisioning
 (ej: `queue_arn`, `dead_letter_arn`). Estos se mapean a los `attributes` del service via el campo `target`.

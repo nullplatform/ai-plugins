@@ -14,7 +14,7 @@ Endpoints públicos: `https://api.nullplatform.com/governance/action_item` y `ht
 
 1. **NUNCA usar `curl` directo** contra `api.nullplatform.com`. Todos los scripts delegan a `${CLAUDE_PLUGIN_ROOT}/skills/np-api/scripts/fetch_np_api_url.sh` con el método correspondiente.
 2. **Idempotency es obligatorio** en cualquier flujo de creación: antes de crear un action item, buscar por `metadata.<key>` para evitar duplicados. Ver `docs/concepts/idempotency.md`.
-3. **Estado `metadata` vs `user_metadata`**: `metadata` es libre (objeto anidado) y solo lo edita el agente. `user_metadata` es flat key/value (solo escalares: string/number/boolean/null) y lo edita el usuario humano. Ver `docs/concepts/metadata-vs-user-metadata.md`.
+3. **Estado `metadata` vs `user_metadata`**: `metadata` es libre (objeto anidado) y solo lo edita el agente. `user_metadata` es flat key/value (escalares string/number/boolean/null, o arrays de escalares) y lo edita el usuario humano. Ver `docs/concepts/metadata-vs-user-metadata.md`.
 4. **Reconciliation respeta decisiones humanas**: nunca cerrar items en `deferred`, `pending_*` o creados por otros agentes. Ver `docs/concepts/reconciliation.md`.
 5. **Cada action item pertenece a un NRN**: el NRN define ownership y permisos. Cualquier query de listado debe incluir `--nrn`.
 
@@ -45,7 +45,7 @@ Endpoints públicos: `https://api.nullplatform.com/governance/action_item` y `ht
 |--------|----------|-----------|
 | `list_categories.sh` | `GET /governance/action_item_category` | Listar categorías |
 | `get_category.sh` | `GET /governance/action_item_category/:id` | Detalle |
-| `ensure_category.sh` | (search-or-create) | ⭐ Idempotent: busca por slug, si no existe crea |
+| `ensure_category.sh` | (search-or-create) | ⭐ Idempotent: busca por name (clave de unicidad), si no existe crea |
 | `create_category.sh` | `POST /governance/action_item_category` | Crear categoría |
 | `update_category.sh` | `PATCH /governance/action_item_category/:id` | Update parcial |
 | `delete_category.sh` | `DELETE /governance/action_item_category/:id` | Eliminar (falla si tiene action items asociados) |
@@ -151,4 +151,4 @@ export NP_TOKEN='eyJ...'
 
 Verificar con: `${CLAUDE_PLUGIN_ROOT}/skills/np-api/scripts/check_auth.sh`
 
-Permisos JWT requeridos: `governance:action_item:list/read/create/update/delete/defer/reject/resolve/approve`, `governance:action_item:suggestion:create/update/delete/approve/reject/execute`, `governance:action_item:category:list/read/create/update/delete`. Ver `docs/concepts/permissions-matrix.md` para el set completo y un ejemplo de rol YAML.
+Permisos JWT requeridos: `governance:action_item:list/read/create/update/delete/defer/reject/resolve/reopen/close`, `governance:action_item:suggestion:create/update/delete/approve/reject/execute`, `governance:action_item:category:list/read/create/update/delete`. Ver `docs/concepts/permissions-matrix.md` para el set completo y un ejemplo de rol YAML.

@@ -1,0 +1,50 @@
+id: WORKFLOW_ID
+name: WORKFLOW_NAME
+description: Run a Claude agent step on a prompt.
+
+inputs:
+  task:
+    type: string
+    default: "Summarize the current deployment status in one sentence."
+
+steps:
+  - id: start
+    type: trigger
+    pluginType: manual
+
+  - id: agent
+    type: module
+    # `claude-code-agent` is the Claude agent plugin. Availability is
+    # per-deployment — run `/np-workflow plugin claude-code-agent` to confirm it
+    # exists and to see the live config schema (required vs optional fields).
+    pluginType: claude-code-agent
+    config:
+      model: claude-sonnet-4-5          # dropdown in the UI; free text also OK
+      systemPrompt: "You are a concise nullplatform assistant."
+      userPrompt: "${{ workflow.inputs.task }}"
+      # --- optional (see `plugin describe` for the full list) ---
+      # nullplatform skills, if the deployment ships them:
+      # skillsEnabled: [np-developer, np-governance]
+      # external MCP servers:
+      # mcpServersEnabled: [github]
+      # credentials handed to the agent's tools (resolved per-step; never logged):
+      # env:
+      #   NP_TOKEN: "${{ secrets.np_token }}"
+      #   GITHUB_TOKEN: "${{ secrets.github_pat }}"
+      # structured output — omit to get the plain text reply under `result`:
+      # outputSchema:
+      #   type: object
+      #   properties:
+      #     summary: { type: string }
+      #   required: [summary]
+    dependsOn: [start]
+
+  - id: log
+    type: module
+    pluginType: log
+    inputs:
+      message: "Agent said: ${{ steps.agent.outputs.result }}"
+    dependsOn: [agent]
+
+outputs:
+  result: "${{ steps.agent.outputs.result }}"

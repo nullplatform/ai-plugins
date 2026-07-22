@@ -1,5 +1,5 @@
 ---
-name: nullplatform-investigation-diagnostic
+name: np-investigation-diagnostic
 description: Use when the user asks to investigate, diagnose, look at, check, or troubleshoot any nullplatform entity (deployments, scopes, services, applications, builds, releases). Also use when the user mentions problems, errors, failures, or unhealthy states in nullplatform.
 allowed-tools: Bash(${CLAUDE_PLUGIN_ROOT}/skills/np-api/scripts/agent-kubectl.sh)
 ---

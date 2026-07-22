@@ -7,6 +7,10 @@ description: This skill should be used when the user asks to "configure nullplat
 
 Configures Nullplatform resources: scopes, dimensions, and service definitions.
 
+## Critical Rules
+
+@${CLAUDE_PLUGIN_ROOT}/skills/np-rules/rules/iac-rule.md
+
 ## When to Use
 
 - Configuring scope definitions (deployment targets)

@@ -24,7 +24,7 @@ ${CLAUDE_PLUGIN_ROOT}/skills/np-governance-agent-builder/scripts/validate_genera
 | 6 | El skill está bajo `.claude/skills/` (no dentro de este repo) | Warning si no — el agente debería vivir en el proyecto del usuario |
 | 7 | Existe `scripts/_lib.sh` (discovery helper) | Warning si no — sin él el agente no puede encontrar `np-governance-action-items` en runtime |
 | 8 | Ningún script generado contiene `curl ` directo (excepto comments) | Falla si encuentra |
-| 9 | `user_metadata` solo contiene escalares en los templates | Warning si encuentra objects/arrays |
+| 9 | `user_metadata` contiene escalares o arrays de escalares (no objetos anidados) | Warning si encuentra objetos anidados |
 | 10 | `detect.sh` (si existe) llama a `search_action_items_by_metadata.sh` o `reconcile_action_items.sh` antes de `create_action_item.sh` | Warning si no — fuerza idempotency |
 | 11 | El state file existe en la ruta pasada con `--state-file` | Falla si no |
 | 12 | El state file pasa a `phase: complete` cuando todas las validaciones pasan | Auto-marca |

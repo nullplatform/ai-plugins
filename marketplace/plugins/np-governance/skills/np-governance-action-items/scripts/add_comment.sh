@@ -3,7 +3,10 @@
 # add_comment.sh - Add a comment to an action item
 #
 # Usage:
-#   add_comment.sh --id <action_item_id> --author <author> --content <content>
+#   add_comment.sh --id <action_item_id> --content <content> [--author <author>]
+#
+# --author is optional — identity is resolved from the token; only honored for
+#   callers with delegation rights.
 
 set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -21,10 +24,10 @@ while [[ $# -gt 0 ]]; do
 done
 
 require_arg id "$ID"
-require_arg author "$AUTHOR"
 require_arg content "$CONTENT"
 
 DATA=$(jq -n --arg author "$AUTHOR" --arg content "$CONTENT" \
-    '{author: $author, content: $content}')
+    '{content: $content}
+    + (if $author != "" then {author: $author} else {} end)')
 
 call_api POST "$(gov_path "action_item/${ID}/comments")" "$DATA"

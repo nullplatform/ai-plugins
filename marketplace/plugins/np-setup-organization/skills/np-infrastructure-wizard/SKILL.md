@@ -6,6 +6,10 @@ allowed-tools: AskUserQuestion, Bash(${CLAUDE_PLUGIN_ROOT}/skills/np-infrastruct
 
 # Nullplatform Infrastructure Wizard
 
+## Critical Rules
+
+@${CLAUDE_PLUGIN_ROOT}/skills/np-rules/rules/iac-rule.md
+
 ## Prerequisites
 
 1. Verify that `organization.properties` exists and has the `organization_id`

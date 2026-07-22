@@ -169,13 +169,15 @@ Ask which additional modules to include:
     }
     ```
 
-7. **Verify action_spec_names against the scopes repo** - DO NOT trust the module default or the patterns in this document. Before generating, check the actual available actions at `github.com/nullplatform/scopes`:
+7. **Verify action_spec_names against the branch the module consumes, NOT the repo default branch** - DO NOT trust the module default or the patterns in this document. The `scope_definition` module fetches each action template via `data.http` from `repository_action_templates_branch` (**default `main`**). The `nullplatform/scopes` repo's *default* branch is `beta`, so a plain `gh api .../contents/...` (no `?ref`) queries **beta** and can return action names that do NOT exist on `main` (e.g. beta has `kill-instance`, main has `kill-instances`; the `scheduled_task` action set also differs between branches). Always pin the ref to the branch the module uses:
    ```bash
-   gh api repos/nullplatform/scopes/contents/{service_path}/specs/actions --jq '.[].name'
+   gh api "repos/nullplatform/scopes/contents/{service_path}/specs/actions?ref=main" --jq '.[].name'
    ```
    - The `{service_path}` corresponds to the scope (e.g., `k8s`, `scheduled_task`)
-   - Use the complete list from the repo as the value for `action_spec_names`
+   - Use `?ref=<branch>` matching the module's `repository_action_templates_branch` (default `main`)
+   - Use the complete list from that branch as the value for `action_spec_names`
    - The default in the `tofu-modules` module may be outdated compared to the scopes repo
+   - **Failure mode**: if a name doesn't exist on that branch, `data.http` does NOT fail on the 404 — it returns the body `"404: Not Found"`, which then breaks the module's `gomplate | jq` pipeline with `jq: parse error ... before ':'`. A jq parse error on `data.external.action_specs["<name>"]` means that action name is wrong for the branch.
 
 ---
 

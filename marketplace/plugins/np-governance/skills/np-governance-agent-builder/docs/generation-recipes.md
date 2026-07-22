@@ -110,7 +110,7 @@ allowed-tools: Bash(./.claude/skills/np-governance-agent-<<AGENT_NAME>>/scripts/
   `reconcile_action_items.sh` or `search_action_items_by_metadata.sh` first.
   The unique key is `metadata.<<METADATA_KEY>>`.
 - **No direct curl**: all API calls must go through `np-api/scripts/fetch_np_api_url.sh`.
-- **user_metadata only contains scalars** (string, number, boolean, null).
+- **user_metadata contains scalars or arrays of scalars** (string, number, boolean, null); no nested objects.
 - Respect hold/abort instructions before executing.
 
 ## Scripts
@@ -188,11 +188,16 @@ element has at least:
 {
   "title": "human readable title",
   "priority": "high|medium|low",
+  "category_slug": "<<CATEGORY_SLUG>>",
   "metadata": {
     "<<METADATA_KEY>>": "<unique-value>"
   }
 }
 \`\`\`
+
+The `<<METADATA_KEY>>` value must be a **string** — the list endpoint filters
+metadata with type-sensitive JSONB containment, so a numeric key would never
+match an existing item and reconcile would create duplicates on every run.
 ```
 
 ---
@@ -332,7 +337,11 @@ NRN="${1:-<<NRN_DEFAULT>>}"
 # 2. SCAN — replace with your detection logic.
 #    Output must be a JSON array of objects with at least:
 #    { "title": "...", "priority": "high|medium|low",
+#      "category_slug": "<<CATEGORY_SLUG>>",
 #      "metadata": { "<<METADATA_KEY>>": "<unique-value>" } }
+#    reconcile takes the category per-problem (category_slug / category_id),
+#    so include category_slug on each object to file the item under the
+#    category that setup_category.sh created.
 PROBLEMS_FILE="$(mktemp -t <<AGENT_NAME>>-problems.XXXXXX.json)"
 trap 'rm -f "$PROBLEMS_FILE"' EXIT
 
@@ -340,10 +349,11 @@ trap 'rm -f "$PROBLEMS_FILE"' EXIT
 echo "[]" > "$PROBLEMS_FILE"
 
 # 3. Reconcile (creates new, closes obsolete; respects deferred & pending_*)
+#    NOTE: the idempotency metadata key must be a STRING (JSONB filters are
+#    type-sensitive; a number key causes duplicate create/close churn).
 "${GOV_SCRIPTS}/reconcile_action_items.sh" \
   --nrn "$NRN" \
-  --created-by "<<CREATED_BY>>" \
-  --category-slug "<<CATEGORY_SLUG>>" \
+  --agent-id "<<CREATED_BY>>" \
   --metadata-key "<<METADATA_KEY>>" \
   --problems-file "$PROBLEMS_FILE"
 ```

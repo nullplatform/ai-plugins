@@ -29,6 +29,8 @@ servicios disponibles y sus caracteristicas. NO asumir service IDs ni dimensions
 > y `/np-developer-actions exec-api` para ESCRITURA (paso 8). NUNCA usar `curl` ni
 > `/np-api` para operaciones POST/PUT/DELETE.
 
+> **Tip:** los pasos de discovery son consultas **independientes** (services disponibles, links existentes, link specifications, action specs, dimensions) y pueden ejecutarse **en paralelo**. Medido en uso real, paralelizar 4 queries reduce el tiempo total ~3× respecto a serie, con resultados idénticos.
+
 #### Paso 1: Obtener datos de la aplicacion
 
 ```bash
@@ -131,6 +133,8 @@ np-api fetch-api "/link_specification/<link_spec_id>/action_specification"
 ```
 
 De las action specifications, filtrar la de `type: "create"`. Su campo `parameters.schema` define los **parametros de entrada** para la action de provisionamiento (equivale al formulario de la UI, ej: permisos read/write/admin para database-user).
+
+Para una guía general de cómo leer un `parameters.schema` de action spec (required, default, enum, oneOf, etc.), ver `services.md` → "Cómo leer un `parameters.schema` de action spec". La misma regla aplica acá: **copiar las keys textualmente del schema, sin normalizar ortografía** — los schemas pueden tener typos intencionales o heredados (p. ej. una property con un plural mal formado) que deben respetarse al armar el body, o el backend ignorará el campo silenciosamente y aplicará defaults.
 
 #### Paso 6: Obtener dimensions disponibles
 

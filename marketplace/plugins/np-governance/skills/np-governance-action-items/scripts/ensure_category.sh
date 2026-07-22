@@ -5,11 +5,17 @@
 # Usage:
 #   ensure_category.sh \
 #     --nrn <nrn> \
-#     --slug <slug> \
 #     --name <name> \
+#     [--slug <slug>] \
 #     [--description <text>] [--color <hex>] [--icon <name>] \
 #     [--unit-name <name>] [--unit-symbol <sym>] \
 #     [--config <json>] [--parent-id <id>]
+#
+# Idempotency is keyed on --name, which is the API's real uniqueness key:
+# categories are unique by (name, nrn). --slug is optional and NOT used for
+# matching — the API generates the slug from the name (a global counter may
+# append -N), so the stored slug can differ from any slug you pass. The actual
+# slug is returned in the output.
 #
 # Output: JSON {id, slug, was_created}
 
@@ -38,21 +44,22 @@ while [[ $# -gt 0 ]]; do
 done
 
 require_arg nrn "$NRN"
-require_arg slug "$SLUG"
 require_arg name "$NAME"
 
-# 1. Search by slug + nrn.
-#
-# IMPORTANT: The backend is currently known to ignore the ?slug= query
-# parameter and return all categories for the NRN (filed as a bug). We always
-# do a client-side match on the exact slug before deciding a category exists.
-# Without this, a backend that returns an unrelated category would make the
-# script either resolve to the wrong id or create a duplicate.
-QS="nrn=$(urlencode "$NRN")&slug=$(urlencode "$SLUG")&limit=100"
-EXISTING=$(call_api GET "$(gov_path "action_item_category")?${QS}")
+# find_by_name — GET the category list filtered by name+nrn and return the
+# exact name match (or empty). The list endpoint filters name server-side
+# (exact match), but ancestor-NRN visibility can surface categories from parent
+# scopes, so we still match exactly client-side before deciding it exists.
+find_by_name() {
+    local qs body
+    qs="nrn=$(urlencode "$NRN")&name=$(urlencode "$NAME")&limit=100"
+    body=$(call_api GET "$(gov_path "action_item_category")?${qs}")
+    echo "$body" | jq --arg name "$NAME" \
+        '(.results // []) | map(select(.name == $name)) | .[0] // empty'
+}
 
-MATCH=$(echo "$EXISTING" | jq --arg slug "$SLUG" \
-    '(.results // []) | map(select(.slug == $slug)) | .[0] // empty')
+# 1. Search by name (the uniqueness key).
+MATCH=$(find_by_name)
 
 if [ -n "$MATCH" ] && [ "$MATCH" != "null" ]; then
     EXISTING_ID=$(echo "$MATCH" | jq -r '.id')
@@ -88,6 +95,19 @@ CREATED_ID=$(echo "$CREATED" | jq -r '.id // empty')
 CREATED_SLUG=$(echo "$CREATED" | jq -r '.slug // empty')
 
 if [ -z "$CREATED_ID" ]; then
+    # Create failed. The most common cause is a lost race or a prior run: the
+    # name already exists in this scope (409 DUPLICATE_NAME). The API returns
+    # the existing id/slug only inside a human-readable message, so instead of
+    # parsing it we re-query by name and recover the existing category — which
+    # keeps this script idempotent. Only a genuinely failed create falls through
+    # to the error.
+    RECOVERED=$(find_by_name)
+    if [ -n "$RECOVERED" ] && [ "$RECOVERED" != "null" ]; then
+        jq -n --arg id "$(echo "$RECOVERED" | jq -r '.id')" \
+              --arg slug "$(echo "$RECOVERED" | jq -r '.slug')" \
+            '{id: $id, slug: $slug, was_created: false}'
+        exit 0
+    fi
     echo "Error: failed to create category. Response:" >&2
     echo "$CREATED" >&2
     exit 1

@@ -7,6 +7,10 @@ description: This skill should be used when the user asks to "connect GitHub", "
 
 Connects Nullplatform with external services: GitHub, container registry, cloud provider.
 
+## Critical Rules
+
+@${CLAUDE_PLUGIN_ROOT}/skills/np-rules/rules/iac-rule.md
+
 ## When to Use
 
 - Configuring GitHub integration

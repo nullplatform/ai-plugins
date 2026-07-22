@@ -5,7 +5,9 @@ description: Orchestrates the complete configuration of a Nullplatform organizat
 
 # Nullplatform Setup Orchestrator
 
-## IMPORTANT RULE: Using np-api
+## Critical Rules
+
+### Rule: Using np-api
 
 **NEVER use `curl` directly to query the Nullplatform API (`api.nullplatform.com`).**
 
@@ -19,6 +21,8 @@ For ANY query to the Nullplatform API, you MUST use:
 
 - `curl` to deployed application endpoints (`*.nullapps.io`) for health checks
 - `curl` to external services (AWS, Azure, GCP)
+
+@${CLAUDE_PLUGIN_ROOT}/skills/np-rules/rules/iac-rule.md
 
 ## Available Commands
 

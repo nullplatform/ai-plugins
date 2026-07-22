@@ -40,18 +40,18 @@ description: This skill should be used when the user asks to "configure cloud cr
 
 description: Creates cloud infrastructure for Nullplatform. Use when you need to configure VPC/VNet, Kubernetes clusters (EKS/AKS/GKE/OKE/ARO), ingress (Istio/ALB), DNS zones, tfstate backend, and deploy the Nullplatform agent. Supports AWS, Azure, Azure ARO, GCP, and OCI.
 
+### np-rules
+
+description: Shared rule files referenced by other nullplatform skills via `@${CLAUDE_PLUGIN_ROOT}/skills/np-rules/rules/*.md`. This skill is a dependency container, not a user-facing skill — other skills auto-load its files through `@` file inclusion. Do not invoke directly from user intent.
+
 ## Installation
 
 ### From Plugin Marketplace
 
-Add the nullplatform marketplace once, then install this plugin:
-
-```bash
-claude plugin marketplace add https://github.com/nullplatform/ai-plugins
-claude plugin install np-setup-organization@nullplatform
-```
-
-Or do it interactively inside Claude Code: run `/plugin`, use the **Marketplaces** tab to add `https://github.com/nullplatform/ai-plugins`, then find **np-setup-organization** in the **Discover** tab and press Enter to install.
+1. Open Claude Code
+2. Go to Plugins
+3. Search for "np-setup-organization"
+4. Click Install
 
 ### Manual Installation
 
@@ -96,6 +96,8 @@ This plugin requires the following permissions:
   "Skill(np-nullplatform-wizard:*)",
   "Skill(np-organization-create)",
   "Skill(np-organization-create:*)",
+  "Skill(np-rules)",
+  "Skill(np-rules:*)",
   "Skill(np-setup-orchestrator)",
   "Skill(np-setup-orchestrator:*)",
   "Skill(np-setup-troubleshooting)",

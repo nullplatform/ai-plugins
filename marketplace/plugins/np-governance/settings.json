@@ -8,6 +8,16 @@
       "Bash(./.claude/skills/np-governance-agent-builder/scripts/*.sh:*)",
       "Bash(./.claude/skills/np-lake/scripts/ch_query.sh:*)",
       "Bash(./.claude/skills/np-lake/scripts/check_ch_auth.sh:*)",
+      "Bash(./.claude/skills/np-workflow/scripts/config.sh:*)",
+      "Bash(./.claude/skills/np-workflow/scripts/execution.sh:*)",
+      "Bash(./.claude/skills/np-workflow/scripts/ping.sh:*)",
+      "Bash(./.claude/skills/np-workflow/scripts/plugins.sh:*)",
+      "Bash(./.claude/skills/np-workflow/scripts/publish.sh:*)",
+      "Bash(./.claude/skills/np-workflow/scripts/run.sh:*)",
+      "Bash(./.claude/skills/np-workflow/scripts/scaffold.sh:*)",
+      "Bash(./.claude/skills/np-workflow/scripts/trigger.sh:*)",
+      "Bash(./.claude/skills/np-workflow/scripts/workflow-api.sh:*)",
+      "Bash(./.claude/skills/np-workflow/scripts/workflows.sh:*)",
       "Skill(np-api)",
       "Skill(np-api:*)",
       "Skill(np-governance-action-items)",
@@ -15,7 +25,9 @@
       "Skill(np-governance-agent-builder)",
       "Skill(np-governance-agent-builder:*)",
       "Skill(np-lake)",
-      "Skill(np-lake:*)"
+      "Skill(np-lake:*)",
+      "Skill(np-workflow)",
+      "Skill(np-workflow:*)"
     ]
   }
 }

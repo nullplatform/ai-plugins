@@ -10,8 +10,7 @@ list_categories.sh \
   [--name "Security Vulnerability"] \
   [--parent-id <id>] \
   [--status active|inactive] \
-  [--offset 0] [--limit 25] \
-  [--order-by createdAt|name] [--order ASC|DESC]
+  [--offset 0] [--limit 25]
 ```
 
 El backend soporta wildcards en NRN: `organization=1:account=*` lista todas. También resuelve herencia: pasar un NRN específico devuelve sus propias categorías + todas las heredadas de ancestros.
@@ -31,23 +30,25 @@ Search-or-create idempotent. Es el script clave para inicialización de agentes.
 ```bash
 ensure_category.sh \
   --nrn "organization=1" \
-  --slug "security-vulnerability" \
   --name "Security Vulnerability" \
+  [--slug "security-vulnerability"] \
   [--description "..."] \
   [--color "#DC2626"] \
   [--icon "shield"] \
   [--unit-name "Risk Score"] \
   [--unit-symbol "R"] \
-  [--config '{"requires_approval_to_reject":true,"max_deferral_days":90}'] \
+  [--config '{"max_deferral_days":90,"max_deferral_count":3}'] \
   [--parent-id <id>]
 ```
 
 Output: `{id, slug, was_created}` donde `was_created=true` si recién la creó, `false` si ya existía.
 
+La idempotencia se basa en `--name`, que es la clave de unicidad real de la API: las categorías son únicas por `(name, nrn)`. `--slug` es opcional y **no** se usa para buscar — la API genera el slug desde el name (un contador global puede agregar `-N`), así que el slug guardado puede diferir del que pases; el slug real viene en el output.
+
 Comportamiento:
-1. Hace `GET /governance/action_item_category?nrn=...&slug=<slug>`.
-2. Si el array tiene resultados, retorna el primero.
-3. Si no, hace POST con los args restantes.
+1. Hace `GET /governance/action_item_category?nrn=...&name=<name>` y matchea el name exacto (el endpoint no filtra por slug; ese param se ignora).
+2. Si existe, retorna esa categoría con `was_created=false`.
+3. Si no, hace POST con los args restantes. Si el POST choca con un `(name, nrn)` ya existente (carrera o corrida previa), re-consulta por name y devuelve la existente en vez de fallar.
 
 ## create_category.sh
 
@@ -110,7 +111,7 @@ SECURITY_CAT=$(ensure_category.sh \
   --description "CVEs and security issues" \
   --color "#DC2626" --icon "shield" \
   --unit-name "Risk Score" --unit-symbol "R" \
-  --config '{"requires_approval_to_reject":true,"max_deferral_days":90}' | jq -r .id)
+  --config '{"max_deferral_days":90}' | jq -r .id)
 
 COST_CAT=$(ensure_category.sh \
   --nrn "$NRN" \
@@ -118,7 +119,7 @@ COST_CAT=$(ensure_category.sh \
   --name "Cost Optimization" \
   --color "#059669" --icon "dollar" \
   --unit-name "Dollars per Month" --unit-symbol "\$" \
-  --config '{"requires_verification":true}' | jq -r .id)
+  --config '{"max_deferral_count":3}' | jq -r .id)
 
 echo "Categories ready: security=$SECURITY_CAT cost=$COST_CAT"
 ```

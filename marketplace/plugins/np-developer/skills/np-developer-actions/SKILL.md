@@ -43,15 +43,15 @@ ejecutar accion, run action, correr accion, custom action, accion custom, operar
 
 ## Operaciones documentadas
 
-| Operacion | Doc | Descripcion |
-|-----------|-----|-------------|
-| Crear aplicacion | `docs/applications.md` | Crear nueva aplicacion con template y repositorio en un namespace |
-| Crear servicio | `docs/services.md` | Provisionar nuevo servicio de infraestructura (DB, cola, cache, etc.) |
-| Crear scope | `docs/scopes.md` | Crear un scope con discovery de tipos, dimensions y capabilities |
-| Desplegar | `docs/deployments.md` | Crear deployment eligiendo build/release y scope target |
-| Gestionar parametros | `docs/parameters.md` | Crear, modificar y eliminar variables de entorno |
-| Linkear servicio | `docs/service-links.md` | Linkear un servicio existente y disponible a una aplicacion |
-| Ejecutar custom action | `docs/custom-actions.md` | Ejecutar acciones custom sobre servicios o links |
+| Operacion | Doc | Descripcion | Requisitos |
+| --- | --- | --- | --- |
+| Crear aplicacion | `docs/applications.md` | Crear nueva aplicacion con template y repositorio en un namespace | Account y namespace activos; directorio de trabajo no es un repositorio git |
+| Crear servicio | `docs/services.md` | Provisionar nuevo servicio de infraestructura (DB, cola, cache, etc.) | Aplicacion dueña creada; service specification disponible en la org |
+| Crear scope | `docs/scopes.md` | Crear un scope con discovery de tipos, dimensions y capabilities | Aplicacion activa |
+| Desplegar | `docs/deployments.md` | Crear deployment eligiendo build/release y scope target | Scope activo **con `asset_name` seteado**; build exitoso; release activo |
+| Gestionar parametros | `docs/parameters.md` | Crear, modificar y eliminar variables de entorno | Aplicacion o scope donde aplican los parametros |
+| Linkear servicio | `docs/service-links.md` | Linkear un servicio existente y disponible a una aplicacion | Servicio en estado `active`; `linkable_to` del servicio incluye el NRN de la app destino; link specification disponible |
+| Ejecutar custom action | `docs/custom-actions.md` | Ejecutar acciones custom sobre servicios o links | Entidad (servicio o link) activa; action specification definida |
 
 **IMPORTANTE**: Cada operacion tiene su propio flujo documentado en `docs/`. Leer la doc
 correspondiente ANTES de ejecutar. Los flujos incluyen consultas previas obligatorias via

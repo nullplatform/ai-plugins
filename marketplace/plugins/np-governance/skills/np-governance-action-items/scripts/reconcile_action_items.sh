@@ -6,7 +6,7 @@
 #  1. Read current problems from --problems-file (JSON array)
 #  2. List existing items created by --agent-id with metadata.<key> indexing
 #  3. For each current problem without matching item: CREATE
-#  4. For each existing item without matching current problem: RESOLVE
+#  4. For each existing item without matching current problem: CLOSE
 #     (only if status=open; deferred/pending_* are skipped to respect humans)
 #  5. Print summary report
 #
@@ -23,6 +23,16 @@
 #   title (required for create), priority, category_slug, category_id, value,
 #   description, metadata (object), labels (object),
 #   affected_resources (array), references (array)
+#
+# IMPORTANT — the metadata idempotency key MUST be a string. The list endpoint
+# filters metadata via JSONB containment, which is type-sensitive: a stored
+# number 5 never matches the query string "5". A non-string key makes every run
+# miss the existing item, create a duplicate, and close the previous one.
+#
+# IMPORTANT — the --created-by filter that scopes this to "this agent's items"
+# is only honored by the API for machine/root tokens with delegation rights.
+# Run this under such a token; under a plain human token, created_by is forced
+# to the token identity and the next run finds nothing, recreating everything.
 
 set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -74,7 +84,16 @@ while true; do
         QS+="&status[]=$(urlencode "$st")"
     done
     PAGE=$(call_api GET "$(gov_path "action_item")?${QS}")
-    PAGE_RESULTS=$(echo "$PAGE" | jq '.results // []')
+    # Guard against a failed list call (auth/gateway error). The API wrapper does
+    # not fail on non-2xx, so an error body would otherwise fall through
+    # `.results // []` as an empty list — and step 3 would then CREATE a
+    # duplicate for every current problem. Abort instead of mass-creating.
+    if ! echo "$PAGE" | jq -e '.results | type == "array"' >/dev/null 2>&1; then
+        echo "Error: unexpected response while listing existing items (no results array)." >&2
+        echo "$PAGE" >&2
+        exit 1
+    fi
+    PAGE_RESULTS=$(echo "$PAGE" | jq '.results')
     PAGE_COUNT=$(echo "$PAGE_RESULTS" | jq 'length')
     if [ "$PAGE_COUNT" = "0" ]; then break; fi
     EXISTING=$(echo "$EXISTING $PAGE_RESULTS" | jq -s 'add')
@@ -91,8 +110,8 @@ EXISTING_KEYS=$(echo "$EXISTING" | jq -r --arg key "$METADATA_KEY" \
 CURRENT_KEYS=$(echo "$CURRENT_PROBLEMS" | jq -r --arg key "$METADATA_KEY" \
     '[.[] | (.[$key] // (.metadata // {})[$key]) // empty] | unique | .[]')
 
-CREATED=0; RESOLVED=0; UNCHANGED=0; SKIPPED=0
-CREATED_IDS="[]"; RESOLVED_IDS="[]"; SKIPPED_DETAILS="{}"
+CREATED=0; CLOSED=0; UNCHANGED=0; SKIPPED=0
+CREATED_IDS="[]"; CLOSED_IDS="[]"; SKIPPED_DETAILS="{}"
 
 # Helper: log action
 log_action() {
@@ -154,7 +173,7 @@ echo "$CURRENT_PROBLEMS" | jq -c '.[]' | while read -r problem; do
     fi
 done
 
-# 4. Auto-resolve obsolete (only items in 'open')
+# 4. Auto-close obsolete (only items in 'open')
 echo "$EXISTING" | jq -c '.[]' | while read -r item; do
     ITEM_ID=$(echo "$item" | jq -r '.id')
     ITEM_STATUS=$(echo "$item" | jq -r '.status')
@@ -166,15 +185,16 @@ echo "$EXISTING" | jq -c '.[]' | while read -r item; do
 
     if [ "$STILL_PRESENT" = "0" ]; then
         if [ "$ITEM_STATUS" = "open" ]; then
-            log_action "RESOLVE: $ITEM_ID (key $METADATA_KEY=$KEY no longer detected)"
+            log_action "CLOSE: $ITEM_ID (key $METADATA_KEY=$KEY no longer detected)"
             if [ "$DRY_RUN" = "false" ]; then
                 "${SCRIPT_DIR}/add_comment.sh" --id "$ITEM_ID" --author "$AGENT_ID" \
-                    --content "## Auto-resolved by reconciler
+                    --content "## Auto-closed by reconciler
 
 The problem identified by \`${METADATA_KEY}=${KEY}\` is no longer detected in the latest scan by \`${AGENT_ID}\`.
 
-Resolved at: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >/dev/null
-                "${SCRIPT_DIR}/resolve_action_item.sh" --id "$ITEM_ID" --actor "$AGENT_ID" >/dev/null
+Closed at: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >/dev/null
+                "${SCRIPT_DIR}/close_action_item.sh" --id "$ITEM_ID" \
+                    --reason "Resource no longer present in latest scan; auto-closed by reconciliation" >/dev/null
             fi
         else
             log_action "SKIP: $ITEM_ID (status=$ITEM_STATUS, respecting human decision)"
@@ -188,19 +208,19 @@ TOTAL_EXISTING=$(echo "$EXISTING" | jq 'length')
 
 # Count by re-iterating (since we used while subshells, we lost variable updates)
 CREATED=$(comm -23 <(echo "$CURRENT_KEYS" | sort -u) <(echo "$EXISTING_KEYS" | sort -u) | wc -l | tr -d ' ')
-RESOLVED_CANDIDATES=$(comm -13 <(echo "$CURRENT_KEYS" | sort -u) <(echo "$EXISTING_KEYS" | sort -u) | wc -l | tr -d ' ')
+CLOSED_CANDIDATES=$(comm -13 <(echo "$CURRENT_KEYS" | sort -u) <(echo "$EXISTING_KEYS" | sort -u) | wc -l | tr -d ' ')
 UNCHANGED=$(comm -12 <(echo "$CURRENT_KEYS" | sort -u) <(echo "$EXISTING_KEYS" | sort -u) | wc -l | tr -d ' ')
 
-# RESOLVED actually applied = resolved_candidates that were in 'open' status
+# CLOSED actually applied = closed_candidates that were in 'open' status
 # (others were skipped)
-RESOLVED=0; SKIPPED=0
+CLOSED=0; SKIPPED=0
 echo "$EXISTING" | jq -c '.[]' | while read -r item; do
     KEY=$(echo "$item" | jq -r --arg k "$METADATA_KEY" '(.metadata // {})[$k] // empty')
     STATUS=$(echo "$item" | jq -r '.status')
     [ -z "$KEY" ] && continue
     if ! echo "$CURRENT_KEYS" | grep -Fxq "$KEY"; then
         if [ "$STATUS" = "open" ]; then
-            echo "RESOLVED" >> /tmp/.recon-counters.$$
+            echo "CLOSED" >> /tmp/.recon-counters.$$
         else
             echo "SKIPPED" >> /tmp/.recon-counters.$$
         fi
@@ -208,8 +228,10 @@ echo "$EXISTING" | jq -c '.[]' | while read -r item; do
 done
 
 if [ -f "/tmp/.recon-counters.$$" ]; then
-    RESOLVED=$(grep -c '^RESOLVED$' "/tmp/.recon-counters.$$" 2>/dev/null || echo 0)
-    SKIPPED=$(grep -c '^SKIPPED$' "/tmp/.recon-counters.$$" 2>/dev/null || echo 0)
+    # grep -c prints the count even when it exits 1 on zero matches; "|| echo 0"
+    # would append a second line ("0\n0") and break the jq --argjson below.
+    CLOSED=$(grep -c '^CLOSED$' "/tmp/.recon-counters.$$" 2>/dev/null || true)
+    SKIPPED=$(grep -c '^SKIPPED$' "/tmp/.recon-counters.$$" 2>/dev/null || true)
     rm -f "/tmp/.recon-counters.$$"
 fi
 
@@ -217,7 +239,7 @@ jq -n \
     --argjson current "$TOTAL_CURRENT" \
     --argjson existing "$TOTAL_EXISTING" \
     --argjson created "$CREATED" \
-    --argjson resolved "$RESOLVED" \
+    --argjson closed "$CLOSED" \
     --argjson unchanged "$UNCHANGED" \
     --argjson skipped "$SKIPPED" \
     --arg dry_run "$DRY_RUN" \
@@ -228,7 +250,7 @@ jq -n \
             existing_items: $existing
         },
         created: $created,
-        resolved: $resolved,
+        closed: $closed,
         unchanged: $unchanged,
         skipped: $skipped
     }'

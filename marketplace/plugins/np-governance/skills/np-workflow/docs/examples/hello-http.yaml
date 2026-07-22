@@ -1,0 +1,30 @@
+id: WORKFLOW_ID
+name: WORKFLOW_NAME
+description: Single HTTP GET that logs the response status.
+
+inputs:
+  url:
+    type: string
+    default: "https://httpbin.org/get"
+
+variables:
+  statusCode:
+    initialValue: 0
+
+steps:
+  - id: fetch
+    type: module
+    pluginType: http-request
+    inputs:
+      url: "${{ workflow.inputs.url }}"
+      method: GET
+
+  - id: log
+    type: module
+    pluginType: log
+    inputs:
+      message: "Fetched ${{ workflow.inputs.url }} -> ${{ steps.fetch.outputs.statusCode }}"
+    dependsOn: [fetch]
+
+outputs:
+  statusCode: "${{ steps.fetch.outputs.statusCode }}"

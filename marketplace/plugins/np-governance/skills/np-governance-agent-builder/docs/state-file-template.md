@@ -127,7 +127,7 @@ Here is what a complete state file looks like after a successful wizard for a `v
 - Icon: shield
 - Unit name: Risk Score
 - Unit symbol: R
-- Config flags: requires_verification, requires_approval_to_reject
+- Config: max_deferral_days=90, max_deferral_count=3
 
 ## Idempotency & metadata
 
@@ -172,6 +172,6 @@ Here is what a complete state file looks like after a successful wizard for a `v
 - [x] scripts/_lib.sh exists
 - [x] Skill is under .claude/skills/
 - [x] No curl direct invocation
-- [x] user_metadata only contains scalars
+- [x] user_metadata contains only scalars or arrays of scalars
 - [x] detect.sh calls reconcile_action_items.sh
 ```

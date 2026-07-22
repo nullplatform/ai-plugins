@@ -20,6 +20,8 @@ Orchestrator to create, list, register, and test Nullplatform services.
    - `np-agent-local-setup` — local agent setup for testing
    - `np-notification-manager` — channel operations
 
+@${CLAUDE_PLUGIN_ROOT}/skills/np-rules/rules/iac-rule.md
+
 ## Reference Documentation
 
 @.claude/skills/np-service-craft/docs/service-structure.md

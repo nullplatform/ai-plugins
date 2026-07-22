@@ -18,6 +18,8 @@
       "Skill(np-nullplatform-wizard:*)",
       "Skill(np-organization-create)",
       "Skill(np-organization-create:*)",
+      "Skill(np-rules)",
+      "Skill(np-rules:*)",
       "Skill(np-setup-orchestrator)",
       "Skill(np-setup-orchestrator:*)",
       "Skill(np-setup-troubleshooting)",

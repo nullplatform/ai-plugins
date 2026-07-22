@@ -104,7 +104,7 @@ No hay script para esto — hacelo directo con las herramientas nativas. Es dete
 
 1. **Siempre usar AskUserQuestion** para preguntar al usuario, nunca volcar texto plano. Max 4 preguntas por batch.
 2. **Forzar idempotency**: el wizard SIEMPRE pregunta el `metadata_match_key` (Batch 3, Q1). Sin idempotency key no se puede continuar.
-3. **`user_metadata` solo escalares**: validar al recibir respuestas que el usuario no propone objects/arrays.
+3. **`user_metadata` escalares o arrays de escalares**: validar al recibir respuestas que el usuario no propone objetos anidados (arrays de escalares sí son válidos).
 4. **El agente generado NO reimplementa lógica** — solo wrappers delgados sobre los scripts de `np-governance-action-items`, descubiertos en runtime via `_lib.sh`.
 5. **Cada agente generado trae su `_lib.sh`** y lo sourcean todos los demás scripts (`setup_category.sh`, `detect.sh`, `execute.sh`).
 6. **Nunca tocar `bundles.json` ni `permissions/permissions.json` de este repo** — el agente vive en el proyecto del usuario, no en el plugin.

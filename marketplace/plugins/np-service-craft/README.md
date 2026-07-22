@@ -40,18 +40,18 @@ description: This skill should be used when the user asks to "run agent locally"
 
 description: This skill should be used when the user asks to "create a notification channel", "debug notifications", "resend a notification", "check channel configuration", "inspect notification delivery", or needs to manage nullplatform notification channels, agent routing, and test notification delivery.
 
+### np-rules
+
+description: Shared rule files referenced by other nullplatform skills via `@${CLAUDE_PLUGIN_ROOT}/skills/np-rules/rules/*.md`. This skill is a dependency container, not a user-facing skill — other skills auto-load its files through `@` file inclusion. Do not invoke directly from user intent.
+
 ## Installation
 
 ### From Plugin Marketplace
 
-Add the nullplatform marketplace once, then install this plugin:
-
-```bash
-claude plugin marketplace add https://github.com/nullplatform/ai-plugins
-claude plugin install np-service-craft@nullplatform
-```
-
-Or do it interactively inside Claude Code: run `/plugin`, use the **Marketplaces** tab to add `https://github.com/nullplatform/ai-plugins`, then find **np-service-craft** in the **Discover** tab and press Enter to install.
+1. Open Claude Code
+2. Go to Plugins
+3. Search for "np-service-craft"
+4. Click Install
 
 ### Manual Installation
 
@@ -89,6 +89,8 @@ This plugin requires the following permissions:
   "Skill(np-api:*)",
   "Skill(np-notification-manager)",
   "Skill(np-notification-manager:*)",
+  "Skill(np-rules)",
+  "Skill(np-rules:*)",
   "Skill(np-service-craft)",
   "Skill(np-service-craft:*)",
   "Skill(np-service-creator)",

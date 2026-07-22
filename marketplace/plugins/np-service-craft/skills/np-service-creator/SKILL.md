@@ -15,6 +15,8 @@ Terraform patterns for registering service definitions and agent bindings in nul
 4. **For local development**, use `git_provider = "local"` to read specs from the filesystem without needing to push to GitHub.
 5. **NEVER hardcode module variables from memory** — always read them from the module source.
 
+@${CLAUDE_PLUGIN_ROOT}/skills/np-rules/rules/iac-rule.md
+
 ## Module Source of Truth
 
 The terraform modules for registering services live in `https://github.com/nullplatform/tofu-modules`:

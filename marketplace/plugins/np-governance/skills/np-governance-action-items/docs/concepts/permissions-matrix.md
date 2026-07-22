@@ -10,13 +10,16 @@ Los endpoints de governance requieren claims JWT específicos en el token. Si el
 |-------|--------------|
 | `governance:action_item:list` | `GET /governance/action_item` |
 | `governance:action_item:read` | `GET /governance/action_item/:id`, `GET /:id/comments`, `GET /:id/audit-logs`, `GET /:id/suggestions` |
-| `governance:action_item:create` | `POST /governance/action_item`, `POST /:id/comments` |
-| `governance:action_item:update` | `PATCH /:id`, `PUT /:id`, `POST /:id/comments`, `POST /:id/reopen`, `POST /:id/close` |
+| `governance:action_item:create` | `POST /governance/action_item` |
+| `governance:action_item:update` | `PATCH /:id`, `PUT /:id`, `POST /:id/comments` (editar campos y comentar — **no** cambia el status) |
 | `governance:action_item:delete` | `DELETE /:id` |
 | `governance:action_item:defer` | `POST /:id/defer` |
 | `governance:action_item:reject` | `POST /:id/reject` |
 | `governance:action_item:resolve` | `POST /:id/resolve` |
-| `governance:action_item:approve` | `POST /:id/approve`, `POST /:id/deny` (para pending_*) |
+| `governance:action_item:reopen` | `POST /:id/reopen` |
+| `governance:action_item:close` | `POST /:id/close` |
+
+> Las transiciones de status se hacen solo con los endpoints de acción (`defer` / `reject` / `resolve` / `reopen` / `close`); cambiar `status` vía `PATCH` / `PUT` se deniega con **401** (ver `lifecycle.md`) — el stack de auth mapea toda denegación de autorización a 401, no a 403. Las decisiones de aprobación las gestiona el servicio de aprobaciones de la plataforma.
 
 ### Suggestions
 
@@ -27,7 +30,7 @@ Los endpoints de governance requieren claims JWT específicos en el token. Si el
 | `governance:action_item:suggestion:delete` | `DELETE /:id/suggestions/:sId` |
 | `governance:action_item:suggestion:approve` | `POST /:id/suggestions/:sId/approve` |
 | `governance:action_item:suggestion:reject` | `POST /:id/suggestions/:sId/reject` |
-| `governance:action_item:suggestion:execute` | `POST /:id/suggestions/:sId/execute` (alternativa al PATCH) |
+| `governance:action_item:suggestion:execute` | `POST /:id/suggestions/:sId/applied` y `POST /:id/suggestions/:sId/failed` |
 
 ### Categories
 
@@ -41,14 +44,14 @@ Los endpoints de governance requieren claims JWT específicos en el token. Si el
 
 ## Permisos mínimos por rol
 
-### Detector agent (read + create + comment)
+### Detector agent (read + create + comment + close)
 
 ```yaml
 - governance:action_item:list
 - governance:action_item:read
 - governance:action_item:create
 - governance:action_item:update           # para agregar comentarios
-- governance:action_item:resolve          # para auto-resolver en reconciliation
+- governance:action_item:close            # para auto-cerrar items obsoletos en reconciliation
 - governance:action_item:suggestion:create
 - governance:action_item:category:list
 - governance:action_item:category:create  # opcional, si auto-crea categorías
@@ -59,9 +62,9 @@ Los endpoints de governance requieren claims JWT específicos en el token. Si el
 ```yaml
 - governance:action_item:list
 - governance:action_item:read
-- governance:action_item:update                 # para comentarios y status
+- governance:action_item:update                 # para agregar comentarios
 - governance:action_item:suggestion:update      # para applied/failed
-- governance:action_item:resolve                # para cerrar items resueltos
+- governance:action_item:resolve                # para marcar resueltos los items ejecutados
 ```
 
 ### Operator humano (full)

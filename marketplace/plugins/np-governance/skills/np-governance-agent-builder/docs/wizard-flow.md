@@ -24,7 +24,9 @@ El wizard usa `AskUserQuestion` en 5 batches. Max 4 preguntas por batch. Despué
 | 1 | "¿Crear categoría nueva o usar existente?" | Category strategy | single | `Create new (Recommended)` / `Use existing by slug` |
 | 2 | "Slug de la categoría (ej `security-vulnerability`, `cost-optimization`)" | Category slug | open text (single) | — |
 | 3 | "Símbolo de la unidad de valor (`$`, `R`, `ms`, `%`, `h`)" | Unit symbol | open text (single) | — |
-| 4 | "Configuración de la categoría (multi-select)" | Category config | multiSelect | `requires_verification` / `requires_approval_to_reject` / `requires_approval_to_defer` / `max_deferral_days=90` |
+| 4 | "Límites de diferimiento de la categoría (multi-select)" | Category config | multiSelect | `max_deferral_days=90` / `max_deferral_count=3` / `Sin límites` |
+
+> **Config de categoría**: la única config que la categoría acepta es `max_deferral_days` y `max_deferral_count` (la schema tiene `additionalProperties: false` — cualquier otra clave da 400 al crear). Que un `defer`/`reject`/`resolve` requiera aprobación **no** se configura acá: lo decide la policy del servicio de aprobaciones de la plataforma. No ofrezcas `requires_verification` / `requires_approval_to_*` como opciones.
 
 **State file update**: `## Category` section. Guardar como `create-new` o `use-existing` según respuesta de Q1.
 
@@ -36,7 +38,7 @@ Si Q1 = `use-existing`, generar `setup_category.sh` que solo hace search (no cre
 |---|----------|--------|------|---------|
 | 1 | "¿Cuál es el campo de `metadata` que identifica unívocamente un problema? (ej `cve_id`, `resource_arn`, `trace_id`)" | Idempotency key | open text (single) | — |
 | 2 | "¿Otros campos de `metadata` importantes para el contexto técnico? (CSV, ej `cvss_score,severity,package`)" | Other metadata | open text (single) | — |
-| 3 | "¿Qué `user_metadata` debe ser configurable por usuario? (CSV, solo escalares, ej `target_branch,auto_merge,reviewer`)" | User metadata | open text (single) | — |
+| 3 | "¿Qué `user_metadata` debe ser configurable por usuario? (CSV, escalares o arrays de escalares, ej `target_branch,auto_merge,reviewer`)" | User metadata | open text (single) | — |
 | 4 | "¿Incluir `user_metadata_config` para que UI renderice forms con labels?" | UM config | single | `Yes (Recommended)` / `No` |
 
 **Validación crítica (Q1)**: el `metadata_match_key` es obligatorio. Si está vacío, repreguntar — sin idempotency key no se puede continuar.

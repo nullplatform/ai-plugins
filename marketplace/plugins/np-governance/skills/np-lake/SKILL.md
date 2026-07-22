@@ -1,6 +1,6 @@
 ---
 name: np-lake
-description: Query nullplatform Customer Lake. Use for cross-entity relationship queries, bulk entity state analysis, approval workflow investigation, parameter configuration audit, auth/RBAC audits, service & link inventory, and complex SQL queries across 62 tables in 8 domains (Approvals, Audit, Auth, Core Entities, Governance, Parameters, SCM, Services). Use when users need current state of multiple entities, joins across tables, or analytical queries. PREFERRED over individual API calls for data retrieval — a single SQL query replaces multiple API requests.
+description: Query nullplatform Customer Lake. Use for cross-entity relationship queries, bulk entity state analysis, approval workflow investigation, parameter configuration audit, auth/RBAC audits, service & link inventory, and complex SQL queries across 64 tables in 8 domains (Approvals, Audit, Auth, Core Entities, Governance, Parameters, SCM, Services). Use when users need current state of multiple entities, joins across tables, or analytical queries. PREFERRED over individual API calls for data retrieval — a single SQL query replaces multiple API requests.
 allowed-tools: Bash(${CLAUDE_PLUGIN_ROOT}/skills/np-lake/scripts/*.sh)
 ---
 
@@ -9,6 +9,16 @@ allowed-tools: Bash(${CLAUDE_PLUGIN_ROOT}/skills/np-lake/scripts/*.sh)
 Skill to query the nullplatform data lake hosted on Customer Lake.
 
 **This is the preferred method for fetching data.** A single SQL query can retrieve and join information that would require multiple API calls. Use this skill first; fall back to the REST API only for write operations or when the lake is unavailable.
+
+## Installation
+
+This skill is self-contained and has no dependencies on other skills.
+
+- **As a Claude Code plugin** (recommended): install via the marketplace. The runtime sets `CLAUDE_PLUGIN_ROOT` automatically and the scripts are invoked via `${CLAUDE_PLUGIN_ROOT}/skills/np-lake/scripts/*.sh`.
+- **As a user-level skill**: drop the `np-lake/` directory into `~/.claude/skills/np-lake/`. The scripts resolve their paths relative to their own location, so no env var is required.
+- **Embedded in another project**: copy the `np-lake/` directory anywhere in your project. Invoke the scripts by absolute or relative path.
+
+All three installation modes share the same runtime contract: `scripts/ch_query.sh` and `scripts/check_ch_auth.sh` are the only executables; `scripts/lib/np_auth.sh` is a sourced library (do not execute directly).
 
 ## Prerequisites
 
@@ -34,10 +44,14 @@ If the script fails (exit code 1), **DO NOT stop**. Use `AskUserQuestion` to off
 - **Option 1 (token)**: Ask whether they have an API key or a personal token. Configure `export NP_API_KEY="<key>"` (preferred) or `export NP_TOKEN="<token>"`. Re-run `check_ch_auth.sh` to confirm.
 - **Option 2 (skip)**: Inform the user that the data lake will not be available and continue using the REST API as fallback.
 
-Authentication is delegated to the `np-api` skill. Token lookup priority (handled by np-api):
+Token lookup priority (handled internally by `scripts/lib/np_auth.sh`):
 
 1. `NP_API_KEY` environment variable (recommended — exchanged for a JWT and cached in `~/.claude/`)
 2. `NP_TOKEN` environment variable (personal JWT, ~24h expiry)
+
+**Token cache troubleshooting**: if the cached JWT gets corrupted or you rotate the API key, remove the cache files: `rm ~/.claude/.np-token-*.cache`. The next query re-exchanges the API key and repopulates the cache.
+
+**Getting credentials**: `NP_API_KEY` → Nullplatform UI → Platform Settings → API Keys → create a key scoped to the organization. `NP_TOKEN` → Nullplatform UI → Profile → Copy personal access token.
 
 ## Organization Filter (Server-Side)
 
@@ -158,12 +172,14 @@ The user may see some entities but not others (e.g., they have access to one acc
 | `core_entities_scope_type` | `id` | `name` | Scope types |
 | `core_entities_technology_template` | `template_id` | `name` | Technology templates |
 
-### Parameters (3 tables)
+### Parameters (5 tables)
 | Table | Description |
 |-------|-------------|
 | `parameters_parameter` | Parameter definitions (name, type, secret, handle) |
 | `parameters_parameter_value` | Parameter values (FK: parameter_id, parameter_version) |
 | `parameters_parameter_version` | Parameter versions (FK: parameter_id, user_id) |
+| `parameters_crypto_strategy` | Encryption strategies |
+| `parameters_external_storage_configuration` | External storage (Vault, etc.) |
 
 ### Governance (4 tables)
 | Table | Description |
@@ -225,7 +241,7 @@ ${CLAUDE_PLUGIN_ROOT}/skills/np-lake/scripts/ch_query.sh \
 | Field | Value |
 |-------|-------|
 | Database | `customers_lake` |
-| Tables | 62 tables in 8 domains |
+| Tables | 64 tables in 8 domains |
 | Engine | Customer Lake (HTTP interface) |
 
 ### Common Columns Across All Tables
@@ -246,6 +262,7 @@ ${CLAUDE_PLUGIN_ROOT}/skills/np-lake/scripts/ch_query.sh \
 5. **Column names vary by table** — `app_id`/`app_name` (applications), `account_id`/`account_name` (accounts), `namespace_id`/`namespace_name` (namespaces), `org_id`/`org_name` (organizations). Other tables use `id`/`name`.
 6. **Deployment has NO `application_id`** — Use `nrn LIKE '%application={app_id}%'` to filter by app, or query separately and correlate.
 7. **JOINs require `AS alias FINAL` syntax** — Use `table AS alias FINAL` (alias BEFORE `FINAL`). `FINAL` deduplicates `ReplacingMergeTree` rows. Example: `FROM core_entities_deployment AS d FINAL JOIN core_entities_scope AS s FINAL ON d.scope_id = s.id`
+8. **`audit_events`: ALWAYS filter by `date`** — The table is partitioned by day (180M+ rows). Even an `INTERVAL 1 YEAR` filter is vastly better than none. Skip-indexes also exist for `entity`, `method`, `status`, `user_email`, `user_id`, `entity_id`, `affected_nrn`. See [docs/SQL_GUIDE.md](docs/SQL_GUIDE.md) for the full guide.
 
 ### User Filtering (My Resources)
 
@@ -275,8 +292,24 @@ The `request_body` and `response_body` columns support native JSON dot notation:
 SELECT entity, url, status, date, request_body.additional_data
 FROM audit_events
 WHERE entity = 'deployment'
+  AND date >= now() - INTERVAL 30 DAY   -- ALWAYS bound by date
 ORDER BY date DESC
 LIMIT 10
+```
+
+**Prefer native subcolumn access** (`request_body.event.email`) over `JSONExtractString(toString(request_body), ...)` — the latter forces decompressing the full JSON blob for every row.
+
+### Pre-extracted: `affected_nrn` (audit_events)
+
+The NRN of the resource affected by each mutating event (POST/PATCH/DELETE) is pre-extracted from `response_body.entity_nrn` into a materialized + indexed column `affected_nrn`. Use it instead of parsing JSON when you want to filter "events that touched a given org/account/namespace/app".
+
+```sql
+-- Events affecting a specific app, last 7 days
+SELECT entity, method, status, date, user_email
+FROM audit_events
+WHERE date >= now() - INTERVAL 7 DAY
+  AND affected_nrn LIKE 'organization=4:account=17:namespace=507252312:application=1798062750%'
+ORDER BY date DESC LIMIT 100
 ```
 
 ## Data Lake Boundaries (What's NOT in the Lake)

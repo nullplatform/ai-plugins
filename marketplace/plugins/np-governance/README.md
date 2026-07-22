@@ -1,6 +1,6 @@
 # np-governance
 
-Governance Action Items: query and operate on action items, categories and suggestions; build new detector/executor agents with a guided wizard
+Governance & workflow authoring on the Nullplatform engine: query and operate on action items, categories and suggestions; build detector/executor agents; and author, publish, validate and test workflows (YAML, signals, triggers, config-entry secrets) — including the local kit (npx @nullplatform/workflow-kit) and the nullplatform/workflows corpus. Workflows commonly read the lake and drive action items, so all live together here.
 
 ## Version
 
@@ -14,7 +14,11 @@ description: This skill should be used when the user asks to "query the nullplat
 
 ### np-lake
 
-description: Query nullplatform Customer Lake. Use for cross-entity relationship queries, bulk entity state analysis, approval workflow investigation, parameter configuration audit, auth/RBAC audits, service & link inventory, and complex SQL queries across 62 tables in 8 domains (Approvals, Audit, Auth, Core Entities, Governance, Parameters, SCM, Services). Use when users need current state of multiple entities, joins across tables, or analytical queries. PREFERRED over individual API calls for data retrieval — a single SQL query replaces multiple API requests.
+description: Query nullplatform Customer Lake. Use for cross-entity relationship queries, bulk entity state analysis, approval workflow investigation, parameter configuration audit, auth/RBAC audits, service & link inventory, and complex SQL queries across 64 tables in 8 domains (Approvals, Audit, Auth, Core Entities, Governance, Parameters, SCM, Services). Use when users need current state of multiple entities, joins across tables, or analytical queries. PREFERRED over individual API calls for data retrieval — a single SQL query replaces multiple API requests.
+
+### np-workflow
+
+description: Build, publish, run, and debug workflows on the Nullplatform workflow engine via REST API. Use when the user asks to "create a workflow", "publish a workflow", "list workflow plugins", "trigger a webhook", "check an execution", "manage workflow secrets", "scaffold a workflow YAML", or any workflow-engine task. Requires NP_TOKEN or NP_API_KEY (same as np-api); NP_WORKFLOW_URL only for self-hosted engines (defaults to api.nullplatform.com).
 
 ### np-governance-action-items
 
@@ -28,14 +32,10 @@ description: Guided wizard to generate new Nullplatform Governance Action Item a
 
 ### From Plugin Marketplace
 
-Add the nullplatform marketplace once, then install this plugin:
-
-```bash
-claude plugin marketplace add https://github.com/nullplatform/ai-plugins
-claude plugin install np-governance@nullplatform
-```
-
-Or do it interactively inside Claude Code: run `/plugin`, use the **Marketplaces** tab to add `https://github.com/nullplatform/ai-plugins`, then find **np-governance** in the **Discover** tab and press Enter to install.
+1. Open Claude Code
+2. Go to Plugins
+3. Search for "np-governance"
+4. Click Install
 
 ### Manual Installation
 
@@ -70,6 +70,16 @@ This plugin requires the following permissions:
   "Bash(./.claude/skills/np-governance-agent-builder/scripts/*.sh:*)",
   "Bash(./.claude/skills/np-lake/scripts/ch_query.sh:*)",
   "Bash(./.claude/skills/np-lake/scripts/check_ch_auth.sh:*)",
+  "Bash(./.claude/skills/np-workflow/scripts/config.sh:*)",
+  "Bash(./.claude/skills/np-workflow/scripts/execution.sh:*)",
+  "Bash(./.claude/skills/np-workflow/scripts/ping.sh:*)",
+  "Bash(./.claude/skills/np-workflow/scripts/plugins.sh:*)",
+  "Bash(./.claude/skills/np-workflow/scripts/publish.sh:*)",
+  "Bash(./.claude/skills/np-workflow/scripts/run.sh:*)",
+  "Bash(./.claude/skills/np-workflow/scripts/scaffold.sh:*)",
+  "Bash(./.claude/skills/np-workflow/scripts/trigger.sh:*)",
+  "Bash(./.claude/skills/np-workflow/scripts/workflow-api.sh:*)",
+  "Bash(./.claude/skills/np-workflow/scripts/workflows.sh:*)",
   "Skill(np-api)",
   "Skill(np-api:*)",
   "Skill(np-governance-action-items)",
@@ -77,7 +87,9 @@ This plugin requires the following permissions:
   "Skill(np-governance-agent-builder)",
   "Skill(np-governance-agent-builder:*)",
   "Skill(np-lake)",
-  "Skill(np-lake:*)"
+  "Skill(np-lake:*)",
+  "Skill(np-workflow)",
+  "Skill(np-workflow:*)"
 ]
 ```
 

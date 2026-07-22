@@ -41,6 +41,8 @@ Crea una nueva aplicacion en un namespace.
 > y `/np-developer-actions exec-api` para ESCRITURA (paso 7). NUNCA usar `curl` ni
 > `/np-api` para operaciones POST.
 
+> **Tip:** dentro del bloque de discovery, las consultas que no dependen del resultado anterior son **independientes** y pueden ejecutarse **en paralelo** (ej. templates y metadata_specification, una vez que se tiene el namespace). Medido en uso real, paralelizar ~4 queries reduce el tiempo total ~3× respecto a serie, con resultados idénticos.
+
 #### Paso 0: Resolver entidades por nombre (np-lake)
 
 Si el usuario proporciona un nombre en lugar de un ID, buscar en np-lake:

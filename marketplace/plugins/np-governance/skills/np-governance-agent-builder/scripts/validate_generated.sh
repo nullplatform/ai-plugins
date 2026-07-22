@@ -103,12 +103,13 @@ if [ -d "${SKILL_DIR}/scripts" ]; then
     fi
 fi
 
-# --- Check 9: user_metadata only contains scalars (in templates) ---
-# Best-effort grep: complain if templates show user_metadata containing { or [
+# --- Check 9: user_metadata contains scalars or arrays of scalars ---
+# Best-effort grep: complain only if a user_metadata value is a nested object
+# ({ after the key). Arrays of scalars ([ ... ]) are valid and not flagged.
 if [ -d "${SKILL_DIR}/scripts" ]; then
     while IFS= read -r line; do
-        WARNINGS+=("user_metadata may contain non-scalar value: $line")
-    done < <(grep -rnE 'user[_-]metadata.*[\{\[]' "${SKILL_DIR}/scripts/" 2>/dev/null || true)
+        WARNINGS+=("user_metadata may contain a nested object (only scalars or arrays of scalars are allowed): $line")
+    done < <(grep -rnE 'user[_-]metadata"?[[:space:]]*[:=].*:[[:space:]]*\{' "${SKILL_DIR}/scripts/" 2>/dev/null || true)
 fi
 
 # --- Check 10: detect.sh idempotency call ---

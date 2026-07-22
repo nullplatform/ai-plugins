@@ -15,6 +15,8 @@ Seguir estos pasos en orden:
 > y `/np-developer-actions exec-api` para ESCRITURA (paso 8). NUNCA usar `curl` ni
 > `/np-api` para operaciones POST/PUT/DELETE.
 
+> **Tip:** los pasos 2–5 de discovery (scope_types, capabilities, dimensions, approvals, scopes existentes) son **independientes entre sí** una vez que se tiene el NRN de la aplicación del Paso 1. Pueden ejecutarse **en paralelo**. Medido en uso real, paralelizar 4 queries reduce el tiempo total de ~3.3 s a ~1.0 s, con resultados idénticos.
+
 #### Paso 0: Resolver app_id por nombre (np-lake)
 
 Si el usuario proporciona un nombre de aplicacion en lugar de un ID:
@@ -404,6 +406,34 @@ Si hay hooks bloqueando:
 **NOTA**: Los approvals tienen precedencia sobre hooks — se evalúan primero. Si hay approval
 Y hooks, el approval se resuelve primero y luego se ejecutan los hooks.
 
+#### Paso 10: Checklist pre-deployment
+
+El `POST /scope` crea el scope con `asset_name: null`. El deployment requiere que el scope tenga un `asset_name` seteado **que coincida con el `name` de algún asset del release que se va a desplegar**. Sin esto, el `POST /deployment` falla con un mensaje engañoso (`"The scope and the release belongs to different applications"`, aunque el `application_id` del scope y del release coincidan).
+
+**Patrón recomendado:**
+
+1. Consultar los assets del build que se va a desplegar:
+
+   ```bash
+   np-api fetch-api "/asset?build_id=<build_id>"
+   ```
+
+   El campo `name` de cada asset es el valor válido para `asset_name` (ej: `"main"`, `"docker-image-asset"`, u otro nombre definido por el build system de la organización).
+
+2. Setearlo en el scope:
+
+   ```bash
+   action-api.sh exec-api --method PATCH --data '{"asset_name":"<name_del_asset>"}' "/scope/<scope_id>"
+   ```
+
+3. Verificar:
+
+   ```bash
+   np-api fetch-api "/scope/<scope_id>" | jq .asset_name
+   ```
+
+> **Por qué no se setea en el POST:** el scope se crea antes de elegir el build a desplegar, por eso `asset_name` no es parte del `POST /scope`. El flujo de deploy en `deployments.md` Paso 5 reitera este requisito.
+
 ### Campos requeridos (POST /scope)
 
 - `application_id` (number): ID de la aplicación
@@ -497,6 +527,31 @@ Y hooks, el approval se resuelve primero y luego se ejecutan los hooks.
 
 > **NOTA**: El body de Scheduled Task usa capabilities planas (no por slug) porque es tipo `custom`
 > con provider UUID. La estructura de capabilities depende del `parameters.schema` del scope_type.
+
+### Body para scope tipo `custom` — patrón general
+
+Los scope types `custom` son el mecanismo genérico que Nullplatform ofrece para que cada organización defina sus propios tipos (p. ej., contenedores especializados, batch jobs, static sites). El ejemplo anterior muestra un caso (Scheduled Task); para cualquier otro tipo custom, el body se arma siguiendo este patrón:
+
+| Campo | Valor |
+| --- | --- |
+| `type` | Literal `"custom"` |
+| `provider` | UUID del scope_type (campo `provider_id` obtenido en Paso 2). **No** se mapea a un string fijo como ocurre con los tipos nativos |
+| `dimensions` | Igual que cualquier scope |
+| `requested_spec` | Igual que cualquier scope (`cpu_profile`, `memory_in_gb`, `local_storage_in_gb`) |
+| `capabilities` | Objeto cuyas **keys y estructura vienen del `parameters.schema` del scope_type** |
+
+#### Cómo leer el `parameters.schema` del scope_type
+
+El schema está en la respuesta del Paso 2 (`/scope_type?...&include=capabilities,wildcard,available`), dentro de `parameters.schema.properties`. Cada property define un campo del `capabilities`:
+
+- `required: [...]`: campos obligatorios en `capabilities`.
+- `properties.<campo>.type`: tipo del valor (string, integer, boolean, object, array).
+- `properties.<campo>.default`: si tiene default, se puede omitir (se usará el default).
+- `properties.<campo>.enum` / `oneOf[].const` / `anyOf[].const`: los valores válidos.
+- `properties.<campo>.properties`: estructura anidada (para objetos).
+- `properties.<campo>.description` / `title`: texto útil para presentar opciones al usuario.
+
+Con estos elementos, se construye `capabilities.<campo>` respetando tipo, obligatoriedad y valores válidos. Los campos con default pueden omitirse sin riesgo.
 
 ### Consultas previas (via /np-api)
 

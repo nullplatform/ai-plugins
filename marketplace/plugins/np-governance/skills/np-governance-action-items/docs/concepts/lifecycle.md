@@ -5,11 +5,11 @@
 | Status | Description |
 |--------|-------------|
 | `open` | Estado inicial, en progreso |
-| `pending_deferral` | Esperando aprobación humana para diferir (si `config.requires_approval_to_defer=true`) |
-| `deferred` | Diferido hasta `deferred_until`. Se reabre automáticamente cuando vence |
-| `pending_verification` | Esperando verificación antes de marcar resuelto (si `config.requires_verification=true`) |
+| `pending_deferral` | Esperando aprobación para diferir (cuando la policy del servicio de aprobaciones lo requiere) |
+| `deferred` | Diferido hasta `deferred_until`. Al vencer NO se reabre solo salvo que la plataforma tenga activo el job de expiración (ver nota abajo); si no, queda `deferred` hasta un `reopen` manual |
+| `pending_verification` | Esperando verificación antes de marcar resuelto (cuando la policy del servicio de aprobaciones lo requiere) |
 | `resolved` | Resuelto exitosamente. Set `resolved_at`. Terminal |
-| `pending_rejection` | Esperando aprobación para rechazar (si `config.requires_approval_to_reject=true`) |
+| `pending_rejection` | Esperando aprobación para rechazar (cuando la policy del servicio de aprobaciones lo requiere) |
 | `rejected` | Rechazado intencionalmente. Terminal |
 | `closed` | Cerrado por su creador (el flujo equivalente a "ya no aplica"). Terminal |
 
@@ -38,55 +38,53 @@
 
 ### Detalle por flujo
 
+Las transiciones se disparan **solo** con los endpoints POST de acción (`defer` / `reject` / `resolve` / `reopen` / `close`). Que un `defer` / `reject` / `resolve` requiera aprobación lo decide la **política de aprobaciones de la plataforma**, no la `config` del item. Cuando se requiere aprobación, la acción deja el item en el `pending_*` correspondiente y crea un pedido de aprobación; cuando el reviewer decide, la plataforma completa el flujo — el item transiciona, el reviewer queda como `actor` en el audit log y su mensaje (`review_message`) se registra como comment y detalle de audit. Un agente/consumidor **no puede aprobar ni denegar** por esta API: solo puede consultar el status con `GET` y esperar.
+
+En `defer` / `reject` / `resolve`, el campo opcional `category` (string libre 1-100) se registra únicamente en el audit log; no afecta la lógica de estado.
+
 **Defer (request)**:
-1. `POST /governance/action_item/:id/defer` con `{until, reason, actor}`.
-2. Si `config.requires_approval_to_defer = true` → status pasa a `pending_deferral`.
-3. Si no → status pasa directo a `deferred`, set `deferred_until`, increment `deferral_count`.
-4. Validaciones: `max_deferral_count` y `max_deferral_days` no pueden superarse.
+1. `POST /governance/action_item/:id/defer` con `{defer_until, reason?, category?, actor?}`. `defer_until` acepta formato `date` (`YYYY-MM-DD`) o `date-time`.
+2. Si la policy de aprobaciones lo requiere → status pasa a `pending_deferral` y se crea el pedido de aprobación.
+3. Si no → status pasa directo a `deferred`, set `deferred_until`, increment `deferral_count`. Si se dio `reason`, se persiste también como comment.
+4. Validaciones: `config.max_deferral_count` y `config.max_deferral_days` (ambos vigentes) no pueden superarse.
 
 **Defer (approval)**:
-- `POST /governance/action_item/:id/approve` con `{actor}` mientras está en `pending_deferral` → pasa a `deferred`.
-- `POST /governance/action_item/:id/deny` con `{actor, comment}` → vuelve a `open`.
+- Lo completa la plataforma cuando el reviewer decide (ver arriba).
+- Aprobado → `deferred` (set `deferred_until`, increment `deferral_count`). Si el reviewer dejó `review_message`, queda como comment y en el audit.
+- Denegado o cancelado → vuelve a `open` con un comment automático: el `review_message` del reviewer o, si no hay, un fallback fijo (`Deferral request was denied during approval.` / `Deferral request was withdrawn before approval.`).
 
 **Auto-reopen de deferred**:
-- Background job busca items con `status=deferred` y `deferred_until <= NOW()` y los pasa a `open` automáticamente.
+- La reapertura al vencer (`status=deferred` con `deferred_until <= NOW()` → `open`, audit action `deferral_expired`) existe en la API como operación (`reopenExpiredDeferrals`) pero **no la dispara ningún scheduler dentro del servicio**: depende de un job de plataforma externo que la invoque. Si ese job no está activo en tu deployment, los items diferidos NO vuelven a `open` solos — hay que reabrirlos con `reopen_action_item.sh`. Confirmá con el equipo de plataforma si el job corre en tu entorno.
 
 **Resolve (request)**:
-- `POST /governance/action_item/:id/resolve` con `{actor}`.
-- Si `config.requires_verification = true` → `pending_verification`.
+- `POST /governance/action_item/:id/resolve` con `{resolution?, evidence_url?, category?, actor?}` — sin campos requeridos; body estricto (claves extra → 400). `resolution` se persiste también como comment.
+- Si la policy de aprobaciones lo requiere → `pending_verification`.
 - Si no → `resolved` directo, set `resolved_at`.
 
 **Resolve (approval)**:
-- `POST /.../approve` mientras está en `pending_verification` → `resolved`.
-- `POST /.../deny` → vuelve a `open`.
+- Lo completa la plataforma cuando el reviewer decide (ver arriba).
+- Aprobado → `resolved` (set `resolved_at`).
+- Denegado o cancelado → vuelve a `open` con un comment automático (`review_message` del reviewer o el fallback de Resolution).
 
 **Reject (request)**:
-- `POST /governance/action_item/:id/reject` con `{reason, actor}`.
-- Si `config.requires_approval_to_reject = true` → `pending_rejection`.
+- `POST /governance/action_item/:id/reject` con `{reason, category?, actor?}` — **`reason` es requerido** (1-2000 chars) y se persiste como comment.
+- Si la policy de aprobaciones lo requiere → `pending_rejection`.
 - Si no → `rejected` directo.
 
 **Reject (approval)**:
-- `POST /.../approve` mientras está en `pending_rejection` → `rejected`.
-- `POST /.../deny` → vuelve a `open`.
+- Lo completa la plataforma cuando el reviewer decide (ver arriba).
+- Aprobado → `rejected`.
+- Denegado o cancelado → vuelve a `open` con un comment automático (`review_message` del reviewer o el fallback de Rejection).
 
 **Reopen** (manual):
-- `POST /governance/action_item/:id/reopen` con `{actor}` desde `rejected` o `deferred` → `open`. Limpia `resolved_at` y `deferred_until`.
+- `POST /governance/action_item/:id/reopen` desde `rejected` o `deferred` → `open`. El body se ignora por completo — la identidad (`actor`) se resuelve del token; este endpoint no tiene canal de `actor` en el body. Limpia `resolved_at` y `deferred_until`.
 
 **Close**:
-- `POST /governance/action_item/:id/close` con `{actor}` desde `open` → `closed`. Set `resolved_at`. Terminal.
+- `POST /governance/action_item/:id/close` con `{reason?}` desde `open` → `closed`. `reason` se registra en el audit log. Set `resolved_at`. Terminal.
 
-### Cambios via PATCH directo
+### Cambios de status: solo vía endpoints de acción
 
-`PATCH /governance/action_item/:id` con `{status: "..."}` también funciona para transiciones simples (sin pasar por los endpoints de lifecycle), pero **no respeta `config.requires_*`**. Preferir los endpoints específicos cuando hay aprobaciones de por medio.
-
-Ejemplo válido para agentes que verifican externamente:
-```json
-PATCH /governance/action_item/abc123
-{
-  "status": "resolved",
-  "actor": "agent:vuln-scanner"
-}
-```
+Las transiciones de estado se hacen **exclusivamente** con los endpoints POST de acción de arriba. Un intento de cambiar `status` vía `PATCH` / `PUT` se deniega con **401** (el stack de auth mapea toda denegación de autorización a 401, no a 403). El claim `governance:action_item:update` alcanza para editar campos (`PATCH` / `PUT`) y agregar comentarios, pero **no** para cambiar el status.
 
 ## Estados terminales
 
@@ -94,4 +92,4 @@ PATCH /governance/action_item/abc123
 
 ## Audit log
 
-Cada transición se registra automáticamente en `audit_logs`. Los detalles incluyen el actor, el `from`/`to` del status, y la razón si fue provista.
+Cada transición se registra automáticamente en `audit_logs`. Cada entrada incluye el `actor`, el `from`/`to` del status y, según el caso, `reason`, `category`, `resolution`, `evidence_url`, `deferred_until`, `review_message` o `comment`. En las entradas generadas por una aprobación, el `actor` es el **reviewer**. Ver el vocabulario completo de `action` en `model.md`.

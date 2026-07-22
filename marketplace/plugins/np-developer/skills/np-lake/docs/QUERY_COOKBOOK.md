@@ -133,15 +133,32 @@ ORDER BY created_at DESC
 LIMIT 10
 ```
 
-### Deployments by NRN (per application)
+### Deployments by application (preferred: JOIN through scope)
 
-Since deployments have no `application_id`, use NRN prefix to filter by app:
+Since deployments have no `application_id`, join through scope to filter by app:
 
 ```sql
+SELECT d.id, d.status, d.strategy, d.scope_id, d.release_id, d.created_by, d.created_at
+FROM core_entities_deployment AS d FINAL
+JOIN core_entities_scope AS s FINAL ON d.scope_id = s.id AND s._deleted = 0
+WHERE d._deleted = 0
+AND s.application_id = {app_id}
+ORDER BY d.created_at DESC
+LIMIT 20
+```
+
+### Deployments by NRN prefix (alternative)
+
+If using NRN filtering, ALWAYS use the full prefix with parents (never leading `%`):
+
+```sql
+-- First resolve the full NRN prefix from the application:
+-- SELECT nrn FROM core_entities_application FINAL WHERE _deleted = 0 AND app_id = {app_id}
+-- Then use the returned NRN as prefix:
 SELECT id, status, strategy, scope_id, release_id, created_by, created_at
 FROM core_entities_deployment FINAL
 WHERE _deleted = 0
-AND nrn LIKE '%application={app_id}%'
+AND nrn LIKE 'organization={org_id}:account={acct_id}:namespace={ns_id}:application={app_id}%'
 ORDER BY created_at DESC
 LIMIT 20
 ```
@@ -284,7 +301,7 @@ LIMIT 20
 SELECT id, name, type, secret, handle, encoding, read_only, nrn
 FROM parameters_parameter FINAL
 WHERE _deleted = 0
-AND nrn LIKE '%application={app_id}%'
+AND nrn LIKE 'organization={org_id}:account={account_id}:namespace={namespace_id}:application={app_id}%'
 ORDER BY name
 LIMIT 100
 ```
@@ -375,42 +392,89 @@ LIMIT 20
 
 ## Audit Events
 
-### Recent events
+> ⚠️ **`audit_events` is partitioned by `date` (daily) and has 180M+ rows.**
+> **Every query MUST include a `date` filter** — without it, the engine scans the full ~35 GiB table. Even an `INTERVAL 1 YEAR` is far better than no bound.
+> Skip-indexes also exist for `entity`, `method`, `status`, `user_email`, `user_id`, `entity_id`, `affected_nrn` — filtering by these is cheap.
+
+### Recent events (last 24h)
 
 ```sql
 SELECT entity, method, url, status, entity_id, user_id, user_email, date
 FROM audit_events
+WHERE date >= now() - INTERVAL 24 HOUR
 ORDER BY date DESC
 LIMIT 50
 ```
 
-### Events by user
+### Events by user (last 30 days)
 
 ```sql
 SELECT entity, method, url, status, entity_id, date
 FROM audit_events
-WHERE user_email = '{email}'
+WHERE date >= now() - INTERVAL 30 DAY
+  AND user_email = '{email}'
 ORDER BY date DESC
 LIMIT 50
 ```
 
-### Deployment events
+### Deployment events (last 7 days)
 
 ```sql
 SELECT entity, method, url, status, entity_id, user_email, date
 FROM audit_events
-WHERE entity = 'deployment'
+WHERE date >= now() - INTERVAL 7 DAY
+  AND entity = 'deployment'
 ORDER BY date DESC
 LIMIT 20
 ```
 
-### Access JSON fields
+### Failed mutations in the last 24h
+
+```sql
+SELECT entity, method, url, status, user_email, date
+FROM audit_events
+WHERE date >= now() - INTERVAL 24 HOUR
+  AND method IN ('POST','PATCH','DELETE')
+  AND status >= 400
+ORDER BY date DESC
+LIMIT 50
+```
+
+### Events affecting a specific application
+
+Use the pre-extracted `affected_nrn` column (faster than parsing JSON):
+
+```sql
+SELECT entity, method, status, date, user_email
+FROM audit_events
+WHERE date >= now() - INTERVAL 7 DAY
+  AND affected_nrn LIKE 'organization=4:account=17:namespace=507252312:application=1798062750%'
+ORDER BY date DESC LIMIT 100
+```
+
+### Activity per namespace (mutations created)
+
+```sql
+SELECT
+  toInt64OrZero(extractAll(affected_nrn, 'namespace=(\d+)')[1]) AS namespace_id,
+  count() AS mutations
+FROM audit_events
+WHERE date >= now() - INTERVAL 30 DAY
+  AND method = 'POST'
+  AND affected_nrn != ''
+GROUP BY namespace_id
+HAVING namespace_id > 0
+ORDER BY mutations DESC LIMIT 20
+```
+
+### Access JSON fields (native subcolumn)
 
 ```sql
 SELECT entity, url, status, date,
-       request_body.additional_data
+       request_body.event.email AS user_email
 FROM audit_events
-WHERE entity = 'login_success'
+WHERE date >= now() - INTERVAL 7 DAY
+  AND entity = 'login_success'
 ORDER BY date DESC
 LIMIT 10
 ```
@@ -454,6 +518,26 @@ LIMIT 10
 ---
 
 ## Performance Tips
+
+### NRN filtering — ALWAYS use full prefix
+
+When filtering by NRN, build the full hierarchical prefix from `organization=` down. **Never** use a leading wildcard (`LIKE '%application=123%'`) — it disables index usage and forces a full scan.
+
+```sql
+-- ✅ Good: anchored prefix, index-friendly
+WHERE nrn LIKE 'organization=123:account=456:namespace=789:application=012%'
+
+-- ❌ Bad: leading wildcard, full scan
+WHERE nrn LIKE '%application=012%'
+```
+
+If you only have the leaf ID (e.g., `app_id`), resolve the full NRN first:
+
+```sql
+SELECT nrn FROM core_entities_application FINAL WHERE _deleted = 0 AND app_id = {app_id}
+```
+
+Then use the returned value as the anchored prefix in the second query.
 
 ### Date filtering
 
@@ -502,6 +586,19 @@ AND created_at >= now() - INTERVAL 7 DAY
 
 ## Auth
 
+> **`auth_resource_grants_expanded` is a View** — do NOT use `FINAL` or `WHERE _deleted = 0` on it. Query it directly.
+
+### List active users
+
+```sql
+SELECT id, email, first_name, last_name, user_type, status, provider, created_at
+FROM auth_user FINAL
+WHERE _deleted = 0
+AND status = 'active'
+ORDER BY email
+LIMIT 50
+```
+
 ### Find a user by email
 
 ```sql
@@ -510,6 +607,27 @@ FROM auth_user FINAL
 WHERE _deleted = 0
 AND email ILIKE '%{search:String}%'
 LIMIT 20
+```
+
+### Count users by type and status
+
+```sql
+SELECT user_type, status, count() AS total
+FROM auth_user FINAL
+WHERE _deleted = 0
+GROUP BY user_type, status
+ORDER BY user_type, total DESC
+```
+
+### List active roles
+
+```sql
+SELECT id, name, slug, level, status, organization_id
+FROM auth_role FINAL
+WHERE _deleted = 0
+AND status = 'active'
+ORDER BY level, name
+LIMIT 50
 ```
 
 ### List every role a user has, with the NRN it applies to
@@ -536,6 +654,58 @@ ORDER BY users DESC
 LIMIT 50
 ```
 
+### List all active grants on a resource NRN prefix
+
+```sql
+SELECT g.id, g.user_id, u.email, g.role_id, r.name AS role_name, r.level, g.status, g.created_at
+FROM auth_resource_grants AS g FINAL
+JOIN auth_user AS u FINAL ON u.id = g.user_id AND u._deleted = 0
+JOIN auth_role AS r FINAL ON r.id = g.role_id AND r._deleted = 0
+WHERE g._deleted = 0
+AND g.status = 'active'
+AND g.nrn LIKE 'organization={org_id}:account={acct_id}%'
+ORDER BY g.created_at DESC
+LIMIT 50
+```
+
+### Users with a specific role on a resource (NRN prefix)
+
+```sql
+SELECT g.user_id, g.role_name, g.role_level, g.nrn, g.created_at,
+       u.email, u.first_name, u.last_name
+FROM auth_resource_grants_expanded AS g
+JOIN auth_user AS u FINAL ON g.user_id = u.id
+WHERE u._deleted = 0
+AND g.status = 'active'
+AND g.nrn LIKE 'organization={org_id}%'
+AND g.role_slug = '{role_slug}'
+ORDER BY g.created_at DESC
+LIMIT 50
+```
+
+### API keys for a user
+
+```sql
+SELECT id, name, status, masked_api_key, roles, internal, used_at, created_at
+FROM auth_apikey FINAL
+WHERE _deleted = 0
+AND user_id = {user_id}
+ORDER BY created_at DESC
+LIMIT 20
+```
+
+### List active API keys (non-internal)
+
+```sql
+SELECT id, name, masked_api_key, status, used_at, created_at, nrn
+FROM auth_apikey FINAL
+WHERE _deleted = 0
+AND status = 'active'
+AND internal = 0
+ORDER BY created_at DESC
+LIMIT 50
+```
+
 ### API keys touched in the last N days
 
 ```sql
@@ -556,6 +726,18 @@ WHERE _deleted = 0
 AND used_at IS NULL
 ORDER BY created_at DESC
 LIMIT 100
+```
+
+### Find API keys not used recently
+
+```sql
+SELECT id, name, masked_api_key, status, used_at, created_at, nrn
+FROM auth_apikey FINAL
+WHERE _deleted = 0
+AND status = 'active'
+AND (used_at IS NULL OR used_at < now() - INTERVAL 90 DAY)
+ORDER BY used_at ASC
+LIMIT 50
 ```
 
 ---
@@ -640,4 +822,123 @@ FROM services_parameters FINAL
 WHERE _deleted = 0 AND deleted_at IS NULL
 AND service_id = {service_id:UUID}
 LIMIT 100
+```
+
+### List active services with their specification name
+
+```sql
+SELECT s.id, s.name, s.type, s.status, sp.name AS spec_name, s.entity_nrn, s.created_at
+FROM services_services AS s FINAL
+LEFT JOIN services_service_specifications AS sp FINAL
+  ON sp.id = s.specification_id AND sp._deleted = 0
+WHERE s._deleted = 0 AND s.deleted_at IS NULL
+AND s.status = 'active'
+ORDER BY s.type, s.name
+LIMIT 100
+```
+
+### List failed services
+
+```sql
+SELECT id, name, type, status, messages, entity_nrn, updated_at
+FROM services_services FINAL
+WHERE _deleted = 0 AND deleted_at IS NULL
+AND status = 'failed'
+ORDER BY updated_at DESC
+LIMIT 50
+```
+
+### Count services by type and status
+
+```sql
+SELECT type, status, count() AS total
+FROM services_services FINAL
+WHERE _deleted = 0 AND deleted_at IS NULL
+GROUP BY type, status
+ORDER BY type, total DESC
+```
+
+### List active links for a specific service
+
+```sql
+SELECT l.id, l.name, l.status, l.entity_nrn, ls.name AS link_type, l.created_at
+FROM services_links AS l FINAL
+LEFT JOIN services_link_specifications AS ls FINAL
+  ON ls.id = l.specification_id AND ls._deleted = 0
+WHERE l._deleted = 0 AND l.deleted_at IS NULL
+AND l.status = 'active'
+AND l.service_id = {service_id:UUID}
+ORDER BY l.created_at DESC
+LIMIT 50
+```
+
+### List recent action executions on a service
+
+```sql
+SELECT a.id, a.name, a.status, a.created_by, a.created_at, a.updated_at
+FROM services_actions AS a FINAL
+WHERE a._deleted = 0 AND a.deleted_at IS NULL
+AND a.service_id = {service_id:UUID}
+ORDER BY a.created_at DESC
+LIMIT 20
+```
+
+### List available service specification types
+
+```sql
+SELECT id, name, slug, type, created_at
+FROM services_service_specifications FINAL
+WHERE _deleted = 0
+ORDER BY type, name
+LIMIT 50
+```
+
+### Services for an application (via entity_nrn prefix)
+
+```sql
+SELECT id, name, slug, status, type, specification_id, entity_nrn, created_at
+FROM services_services FINAL
+WHERE _deleted = 0 AND deleted_at IS NULL
+AND entity_nrn LIKE 'organization={org_id}:account={account_id}:namespace={namespace_id}:application={app_id}%'
+ORDER BY created_at DESC
+LIMIT 20
+```
+
+### Failed or non-active services
+
+```sql
+SELECT id, name, status, type, entity_nrn, messages, created_at, updated_at
+FROM services_services FINAL
+WHERE _deleted = 0 AND deleted_at IS NULL
+AND status != 'active'
+ORDER BY updated_at DESC
+LIMIT 20
+```
+
+### Links for an application (via entity_nrn prefix)
+
+```sql
+SELECT l.id, l.name, l.status, l.service_id, l.entity_nrn,
+       s.name AS service_name, s.type AS service_type
+FROM services_links AS l FINAL
+JOIN services_services AS s FINAL ON l.service_id = s.id
+WHERE l._deleted = 0 AND l.deleted_at IS NULL
+AND l.entity_nrn LIKE 'organization={org_id}:account={account_id}:namespace={namespace_id}:application={app_id}%'
+ORDER BY l.created_at DESC
+LIMIT 20
+```
+
+### Exported parameters by service (via entity_nrn prefix)
+
+Use when you need the application-level wiring (DATABASE_URL, REDIS_HOST, etc.) across all services attached to an app:
+
+```sql
+SELECT sp.id, sp.target, sp.type, sp.entity_nrn, sp.parameter_id,
+       s.name AS service_name, s.type AS service_type
+FROM services_parameters AS sp FINAL
+JOIN services_services AS s FINAL ON sp.service_id = s.id
+WHERE sp._deleted = 0 AND sp.deleted_at IS NULL
+AND sp.entity_nrn LIKE 'organization={org_id}:account={account_id}:namespace={namespace_id}:application={app_id}%'
+ORDER BY sp.created_at DESC
+LIMIT 50
 ```

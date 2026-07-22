@@ -26,8 +26,8 @@ get_suggestion.sh \
 ```bash
 create_suggestion.sh \
   --action-item-id <ai_id> \
-  --created-by "agent:vuln-scanner" \
   --owner "executor:pr-creator" \
+  [--created-by "agent:vuln-scanner"] \
   [--confidence 0.95] \
   [--description "..."] \
   [--metadata '{"action_type":"...","..."}'] \
@@ -37,8 +37,8 @@ create_suggestion.sh \
 ```
 
 **Validations**:
-- `user_metadata` solo acepta scalars (string/number/boolean/null). Anidar objetos da 400.
-- `created_by` y `owner` son requeridos.
+- `user_metadata` acepta scalars (string/number/boolean/null) o arrays de scalars. Anidar objetos da 400 (validado solo en el PATCH sin `status`; el create no valida esto).
+- `owner` es requerido. `created_by` es opcional: la API resuelve la identidad a partir del token y solo lo honra para llamadores con derechos de delegación; si no, se ignora y se registra la identidad del token.
 
 ## update_suggestion.sh
 
@@ -56,7 +56,10 @@ update_suggestion.sh \
   [--execution-result '{"success":true,...}']
 ```
 
-`user_metadata` se mergea (no resetea): mandar `{"key1":"new"}` solo cambia `key1`.
+El comportamiento de `user_metadata` depende de si el PATCH incluye `--status`:
+
+- **Sin `--status`** (edición de campos): `user_metadata` se **reemplaza** por completo. Mandar `{"key1":"new"}` borra las demás claves — para conservar el resto, incluí el objeto completo.
+- **Con `--status`** (transición): `user_metadata` se **mergea** (solo cambian las claves que mandes), pero en ese mismo request `--description`, `--confidence` y `--expires-at` se **ignoran** (el path de cambio de status solo aplica `user_metadata`, `metadata` y `execution_result`). Hacé la edición de campos en un PATCH aparte, sin `--status`.
 
 ## approve_suggestion.sh
 

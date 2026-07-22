@@ -1,0 +1,19 @@
+id: WORKFLOW_ID
+name: WORKFLOW_NAME
+description: Webhook that echoes the request body back through a log step.
+
+triggers:
+  - id: incoming
+    type: trigger
+    pluginType: webhook
+    config:
+      path: /WORKFLOW_ID
+      method: POST
+
+steps:
+  - id: log-request
+    type: module
+    pluginType: log
+    inputs:
+      message: "Received body=${{ $item.body }} headers=${{ $item.headers }}"
+    dependsOn: [incoming]

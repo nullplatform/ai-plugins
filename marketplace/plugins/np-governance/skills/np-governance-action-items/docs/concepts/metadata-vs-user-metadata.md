@@ -8,7 +8,7 @@ Tres campos JSON con propósitos distintos en suggestions (y solo `metadata` en 
 |-------|-----------|-----------|-----------|---------------|
 | `metadata` | Detector agent | Executor agent | Free-form (puede anidar objetos y arrays) | Always (PATCH sin status) |
 | `user_metadata` | Human user | Executor agent | **Flat** key/value (solo `string`/`number`/`boolean`/`null`) | Solo `pending` y `failed` |
-| `user_metadata_config` | Detector agent | UI (forms) | Schema descriptivo de cada key de `user_metadata` | Always |
+| `user_metadata_config` | Detector agent | UI (forms) | **JSON Schema** (`type: object` + `properties` en la raíz) que describe `user_metadata` | Always |
 
 ## `metadata`
 
@@ -43,10 +43,10 @@ Parámetros que el **usuario humano** puede ajustar **antes de aprobar** la sugg
 
 | Rule | Detail |
 |------|--------|
-| Solo escalares | `string`, `number`, `boolean`, `null`. **NO** objects, NO arrays |
+| Escalares o arrays de escalares | Valores `string`, `number`, `boolean`, `null`, o arrays de esos. **NO** objetos anidados |
 | Flat | No keys nested. Solo un nivel de profundidad |
 | Editable solo en `pending`/`failed` | En `approved`/`applied`/`rejected`/`expired` está locked |
-| Merge no replace | PATCH con `{"user_metadata": {"key1": "new"}}` solo cambia `key1`, no resetea el resto |
+| Merge o replace según el request | Un PATCH **con** `status` mergea (solo cambia las claves que mandes); un PATCH **sin** `status` **reemplaza** el campo completo. Ver `operations/suggestions-crud.md` |
 
 ```json
 {
@@ -66,48 +66,53 @@ const targetBranch = suggestion.user_metadata?.target_branch || 'main';
 const autoMerge = suggestion.user_metadata?.auto_merge === 'true';  // string→bool
 ```
 
-**Anti-patrón**: meter objetos o arrays en `user_metadata`. La API lo rechaza con 400.
+**Anti-patrón**: meter objetos anidados en `user_metadata`. La API lo rechaza con 400 (arrays de escalares sí se aceptan). Nota: esta validación se aplica en el PATCH sin `status`; el create de la suggestion no la valida.
 
 ## `user_metadata_config`
 
-Schema descriptivo opcional que describe **cada key** de `user_metadata`. Permite a las UIs renderizar forms con labels, descripciones, types, defaults.
+Schema opcional que describe `user_metadata` para que la UI renderice un form. **Es un JSON Schema plano** (`type: object` con `properties` en la raíz) — la UI de action items (admin-dashboard `SuggestionCard`) lo pasa DIRECTO a `DynamicForm` (JSONForms).
+
+**Reglas verificadas contra la UI real (2026-07-20):**
+
+1. **El form solo se renderiza si `user_metadata` tiene claves.** El gate es `hasUserMetadata` — un config perfecto con `user_metadata: {}` no muestra NADA. Por eso el detector debe **seedear `user_metadata` con los defaults** al crear la suggestion (el humano los ajusta antes de aprobar; el executor lee los valores finales).
+2. **El schema va en la raíz, sin wrappers.** Un `{"schema": {...}}` anidado se ignora y la UI degrada a un auto-schema plano generado desde los values (pierde labels, enums y descripciones).
+3. **Enums con labels humanos: `oneOf` con `const` + `title`.** JSONForms (`isOneOfEnumSchema`) muestra el `title` y guarda el `const` — el executor sigue leyendo valores machine-readable.
+4. **Cuidado con `pattern` en campos opcionales**: un string vacío seedeado que no matchea el pattern deja el form en error y bloquea el save. Preferir describir el formato en `description`.
+5. **`description` de la suggestion es MARKDOWN**: la UI la renderiza con ReactMarkdown — estructurarla (negritas, listas numeradas), un párrafo corrido se lee pésimo.
 
 ```json
 {
   "user_metadata_config": {
-    "target_branch": {
-      "label": "Target Branch",
-      "description": "Branch where the fix PR will be created",
-      "type": "string",
-      "default": "main"
-    },
-    "auto_merge": {
-      "label": "Auto Merge",
-      "description": "Auto-merge the PR after CI passes",
-      "type": "boolean",
-      "default": "false"
-    },
-    "reviewer": {
-      "label": "Reviewer",
-      "description": "GitHub username to request review from",
-      "type": "string",
-      "default": "team-lead"
+    "type": "object",
+    "properties": {
+      "deploy_timing": {
+        "type": "string",
+        "title": "How to apply",
+        "oneOf": [
+          { "const": "next-deploy", "title": "Apply only — ships with the next regular deploy" },
+          { "const": "now", "title": "Deploy now" },
+          { "const": "scheduled", "title": "Schedule the deploy" }
+        ],
+        "default": "next-deploy"
+      },
+      "deploy_at": {
+        "type": "string",
+        "title": "Scheduled deploy time — optional (HH:MM)",
+        "description": "Only used with Schedule. Empty = tonight's window."
+      }
     }
   }
 }
 ```
 
-| Field per key | Type | Required | Description |
-|---------------|------|----------|-------------|
-| `label` | string | Yes | Human-readable label |
-| `description` | string | No | Tooltip / explanation |
-| `type` | string | No | One of `"string"`, `"number"`, `"boolean"` (informational, para UI hints) |
-| `default` | scalar | No | Default suggested (informational, NO se aplica automáticamente) |
-
-**Reglas**:
-- Es opcional. Si no se manda, `user_metadata` funciona igual.
-- Las UIs usan `type` para renderizar inputs apropiados (checkbox para boolean, etc.).
-- `default` es solo informativo: la UI puede mostrarlo como placeholder, pero NO se aplica automáticamente. El user tiene que escribirlo.
+| Propiedad JSON Schema | Soporte UI | Nota |
+|---|---|---|
+| `title` | ✅ | Label del campo |
+| `description` | ✅ | Ayuda/tooltip |
+| `enum` | ✅ | Dropdown con los valores crudos |
+| `oneOf` const+title | ✅ | Dropdown con labels humanos (preferido) |
+| `default` | Informativo | NO se aplica solo — seedear el valor en `user_metadata` |
+| `pattern` | ⚠️ | Valida en vivo; rompe con seeds vacíos |
 
 ## Ejemplo combinado
 
@@ -133,15 +138,18 @@ POST /governance/action_item/abc/suggestions
   },
 
   "user_metadata_config": {
-    "target_branch": {"label": "Target Branch", "type": "string", "default": "main"},
-    "auto_merge": {"label": "Auto Merge", "type": "boolean", "default": "false"},
-    "reviewer": {"label": "Reviewer", "type": "string"}
+    "type": "object",
+    "properties": {
+      "target_branch": {"type": "string", "title": "Target Branch", "default": "main"},
+      "auto_merge": {"type": "boolean", "title": "Auto Merge", "default": false},
+      "reviewer": {"type": "string", "title": "Reviewer"}
+    }
   }
 }
 ```
 
 Flujo:
-1. Detector crea con los 3 fields.
+1. Detector crea con los 3 fields — `user_metadata` YA seedeado con los defaults (si va vacío, la UI no muestra el form).
 2. UI renderiza form con los 3 campos editables (porque está en `pending`).
 3. User cambia `target_branch` a `develop` y aprueba.
 4. PATCH `{"user_metadata": {"target_branch": "develop"}}` (no resetea los demás).

@@ -13,17 +13,32 @@
 # Authentication precedence:
 #   1. NP_API_KEY environment variable (exchanges for token, caches in ~/.claude/)
 #   2. NP_TOKEN environment variable (direct bearer token, no cache)
+#
+# Environment overrides (for use by other skills that share the same auth):
+#   NP_API_BASE_URL    Target API base URL (default: https://api.nullplatform.com).
+#                      Token exchange always uses https://api.nullplatform.com
+#                      regardless — only the destination of the actual call changes.
+#   NP_API_BASE_PATH   Path prefix prepended to the endpoint (default: "" — none).
+#                      Used by skills whose target API is served under a REST
+#                      prefix like /api. The ALLOWED_MODIFY allowlist still
+#                      matches on the bare resource path (e.g. "workflows/*"),
+#                      so the prefix never leaks into the policy.
 
 set -e
 
 # Configuration
-BASE_URL="https://api.nullplatform.com"
+# TOKEN_EXCHANGE_URL always points at the NP control plane — that's where the
+# /token endpoint lives. BASE_URL is the destination of the *actual* API call,
+# overridable so other skills can reuse this script against their own host.
+TOKEN_EXCHANGE_URL="https://api.nullplatform.com"
+BASE_URL="${NP_API_BASE_URL:-https://api.nullplatform.com}"
 TOKEN_CACHE_DIR="$HOME/.claude"
 
 # Endpoints (after stripping leading "/" and query string) where modifying
 # methods (POST/PUT/PATCH/DELETE) are allowed. Each entry is a bash case glob.
 # Add new entries here when exposing new mutable endpoints to skills.
 ALLOWED_MODIFY=(
+    # NP control plane (api.nullplatform.com)
     "controlplane/agent_command"
     "notification/*/resend"
     "governance/action_item"
@@ -31,6 +46,17 @@ ALLOWED_MODIFY=(
     "governance/action_item_category"
     "governance/action_item_category/*"
     "data/lake/query"
+
+    # Workflow engine (NP_API_BASE_URL = NP_WORKFLOW_URL, paths here are bare
+    # resource paths — the NP_API_BASE_PATH prefix like /workflows is stripped
+    # before the allowlist check). The bash case glob's `*` spans '/' so a
+    # single `resource/*` pattern covers every depth under it.
+    "definitions"
+    "definitions/*"
+    "executions/*"
+    "signals"
+    "config"
+    "config/*"
 )
 
 is_modify_allowed() {
@@ -175,7 +201,9 @@ exchange_api_key_for_token() {
     local api_key="$1"
     local response
 
-    response=$(npcurl -s -X POST "${BASE_URL}/token" \
+    # The /token endpoint always lives on the NP control plane — even when the
+    # caller is targeting a different API host (overridden via NP_API_BASE_URL).
+    response=$(npcurl -s -X POST "${TOKEN_EXCHANGE_URL}/token" \
         -H 'Content-Type: application/json' \
         -H 'Accept: application/json' \
         -d "{\"api_key\": \"$api_key\"}")
@@ -260,13 +288,27 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# Build URL
+# Build URL.
+# - When NP_API_BASE_PATH is set (e.g. "/api"), it is interposed between BASE_URL
+#   and the endpoint. The allowlist already matched on the bare endpoint above,
+#   so prefixing here doesn't affect policy.
+# - Normalise: NP_API_BASE_PATH gets a leading "/" and no trailing "/".
 if [[ "$ENDPOINT" == http* ]]; then
     URL="$ENDPOINT"
 else
     # Remove leading slash if present
     ENDPOINT="${ENDPOINT#/}"
-    URL="${BASE_URL}/${ENDPOINT}"
+
+    PATH_PREFIX="${NP_API_BASE_PATH:-}"
+    if [ -n "$PATH_PREFIX" ]; then
+        case "$PATH_PREFIX" in
+            /*) ;;
+            *)  PATH_PREFIX="/$PATH_PREFIX" ;;
+        esac
+        PATH_PREFIX="${PATH_PREFIX%/}"
+    fi
+
+    URL="${BASE_URL%/}${PATH_PREFIX}/${ENDPOINT}"
 fi
 
 # Make request

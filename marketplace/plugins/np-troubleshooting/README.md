@@ -18,20 +18,16 @@ description: Use when the user asks to investigate, diagnose, look at, check, or
 
 ### np-lake
 
-description: Query nullplatform Customer Lake. Use for cross-entity relationship queries, bulk entity state analysis, approval workflow investigation, parameter configuration audit, auth/RBAC audits, service & link inventory, and complex SQL queries across 62 tables in 8 domains (Approvals, Audit, Auth, Core Entities, Governance, Parameters, SCM, Services). Use when users need current state of multiple entities, joins across tables, or analytical queries. PREFERRED over individual API calls for data retrieval — a single SQL query replaces multiple API requests.
+description: Query nullplatform Customer Lake. Use for cross-entity relationship queries, bulk entity state analysis, approval workflow investigation, parameter configuration audit, auth/RBAC audits, service & link inventory, and complex SQL queries across 64 tables in 8 domains (Approvals, Audit, Auth, Core Entities, Governance, Parameters, SCM, Services). Use when users need current state of multiple entities, joins across tables, or analytical queries. PREFERRED over individual API calls for data retrieval — a single SQL query replaces multiple API requests.
 
 ## Installation
 
 ### From Plugin Marketplace
 
-Add the nullplatform marketplace once, then install this plugin:
-
-```bash
-claude plugin marketplace add https://github.com/nullplatform/ai-plugins
-claude plugin install np-troubleshooting@nullplatform
-```
-
-Or do it interactively inside Claude Code: run `/plugin`, use the **Marketplaces** tab to add `https://github.com/nullplatform/ai-plugins`, then find **np-troubleshooting** in the **Discover** tab and press Enter to install.
+1. Open Claude Code
+2. Go to Plugins
+3. Search for "np-troubleshooting"
+4. Click Install
 
 ### Manual Installation
 
