@@ -230,6 +230,17 @@ Invoke `/np-nullplatform-wizard` to configure dimensions and scopes. Do NOT crea
 
 Invoke `/np-nullplatform-bindings-wizard` to configure bindings. Do NOT create terraform.tfvars manually.
 
+> **The scope/service selection is made once and governs all three layers.** It is captured in Step 5
+> (`/np-infrastructure-wizard`) as `enable_<catalog_slug>` toggles in `common.tfvars`, and steps 6 and 7
+> read them from there — do not ask again, and do not let a layer keep its own copy.
+>
+> Each layer contributes a different piece for the same entry: `infrastructure/` creates its
+> permissions role and clones its repo into the agent; `nullplatform/` registers its spec;
+> `nullplatform-bindings/` routes its channel and publishes its IAM selector. Changing the selection
+> later means re-applying all three, in order —
+> `infrastructure/` → `nullplatform/` → `nullplatform-bindings/` — because each layer's outputs feed
+> the next. Applying only one leaves a scope that registers cleanly and fails on its first deploy.
+
 ### Step 8: Summary
 
 Show a table with the status of all components and suggest `/np-setup-orchestrator check-status`.

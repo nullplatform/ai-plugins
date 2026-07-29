@@ -1,6 +1,6 @@
 # np-governance
 
-Governance & workflow authoring on the Nullplatform engine: query and operate on action items, categories and suggestions; build detector/executor agents; and author, publish, validate and test workflows (YAML, signals, triggers, config-entry secrets) — including the local kit (npx @nullplatform/workflow-kit) and the nullplatform/workflows corpus. Workflows commonly read the lake and drive action items, so all live together here.
+Governance & workflow authoring on the Nullplatform engine: query and operate on action items, categories and suggestions; build detector/executor agents; manage approval checklists (templates, action associations, runs, manual approvals); and author, publish, validate and test workflows (YAML, signals, triggers, config-entry secrets) — including the local kit (npx @nullplatform/workflow-kit) and the nullplatform/workflows corpus. Workflows commonly read the lake and drive action items, so all live together here.
 
 ## Version
 
@@ -27,6 +27,14 @@ description: Operate on Nullplatform Governance Action Items - list, create, upd
 ### np-governance-agent-builder
 
 description: Guided wizard to generate new Nullplatform Governance Action Item agents (detectors, executors, or both) inside the user's project. Use when the user says "create a governance agent", "new action item agent", "build a detector for X", "generar executor", or invokes /np-governance-create-action-item-agent.
+
+### np-report
+
+description: Generate, modify, and persist nullplatform dynamic reports (dashboards) to the Reports API. Use whenever the user asks to create, update, list, publish, or delete a report/dashboard/visualization/metrics view backed by the nullplatform Customer Lake. Generates the full report definition JSON (JSON Schema + ui_schema + SQL queries) itself — no MCP — validates queries best-effort against the Lake, and saves a draft via the Reports API.
+
+### np-checklist
+
+description: Operate on Nullplatform Approval Checklists — create and manage checklist templates, associate them with approval actions, inspect checklist runs (state, items, events, logs), apply manual approvals and overrides, and migrate existing policy-based actions to checklist mode. Use when the user asks to "create a checklist template", "associate a checklist with an action", "view checklist run state", "approve a manual checklist item", "migrate from policies to checklist", or anything about checklist-mode approvals on the approval-api.
 
 ## Installation
 
@@ -66,11 +74,11 @@ This plugin requires the following permissions:
   "Bash(./.claude/skills/np-api/scripts/check_auth.sh:*)",
   "Bash(./.claude/skills/np-api/scripts/fetch_np_api_url.sh:*)",
   "Bash(./.claude/skills/np-api/scripts/np-api.sh:*)",
+  "Bash(./.claude/skills/np-checklist/scripts/*.sh:*)",
   "Bash(./.claude/skills/np-governance-action-items/scripts/*.sh:*)",
   "Bash(./.claude/skills/np-governance-agent-builder/scripts/*.sh:*)",
   "Bash(./.claude/skills/np-lake/scripts/ch_query.sh:*)",
   "Bash(./.claude/skills/np-lake/scripts/check_ch_auth.sh:*)",
-  "Bash(./.claude/skills/np-workflow/scripts/config.sh:*)",
   "Bash(./.claude/skills/np-workflow/scripts/execution.sh:*)",
   "Bash(./.claude/skills/np-workflow/scripts/ping.sh:*)",
   "Bash(./.claude/skills/np-workflow/scripts/plugins.sh:*)",
@@ -82,12 +90,16 @@ This plugin requires the following permissions:
   "Bash(./.claude/skills/np-workflow/scripts/workflows.sh:*)",
   "Skill(np-api)",
   "Skill(np-api:*)",
+  "Skill(np-checklist)",
+  "Skill(np-checklist:*)",
   "Skill(np-governance-action-items)",
   "Skill(np-governance-action-items:*)",
   "Skill(np-governance-agent-builder)",
   "Skill(np-governance-agent-builder:*)",
   "Skill(np-lake)",
   "Skill(np-lake:*)",
+  "Skill(np-report)",
+  "Skill(np-report:*)",
   "Skill(np-workflow)",
   "Skill(np-workflow:*)"
 ]

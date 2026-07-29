@@ -11,6 +11,13 @@ Configures Nullplatform resources: scopes, dimensions, and service definitions.
 
 @${CLAUDE_PLUGIN_ROOT}/skills/np-rules/rules/iac-rule.md
 
+## Scope and service repositories
+
+Each scope and service lives in its own repo, so every catalog entry in this layer needs its
+`repository_org`, `repository_name`, `version` and `service_path`:
+
+@${CLAUDE_PLUGIN_ROOT}/skills/np-rules/references/scopes-services-catalog.md
+
 ## When to Use
 
 - Configuring scope definitions (deployment targets)

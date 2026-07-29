@@ -11,12 +11,20 @@ Connects Nullplatform with external services: GitHub, container registry, cloud 
 
 @${CLAUDE_PLUGIN_ROOT}/skills/np-rules/rules/iac-rule.md
 
+## Scope and service repositories
+
+Channel associations point at the path where the agent cloned each scope's repo, and the IAM
+selectors published here must match what each scope's workflow looks up:
+
+@${CLAUDE_PLUGIN_ROOT}/skills/np-rules/references/scopes-services-catalog.md
+
 ## When to Use
 
 - Configuring GitHub integration
 - Connecting container registry (ECR/ACR/Artifact Registry)
 - Configuring cloud provider in Nullplatform
 - Creating channel associations to route to agents
+- Publishing assume-role ARNs by selector (`identity-access-control`) — required on AWS
 
 ## Prerequisites
 

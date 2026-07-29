@@ -2,17 +2,21 @@
 
 ## Path A: From Reference Example
 
-Use the reference repository defined in `np-service-guide` (Reference Repository section).
+Each base service lives in its own repo (`nullplatform/services` is an index). See the Reference
+Repositories section in `np-service-guide` for the resolution flow.
 
-1. **Clone/update reference repo**:
+1. **Resolve the repo and ref** for the closest reference service in the catalog:
+   `${CLAUDE_PLUGIN_ROOT}/skills/np-rules/references/scopes-services-catalog.md`
+2. **Clone that repo at its ref**:
    ```bash
-   git clone https://github.com/nullplatform/services /tmp/np-services-reference 2>/dev/null \
-     || (cd /tmp/np-services-reference && git pull)
+   # <repo> and <ref> come from the catalog (e.g. services-s-3 / 1.0.0)
+   git clone --branch <ref> https://github.com/nullplatform/<repo>.git /tmp/np-<repo>-reference 2>/dev/null \
+     || (cd /tmp/np-<repo>-reference && git fetch origin <ref> && git checkout <ref>)
    ```
-2. **List available examples** (dynamically):
+3. **List the services it implements** (dynamically):
    ```bash
-   find /tmp/np-services-reference -name "service-spec.json.tpl" -not -path "*/.git/*" | \
-     xargs -I{} sh -c 'echo "---"; dirname {} | sed "s|/tmp/np-services-reference/||"; jq "{name, slug, selectors}" {}'
+   find /tmp/np-<repo>-reference -name "service-spec.json.tpl" -not -path "*/.git/*" | \
+     xargs -I{} sh -c 'echo "---"; dirname {} | sed "s|/tmp/np-<repo>-reference/||"; jq "{name, slug, selectors}" {}'
    ```
 3. **AskUserQuestion**: offer found examples + "Other (create new service)"
 4. **Copy structure** from reference to local repo:

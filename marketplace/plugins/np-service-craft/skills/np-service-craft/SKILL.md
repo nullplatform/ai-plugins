@@ -58,7 +58,7 @@ Orchestrator to create, list, register, and test Nullplatform services.
 ## Command: create
 
 See `docs/create-service.md`. Two paths:
-- **Path A**: From reference example (clone `nullplatform/services` repo, copy, adapt)
+- **Path A**: From reference example (resolve the repo in the scope/service catalog, clone it at its ref, copy, adapt)
 - **Path B**: New service (guided discovery, delegates to `np-service-specs` and `np-service-workflows` for conventions)
 
 ## Command: modify <name>
@@ -87,4 +87,7 @@ Check result: `/np-api fetch-api "/notification/<id>/result"`
 
 ## Command: examples
 
-Clone reference repo (`nullplatform/services`), list available examples with spec summary.
+List the base services from the scope/service catalog
+(`${CLAUDE_PLUGIN_ROOT}/skills/np-rules/references/scopes-services-catalog.md`), then clone the repo of
+the one the user picks and summarize its specs. `nullplatform/services` is an index — cloning it
+yields no implementations.

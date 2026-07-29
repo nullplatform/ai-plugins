@@ -55,18 +55,23 @@ module "asset_repository" { }  # nullplatform/asset/ecr (AWS) or nullplatform/as
 # Cloud provider config
 module "cloud_provider" { }  # nullplatform/cloud/aws/cloud (or azure/gcp)
 
-# Scope-agent associations
-module "scope_definition_channel_association" { }  # nullplatform/scope_definition_agent_association
+# Scope-agent associations — ONE block with for_each over the derived catalog
+module "scope_channel_associations" { }  # nullplatform/scope_definition_agent_association
 
-# Service definition associations (optional)
-module "service_definition_channel_association" { }  # nullplatform/service_definition_agent_association
+# Service definition associations — ONE block with for_each
+module "service_channel_associations" { }  # nullplatform/service_definition_agent_association
+
+# Identity & access control (AWS IAM provider config) — REQUIRED for assume-role
+module "identity_access_control" { }  # nullplatform/identity-access-control
+
+# Scope configuration — for catalog entries with create_scope_configuration = true
+module "scope_configuration_<slug>" { }  # nullplatform/scope_configuration
 
 # Monitoring
 module "monitoring_provider" { }  # nullplatform/metrics
 
-# API Keys for notifications
-module "scope_notification_api_key" { }    # nullplatform/api_key
-module "service_notification_api_key" { }  # nullplatform/api_key (optional, if there are service definitions)
+# API Keys for notifications — ONE block with for_each, keys shared with the associations
+module "notification_api_keys" { }  # nullplatform/api_key
 ```
 
 ---
@@ -133,31 +138,28 @@ Show a table with all components and captured variables. Wait for confirmation b
 
 8. **MANDATORY: Read variables.tf of EACH module before generating main.tf** - After `tofu init -backend=false`, read the downloaded `variables.tf` of each module in `.terraform/modules/<name>/`. Only include variables without default (mandatory) and only then generate the module blocks. Don't trust the patterns in this document - they may be outdated compared to the module version.
 
-9. **Generate one api_key per scope defined in nullplatform** - For each scope that exists (containers, scheduled_task, etc.), create an `api_key` module with `type = "scope_notification"` and a distinctive name. Then pass that api_key to the corresponding channel association:
+9. **One api_key per scope/service, generated with `for_each`** - Each scope and service needs its own
+   notification api_key. Use a single `for_each` module over the remote-state map rather than one block
+   per entry, so the set follows the enabled entries automatically:
    ```hcl
-   module "scope_notification_api_key" {
-     source             = "...//nullplatform/api_key?ref=vX.Y.Z"
+   module "notification_api_keys" {
+     source   = "...//nullplatform/api_key?ref=vX.Y.Z"
+     for_each = local.scope_specs
+
      type               = "scope_notification"
      nrn                = var.nrn
-     specification_slug = local.scope_specification_slug
+     specification_slug = each.value.slug
    }
 
-   module "scope_notification_api_key_scheduled_task" {
-     source             = "...//nullplatform/api_key?ref=vX.Y.Z"
-     type               = "scope_notification"
-     nrn                = var.nrn
-     specification_slug = local.scope_specification_slug_scheduled_task
-   }
+   module "scope_channel_associations" {
+     for_each = local.scope_channel_associations_catalog
 
-   module "scope_definition_channel_association" {
-     api_key = module.scope_notification_api_key.api_key
-   }
-
-   module "scope_definition_channel_association_scheduled_task" {
-     api_key = module.scope_notification_api_key_scheduled_task.api_key
+     api_key = module.notification_api_keys[each.key].api_key
    }
    ```
-   The same applies for service_definitions if they exist (with `type = "service_notification"`).
+   The `for_each` keys must be the same catalog slugs in both blocks — that is what lets `api_key` wire
+   by `each.key`. Services follow the same pattern over `local.service_specs` with
+   `type = "service_notification"`.
 
 ---
 
@@ -193,7 +195,7 @@ The `nullplatform-bindings/` layer consumes outputs from previous layers via `te
 | Source | Pattern | Example |
 |--------|---------|---------|
 | **Infrastructure** | Conditional fallback: variable `default = null` + ternary | `cluster_name`, `domain_name`, zone IDs |
-| **Nullplatform** | Always from remote state, no fallback or variable | `scope_specification_id`, `scope_specification_slug` |
+| **Nullplatform** | Always from remote state, no fallback or variable | the `scope_definitions` / `service_definitions` maps |
 | **Bindings-specific** | Direct variable in `variables.tf` + tfvars | `github_organization`, `git_provider` |
 
 ### 1. data.tf - Remote state references
@@ -232,9 +234,12 @@ locals {
   cluster_name    = var.cluster_name != null ? var.cluster_name : data.terraform_remote_state.infrastructure[0].outputs.cluster_name
   domain_name     = var.domain_name != null ? var.domain_name : data.terraform_remote_state.infrastructure[0].outputs.domain_name
 
-  # Nullplatform - always from remote state
-  scope_specification_id   = data.terraform_remote_state.nullplatform.outputs.scope_specification_id
-  scope_specification_slug = data.terraform_remote_state.nullplatform.outputs.scope_specification_slug
+  # Assume-role ARNs from infrastructure, one per enabled scope/service
+  static_files_assume_role_arn = data.terraform_remote_state.infrastructure[0].outputs.static_files_assume_role_arn
+
+  # Nullplatform - always from remote state, as maps keyed by catalog slug
+  scope_specs   = data.terraform_remote_state.nullplatform.outputs.scope_definitions
+  service_specs = data.terraform_remote_state.nullplatform.outputs.service_definitions
 }
 ```
 
@@ -254,7 +259,7 @@ variable "cluster_name" {
 }
 ```
 
-**DO NOT declare variables for nullplatform values** (scope_specification_id, scope_specification_slug, etc.). These only exist in locals.tf via remote state.
+**DO NOT declare variables for nullplatform values** (the `scope_definitions` / `service_definitions` maps and anything derived from them). These only exist in locals.tf via remote state.
 
 ### 4. main.tf - Always use local.*
 
@@ -265,8 +270,10 @@ module "cloud_provider" {
   domain_name = local.domain_name        # NOT var.domain_name
 }
 
-module "scope_definition_channel_association" {
-  scope_specification_id = local.scope_specification_id  # NOT var.scope_specification_id
+module "scope_channel_associations" {
+  for_each = local.scope_channel_associations_catalog
+
+  scope_specification_id = each.value.scope_specification_id  # derived from local.scope_specs
 }
 ```
 
@@ -291,11 +298,196 @@ Remote state connection data (bucket, key, region, profile) is read from each la
 | `public_zone_id` | Public DNS zone ID | cloud_provider |
 | `private_zone_id` | Private DNS zone ID | cloud_provider |
 
-**From nullplatform/outputs.tf:**
+**From infrastructure/outputs.tf — assume-role ARNs (AWS):**
 
-For each scope definition: 2 outputs (id + slug). For each service definition: 2 outputs (id + slug). Exact names are determined by reading `nullplatform/outputs.tf`.
+| Local variable | Source output | Where used |
+|---|---|---|
+| `<catalog_slug>_assume_role_arn` | `<catalog_slug>_assume_role_arn` | `identity_access_control`, one `{selector, arn}` entry each |
+| `parameter_store_iam_role_arn` | `parameter_store_iam_role_arn` | `identity_access_control`, selector `parameter_store` |
+| `secrets_manager_iam_role_arn` | `secrets_manager_iam_role_arn` | `identity_access_control`, selector `secret_manager` |
+
+**From nullplatform/outputs.tf — canonical (map) shape:**
+
+```hcl
+locals {
+  scope_specs   = data.terraform_remote_state.nullplatform.outputs.scope_definitions
+  service_specs = data.terraform_remote_state.nullplatform.outputs.service_definitions
+}
+```
+
+Only enabled entries are present. Each entry carries:
+
+| Field | Used to derive |
+|---|---|
+| `id` | `scope_specification_id` |
+| `slug` | `scope_specification_slug`, `specification_slug` on the api_key |
+| `provider_specification_slug` | `scope_configuration` (entries with `create_scope_configuration = true`) |
+| `repository_org` + `repository_name` | `repo_path`, `repository_notification_channel`, `repository_service_spec_repo` |
+| `service_path` | `service_path` |
+| `version` | `repository_notification_channel_branch` |
+
+**Detect the shape before writing `locals.tf`.** Setups generated before the catalog shape expose
+suffixed outputs instead of the two maps:
+
+```bash
+grep -E '^output "(scope|service)_definitions"' ../nullplatform/outputs.tf
+```
+
+No match means the legacy shape — read the per-entry outputs (`scope_specification_id`,
+`scope_specification_slug_scheduled_task`, …) directly, and see the migration path in the
+`np-nullplatform-wizard` generation guide before converting. **Never mix the two shapes**: half
+migrated, some associations read a map that does not exist yet.
 
 ---
+
+## Identity & access control (assume-role) — REQUIRED on AWS
+
+The agent's base IAM role is assume-only: it may call `sts:AssumeRole` on a list of permissions
+roles, but nothing tells it **which** role belongs to which scope. This module publishes that
+mapping as an `aws-iam-configuration` provider config, keyed by `selector`:
+
+```hcl
+module "identity_access_control" {
+  source = "git::https://github.com/nullplatform/tofu-modules.git//nullplatform/identity-access-control?ref=vX.Y.Z"
+
+  nrn = var.nrn
+
+  attributes = {
+    iam_role_arns = {
+      arns = [
+        { selector = "static-files", arn = local.static_files_assume_role_arn },
+        { selector = "lambda", arn = local.lambda_assume_role_arn },
+        { selector = "s3", arn = local.s3_assume_role_arn },
+      ]
+    }
+  }
+}
+```
+
+**Without this module the deploy fails on credentials**, even though every IAM role exists and the
+assume policy is correct — the agent resolves no ARN for its selector. This is the single most
+common omission when moving a setup to assume-role.
+
+The ARNs come from the infrastructure layer's `<catalog_slug>_assume_role_arn` outputs via
+`terraform_remote_state` (see [Consumed outputs](#consumed-outputs)).
+
+**Verify each selector against the scope's workflow** — it varies by repo and ref (see the catalog's
+IAM selector note above). Do not copy a selector from another setup.
+
+## Channel associations: derive, do not repeat
+
+`repo_path` must correspond **1:1** with an entry in `agent_repos_extra` in the infrastructure layer
+(or `agent_repos_scope` for `nullplatform/scopes`) — see the catalog's clone-layout note. A mismatch
+fails at runtime with `stat: no such file or directory` while the scope still shows as active in
+nullplatform — no `tofu` error at any point.
+
+Rather than restating the catalog here, derive everything from the remote-state map, which already
+carries the metadata:
+
+```hcl
+locals {
+  # Workflow overrides are not derivable, so they stay an explicit per-entry
+  # exception merged over the derived catalog.
+  scope_channel_overrides = {
+    aws_lambda = {
+      enabled_override       = true
+      override_repo_path     = "/root/.np/nullplatform/scopes-networking/"
+      overrides_service_path = "lambda"
+    }
+  }
+
+  scope_channel_associations_catalog = {
+    for k, spec in local.scope_specs : k => merge({
+      scope_specification_id                 = spec.id
+      scope_specification_slug               = spec.slug
+      service_path                           = spec.service_path
+      repo_path                              = "/root/.np/${spec.repository_org}/${spec.repository_name}"
+      repository_notification_channel        = "https://raw.githubusercontent.com/${spec.repository_org}/${spec.repository_name}/refs/heads"
+      repository_notification_channel_branch = spec.version
+      enabled_override                       = false
+      override_repo_path                     = ""
+      overrides_service_path                 = ""
+    }, try(local.scope_channel_overrides[k], {}))
+  }
+
+  service_channel_associations_catalog = {
+    for k, spec in local.service_specs : k => {
+      service_specification_slug   = spec.slug
+      repository_service_spec_repo = "${spec.repository_org}/${spec.repository_name}"
+      service_path                 = spec.service_path
+    }
+  }
+}
+
+module "notification_api_keys" {
+  source   = "git::https://github.com/nullplatform/tofu-modules.git//nullplatform/api_key?ref=vX.Y.Z"
+  for_each = local.scope_specs
+
+  type               = "scope_notification"
+  nrn                = var.nrn
+  specification_slug = each.value.slug
+}
+
+module "scope_channel_associations" {
+  source   = "git::https://github.com/nullplatform/tofu-modules.git//nullplatform/scope_definition_agent_association?ref=vX.Y.Z"
+  for_each = local.scope_channel_associations_catalog
+
+  nrn            = var.nrn
+  api_key        = module.notification_api_keys[each.key].api_key
+  tags_selectors = var.tags_selectors
+
+  scope_specification_id                 = each.value.scope_specification_id
+  scope_specification_slug               = each.value.scope_specification_slug
+  service_path                           = each.value.service_path
+  repo_path                              = each.value.repo_path
+  repository_notification_channel        = each.value.repository_notification_channel
+  repository_notification_channel_branch = each.value.repository_notification_channel_branch
+
+  enabled_override       = each.value.enabled_override
+  override_repo_path     = each.value.override_repo_path
+  overrides_service_path = each.value.overrides_service_path
+}
+```
+
+**Why derive instead of restating**: only enabled entries reach the map, so the single
+`enable_<catalog_slug>` toggle in `common.tfvars` governs all three layers with nothing to keep in
+sync by hand (same `each.key` wiring as the api_key rule above).
+
+> **Status:** this derivation is validated with `tofu validate` (including with an entry removed from
+> the map) but is **not yet present in any applied setup**. The AWS reference setup writes these
+> catalogs out per entry with literal indexes and hardcoded branch strings. When extending an existing
+> layer, expect to find that shape and convert it rather than assuming this one is already there.
+
+**Do not index the map with literals.** `local.scope_specs["static_files"].id` evaluates fine while
+that scope is enabled and fails with `The given key does not identify an element in this collection
+value` the moment it is toggled off — taking the whole layer down. The comprehension above has no
+such failure mode. (Verified both ways against the real modules.)
+
+## Scope configuration lives in this layer
+
+For catalog entries with `create_scope_configuration = true` (Static Files, AWS Lambda), the
+`nullplatform/scope_configuration` module goes **here**, not in `nullplatform/`, because it needs the
+`provider_specification_slug` that only exists after the scope definition is created:
+
+```hcl
+module "scope_configuration_static_files" {
+  source = "git::https://github.com/nullplatform/tofu-modules.git//nullplatform/scope_configuration?ref=vX.Y.Z"
+
+  nrn                         = var.nrn
+  np_api_key                  = var.np_api_key
+  provider_specification_slug = local.scope_specs["static_files"].provider_specification_slug
+  dimensions                  = { environment = "development" }
+  attributes                  = { /* per-scope schema — read the scope's spec */ }
+}
+```
+
+The `attributes` schema is specific to each scope and lives in **`scope-configuration.json.tpl`** in the
+scope's repo (`<service_path>/specs/scope-configuration.json.tpl`) — *not* in `service-spec.json.tpl`,
+which is a different file in the same directory describing the deployable scope spec. Ask the user for
+the values (bucket names, state buckets, zone IDs) — never invent them.
+
+> This is one place a literal index is acceptable, because the module block only exists when that
+> entry is enabled. If you generate it for an entry the user disabled, the layer breaks.
 
 ## Lessons learned
 
@@ -307,7 +499,15 @@ However, `asset_repository` (ECR) has an implicit dependency on `cloud_provider`
 To inform the user: if `asset_repository` fails on the first apply with "unresolved dependencies", run `tofu apply` again. This is a known limitation of the ECR module.
 
 ### 2. Output mapping between scope_definition and scope_definition_agent_association
-Modules use different names: `service_specification_id` -> `scope_specification_id`, `service_slug` -> `scope_specification_slug`. The mapping is resolved in `nullplatform/outputs.tf`.
+Modules use different names, and the two definition modules are not even symmetric with each other:
+
+| Field | `scope_definition` output | `service_definition` output | Association argument |
+|---|---|---|---|
+| id | `service_specification_id` | `service_specification_id` | `scope_specification_id` |
+| slug | `service_slug` | `service_specification_slug` | `scope_specification_slug` |
+
+The mapping is resolved once in `nullplatform/outputs.tf`, which normalizes both into `id` and `slug`
+inside the map entries. This layer consumes the normalized names and never the module output names.
 
 ### 3. `np_api_key` vs `api_key` - they are different things
 - `np_api_key`: Nullplatform provider authentication. Used by modules that only need auth (code_repository, asset, cloud, metrics).

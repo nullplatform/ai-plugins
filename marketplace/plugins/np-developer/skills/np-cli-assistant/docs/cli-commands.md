@@ -131,7 +131,7 @@ These operations have no `np` CLI equivalent. Explain the limitation and provide
 | `metadata specification patch` | Use API instead |
 | `metadata specification read` | Use API instead |
 | `metadata specification update` | Use API instead |
-| `metadata update` | Use `PATCH /metadata/:id` |
+| `metadata update` | Use `PATCH /metadata/:entity/:id` |
 | `namespace delete` | Use `DELETE /namespace/:id` |
 | `notification list` | Use `GET /notification` |
 | `notification read` | Use `GET /notification/:id` |

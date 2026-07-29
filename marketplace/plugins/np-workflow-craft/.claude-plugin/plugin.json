@@ -1,0 +1,12 @@
+{
+  "name": "np-workflow-craft",
+  "version": "1.2.12",
+  "description": "Build, publish, run, and debug workflows on the Nullplatform workflow engine via REST",
+  "author": {
+    "name": "Nullplatform",
+    "email": "support@nullplatform.com",
+    "url": "https://nullplatform.com"
+  },
+  "repository": "https://github.com/nullplatform/np-claude-skills",
+  "license": "Apache-2.0"
+}

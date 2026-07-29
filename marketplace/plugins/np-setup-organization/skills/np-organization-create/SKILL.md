@@ -169,15 +169,17 @@ Options:
 
 ### Step 6: Execute
 
-**Do NOT use `/np-api fetch-api` here** — np-api authenticates via `NP_API_KEY` env var against `api.nullplatform.com`. It cannot exchange a root API key against the onboarding API (`*.nullapps.io`). Use `curl` directly with token exchange:
+**Do NOT use `/np-api fetch-api` here** — np-api reads its key from the `NP_API_KEY` env var, not from the `organization-create-api.key` file, and the org creation POST targets the onboarding API (`*.nullapps.io`), not `api.nullplatform.com`. Use `curl` directly with token exchange:
 
 ```bash
-# 1. Exchange the API key for a bearer token
-# NOTE: The onboarding API uses "apiKey" (camelCase), unlike the public API which uses "api_key" (snake_case)
+# 1. Exchange the API key for a bearer token against the public API /token
+#    endpoint (same as every other key: "api_key" snake_case). The onboarding
+#    host no longer exposes /token. The resulting root token (claim
+#    organization=0) is used as Bearer against the onboarding /organization.
 API_KEY=$(cat organization-create-api.key)
-TOKEN=$(curl -s -X POST "https://onboarding-onboarding-api-production-lmhky.prod.nullapps.io/token" \
+TOKEN=$(curl -s -X POST "https://api.nullplatform.com/token" \
   -H "Content-Type: application/json" \
-  -d "{\"apiKey\": \"$API_KEY\"}" | jq -r '.access_token')
+  -d "{\"api_key\": \"$API_KEY\"}" | jq -r '.access_token')
 
 # 2. Validate token before proceeding (this is an IRREVERSIBLE operation)
 if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
@@ -225,7 +227,7 @@ curl -s -X POST "https://onboarding-onboarding-api-production-lmhky.prod.nullapp
 
 **NOTE:** This step is executed ONLY after creating a new organization (Steps 6-7). If the org already existed and creation was skipped (Step 0), DO NOT execute this step or the verification.
 
-**IMPORTANT:** The root API key (`organization-create-api.key`) **only works against the onboarding API** (`*.nullapps.io`). The public API (`api.nullplatform.com`) rejects root tokens with 403. An API key from the new organization is needed.
+**IMPORTANT:** The root token (claim `organization=0`, obtained by exchanging `organization-create-api.key` at `api.nullplatform.com/token`) is only accepted by the onboarding `/organization` endpoint. Public API (`api.nullplatform.com`) entity endpoints reject it with 403. An API key from the new organization is needed.
 
 Guide the user:
 

@@ -15,21 +15,29 @@ Entry point for developing nullplatform services. A **service** is a cloud resou
 4. **NEVER write scripts without `set -euo pipefail`** and error handling.
 5. **NEVER use `curl` against the API** — always `/np-api fetch-api`.
 
-## Reference Repository
+## Reference Repositories
 
-The repository `https://github.com/nullplatform/services` contains reference services with complete implementations (specs, deployment, permissions, workflows, scripts, entrypoints).
+`https://github.com/nullplatform/services` is an **index**, not code. Each base service lives in its
+own repo with independent versioning. Cloning the index yields no implementations.
 
-To explore available examples:
+Resolve which repo a service lives in — with its release ref and `service_path` — from the catalog:
+`${CLAUDE_PLUGIN_ROOT}/skills/np-rules/references/scopes-services-catalog.md`
+
+Then clone that repo at its ref:
 
 ```bash
-# Clone/update reference
-git clone https://github.com/nullplatform/services /tmp/np-services-reference 2>/dev/null \
-  || (cd /tmp/np-services-reference && git pull)
+# <repo> and <ref> come from the catalog (e.g. services-rds / 1.0.0)
+git clone --branch <ref> https://github.com/nullplatform/<repo>.git /tmp/np-<repo>-reference 2>/dev/null \
+  || (cd /tmp/np-<repo>-reference && git fetch origin <ref> && git checkout <ref>)
 
-# List available services (searches by service-spec.json.tpl)
-find /tmp/np-services-reference -name "service-spec.json.tpl" -not -path "*/.git/*" | \
-  xargs -I{} sh -c 'echo "---"; dirname {} | sed "s|/tmp/np-services-reference/||"; jq "{name, slug, selectors}" {}'
+# List the services this repo implements (searches by service-spec.json.tpl)
+find /tmp/np-<repo>-reference -name "service-spec.json.tpl" -not -path "*/.git/*" | \
+  xargs -I{} sh -c 'echo "---"; dirname {} | sed "s|/tmp/np-<repo>-reference/||"; jq "{name, slug, selectors}" {}'
 ```
+
+> Refs are release **branches** in most repos (migrating to tags), so `--branch <ref>` works for both.
+> One repo can hold more than one service: `services-rds` implements both the Postgres server and the
+> database.
 
 Do not hardcode the repo structure — always explore dynamically because it can change.
 

@@ -31,16 +31,28 @@ Focused investigation and diagnostics toolkit for Nullplatform.
 - **np-api** - Explore and query the Nullplatform API
 - **np-investigation-diagnostic** - Investigate and troubleshoot deployments, services, and applications
 - **np-lake** - Query the Nullplatform Customer Lake with SQL across entities
+- **np-checklist** - Inspect approval checklist runs, items, events, and logs
 
 ### np-governance
 
-Governance Action Items: query and operate on action items, categories and suggestions; build new detector/executor agents with a guided wizard.
+Governance and workflow authoring: query and operate on action items, categories and suggestions; manage approval checklists; build detector/executor agents; and author, publish and debug workflows.
 
 **Skills included:**
 - **np-api** - Explore and query the Nullplatform API
 - **np-lake** - Query the Nullplatform Customer Lake with SQL across entities
 - **np-governance-action-items** - List, create, and update action items, categories, and suggestions
 - **np-governance-agent-builder** - Guided wizard to generate new governance detector/executor agents
+- **np-workflow** - Build, publish, run, and debug workflows on the Nullplatform workflow engine
+- **np-report** - Generate and persist dynamic reports and dashboards backed by the Customer Lake
+- **np-checklist** - Manage approval checklist templates, action associations, runs, and manual approvals
+
+### np-workflow-craft
+
+Focused toolkit for the Nullplatform workflow engine: author YAML, publish, trigger, and debug executions.
+
+**Skills included:**
+- **np-api** - Explore and query the Nullplatform API
+- **np-workflow** - Build, publish, run, and debug workflows on the Nullplatform workflow engine
 
 ### np-service-craft
 
@@ -128,6 +140,8 @@ claude plugin install np-troubleshooting@nullplatform
 # or
 claude plugin install np-governance@nullplatform
 # or
+claude plugin install np-workflow-craft@nullplatform
+# or
 claude plugin install np-service-craft@nullplatform
 # or
 claude plugin install np-setup-organization@nullplatform
@@ -148,6 +162,8 @@ claude plugin install np-setup-organization@nullplatform
    cp -r marketplace/plugins/np-troubleshooting ~/.claude/plugins/
    # or
    cp -r marketplace/plugins/np-governance ~/.claude/plugins/
+   # or
+   cp -r marketplace/plugins/np-workflow-craft ~/.claude/plugins/
    # or
    cp -r marketplace/plugins/np-service-craft ~/.claude/plugins/
    # or

@@ -76,6 +76,15 @@ The ALB Controller is **always required**. Ask for schema:
 **ACM + Ingress Schema (Alternative):**
 - ALB Controller, ACM, Ingress Controller, External DNS + IAM, Prometheus, Agent + Agent IAM, Base
 
+### Step 5: Enabled scopes and services
+
+Which scopes and services this organization will offer. Options come from the scope/service catalog
+(referenced from `SKILL.md`); Containers is always included and is not offered as a choice.
+
+On AWS the answer determines three things at once, so it cannot be deferred past `main.tf` generation:
+the requirements modules, the contents of `agent_repos_extra`, and the `<catalog_slug>_assume_role_arn`
+outputs the bindings layer consumes.
+
 ---
 
 ## Kubernetes/Helm Providers
@@ -239,6 +248,44 @@ The `kubernetes` and `helm` providers are ONLY needed in `infrastructure/` — d
 }
 ```
 
+### Step 5: Enabled scopes and services
+
+Containers is always generated, so it is not an option here.
+
+```json
+{
+  "questions": [
+    {
+      "question": "Which scopes should this organization support? (Containers is always included)",
+      "header": "Scopes",
+      "multiSelect": true,
+      "options": [
+        {"label": "Scheduled Tasks", "description": "CronJobs / periodic Jobs on Kubernetes. Same repo as Containers, no extra IAM."},
+        {"label": "Static Files (Recommended)", "description": "Static assets on S3 + CloudFront. Own repo, needs an assume-role and a scope configuration."},
+        {"label": "AWS Lambda", "description": "Serverless functions. Own repo, needs an assume-role, a scope configuration, and pulls scopes-networking for ALB/API Gateway wiring."}
+      ]
+    },
+    {
+      "question": "Which services should this organization offer?",
+      "header": "Services",
+      "multiSelect": true,
+      "options": [
+        {"label": "AWS S3 Bucket", "description": "Own repo (services-s-3), needs an assume-role."},
+        {"label": "RDS PostgreSQL (server + database)", "description": "Both live in services-rds. Two specs, two assume-roles."},
+        {"label": "PostgreSQL on Kubernetes", "description": "In-cluster Postgres. Own repo, no assume-role needed."},
+        {"label": "None", "description": "Scopes only for now; services can be added later by re-applying the three layers."}
+      ]
+    }
+  ]
+}
+```
+
+Write the resulting toggles to **`common.tfvars`** as `enable_<catalog_slug>`, not to
+`infrastructure/{cloud}/terraform.tfvars` — all three layers read them, and splitting them is how
+the layers drift out of sync. Containers gets no toggle: it is always generated.
+
+Then generate the assume-role wiring per [agent-assume-role.md](agent-assume-role.md).
+
 ### Show summary before generating
 
 ```markdown
@@ -251,6 +298,8 @@ The `kubernetes` and `helm` providers are ONLY needed in `infrastructure/` — d
 | **DNS** | Create new |
 | **Networking** | Istio |
 | **Region** | us-east-1 |
+| **Scopes** | containers (always), static_files |
+| **Services** | aws_s3_bucket |
 ```
 
 ---

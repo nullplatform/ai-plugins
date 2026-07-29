@@ -73,6 +73,11 @@ Read `main.tf` dynamically and classify:
 | `iam_cert_manager` | Do you already have the IAM role for cert-manager? |
 | `iam_agent` | Do you already have the IAM role for the agent? |
 
+> `iam_agent` is **not** a standalone question. From v6.0.0 it pulls in one requirements module per
+> enabled scope/service (`assume_role_arns`) plus one `<catalog_slug>_assume_role_arn` output each,
+> which the bindings layer consumes. Ask about the enabled scopes/services first — see
+> [infrastructure-generation.md](infrastructure-generation.md) — then generate all of it together.
+
 ### Nullplatform (always included, don't ask)
 
 - `agent_api_key`, `agent`, `base`
@@ -374,9 +379,24 @@ For source format and versioning see [tofu-modules-patterns.md](tofu-modules-pat
 - Inputs: `cluster_name`, `aws_iam_openid_connect_provider_arn`, `hosted_zone_public_id`, `hosted_zone_private_id`
 - Output: `nullplatform_cert_manager_role_arn`
 
-**agent_iam** (`infrastructure/aws/iam/agent`):
-- Inputs: `cluster_name`, `aws_iam_openid_connect_provider_arn`, `agent_namespace`
+**agent_iam** (`infrastructure/aws/iam/agent`) — pin to `?ref=v6.0.0` or later:
+- Required inputs: `cluster_name`, `aws_iam_openid_connect_provider_arn`, `agent_namespace`
+- Optional inputs: `assume_role_arns`, `additional_policies`, `permissions_roles`, `service_account_name`, `role_name`, `policies_name_prefix`
 - Output: `nullplatform_agent_role_arn`
+
+From v6.0.0 the agent role is **assume-only**: it carries no workload policies, just
+`sts:AssumeRole` over `assume_role_arns`. Each scope/service contributes its own permissions
+role from its own repo. See [agent-assume-role.md](agent-assume-role.md) for the wiring, the
+module cycle and the outputs contract with the bindings layer.
+
+### Scope/service requirements modules
+
+These modules create the per-scope and per-service permissions roles the agent assumes. They do
+**not** live in `tofu-modules` — each one lives in the repo of the scope or service it belongs to,
+and its path inside that repo is not derivable from a pattern.
+
+- Paths, refs and IAM selectors: see the scope/service catalog referenced from `SKILL.md`.
+- Wiring, module contracts and the `count` + `one()` toggle pattern: [agent-assume-role.md](agent-assume-role.md).
 
 ### External DNS (correct variables)
 

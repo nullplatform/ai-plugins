@@ -47,6 +47,14 @@ ALLOWED_MODIFY=(
     "governance/action_item_category/*"
     "data/lake/query"
 
+    # Checklist approvals (np-checklist skill)
+    "approval/checklist/template"
+    "approval/checklist/template/*"
+    "approval/action/*/checklist_template"
+    "approval/*/checklist/items/*/approve"
+    "approval/checklist/migrate-from-policy/apply"
+    "approval/checklist/migrate-from-policy/rollback"
+
     # Workflow engine (NP_API_BASE_URL = NP_WORKFLOW_URL, paths here are bare
     # resource paths — the NP_API_BASE_PATH prefix like /workflows is stripped
     # before the allowlist check). The bash case glob's `*` spans '/' so a
@@ -57,6 +65,10 @@ ALLOWED_MODIFY=(
     "signals"
     "config"
     "config/*"
+
+    # Reports API
+    "report"
+    "report/*"
 )
 
 is_modify_allowed() {

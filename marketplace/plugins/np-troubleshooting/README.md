@@ -20,6 +20,10 @@ description: Use when the user asks to investigate, diagnose, look at, check, or
 
 description: Query nullplatform Customer Lake. Use for cross-entity relationship queries, bulk entity state analysis, approval workflow investigation, parameter configuration audit, auth/RBAC audits, service & link inventory, and complex SQL queries across 64 tables in 8 domains (Approvals, Audit, Auth, Core Entities, Governance, Parameters, SCM, Services). Use when users need current state of multiple entities, joins across tables, or analytical queries. PREFERRED over individual API calls for data retrieval — a single SQL query replaces multiple API requests.
 
+### np-checklist
+
+description: Operate on Nullplatform Approval Checklists — create and manage checklist templates, associate them with approval actions, inspect checklist runs (state, items, events, logs), apply manual approvals and overrides, and migrate existing policy-based actions to checklist mode. Use when the user asks to "create a checklist template", "associate a checklist with an action", "view checklist run state", "approve a manual checklist item", "migrate from policies to checklist", or anything about checklist-mode approvals on the approval-api.
+
 ## Installation
 
 ### From Plugin Marketplace
@@ -58,10 +62,13 @@ This plugin requires the following permissions:
   "Bash(./.claude/skills/np-api/scripts/check_auth.sh:*)",
   "Bash(./.claude/skills/np-api/scripts/fetch_np_api_url.sh:*)",
   "Bash(./.claude/skills/np-api/scripts/np-api.sh:*)",
+  "Bash(./.claude/skills/np-checklist/scripts/*.sh:*)",
   "Bash(./.claude/skills/np-lake/scripts/ch_query.sh:*)",
   "Bash(./.claude/skills/np-lake/scripts/check_ch_auth.sh:*)",
   "Skill(np-api)",
   "Skill(np-api:*)",
+  "Skill(np-checklist)",
+  "Skill(np-checklist:*)",
   "Skill(np-investigation-diagnostic)",
   "Skill(np-investigation-diagnostic:*)",
   "Skill(np-lake)",

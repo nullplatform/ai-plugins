@@ -42,7 +42,7 @@ description: Creates cloud infrastructure for Nullplatform. Use when you need to
 
 ### np-rules
 
-description: Shared rule files referenced by other nullplatform skills via `@${CLAUDE_PLUGIN_ROOT}/skills/np-rules/rules/*.md`. This skill is a dependency container, not a user-facing skill — other skills auto-load its files through `@` file inclusion. Do not invoke directly from user intent.
+description: Shared rule and reference files consumed by other nullplatform skills via `@${CLAUDE_PLUGIN_ROOT}/skills/np-rules/{rules,references}/*.md`. This skill is a dependency container, not a user-facing skill — other skills auto-load its files through `@` file inclusion. Do not invoke directly from user intent.
 
 ## Installation
 

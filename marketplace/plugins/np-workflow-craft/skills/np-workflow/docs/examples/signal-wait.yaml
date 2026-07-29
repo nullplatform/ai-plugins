@@ -1,0 +1,25 @@
+id: WORKFLOW_ID
+name: WORKFLOW_NAME
+description: Pause on a signal and continue when an external system POSTs to /workflows/signals.
+
+steps:
+  - id: log-start
+    type: module
+    pluginType: log
+    inputs:
+      message: "Workflow started, waiting for signal."
+
+  - id: wait
+    type: module
+    pluginType: signal-wait
+    config:
+      channel: approval
+      timeoutMs: 3600000
+    dependsOn: [log-start]
+
+  - id: log-resume
+    type: module
+    pluginType: log
+    inputs:
+      message: "Signal received: ${{ steps.wait.outputs.payload }}"
+    dependsOn: [wait]

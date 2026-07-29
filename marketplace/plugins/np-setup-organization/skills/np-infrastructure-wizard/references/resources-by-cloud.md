@@ -66,6 +66,13 @@ When using Istio (Gateway API) on any cloud, the agent module MUST include the f
 
 These variables are additional to the rest of the agent module variables (`dns_type`, `agent_image_tag`, `nrn`, etc.) — they do not replace them. Set them in both `variables.tf` (as defaults) and `terraform.tfvars`.
 
+> **Why these paths live under `scopes/`**: `nullplatform/scopes` is the only repo cloned by default
+> (the `agent_repos_scope` module default is `https://github.com/nullplatform/scopes.git#main`) — it
+> is not baked into the agent image itself. Every other scope/service repo has to be listed in
+> `agent_repos_extra` or its files are simply absent at runtime. If you point `agent_repos_scope` at
+> a different branch, verify these three templates exist there — the paths are not stable across
+> branches.
+
 ## Base Module — Gateway NLB Naming — MANDATORY
 
 The `base` module's gateway load balancer names MUST always include the account slug to guarantee uniqueness. The module defaults (`k8s-nullplatform-internet-facing`, `k8s-nullplatform-internal`) assume a single setup per cloud account and fail with `DuplicateLoadBalancerName` (or equivalent) when there are multiple.

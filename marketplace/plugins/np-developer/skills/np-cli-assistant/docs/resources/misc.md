@@ -181,6 +181,11 @@ Create and manage values for metadata catalog.
 | `np metadata create` | Create new metadata for an entity |
 | `np metadata read` | Read entity metadata |
 
+`create` is **not** an upsert: if the entity already has a value for that metadata key it
+fails with `400` / `Metadata for entity "X" with ID "Y" and metadata "Z" already exists`.
+Updating an existing value has no CLI verb — use `PATCH /metadata/:entity/:id` (see
+Unsupported Operations below).
+
 ### `np metadata create` flags
 
 | Flag | Type | Description |
@@ -208,7 +213,7 @@ Create and manage values for metadata catalog.
 | `metadata specification patch` | Use API instead |
 | `metadata specification read` | Use API instead |
 | `metadata specification update` | Use API instead |
-| `metadata update` | Use `PATCH /metadata/:id` via API |
+| `metadata update` | Use `PATCH /metadata/:entity/:id` via API |
 
 ---
 

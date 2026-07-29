@@ -105,7 +105,7 @@ in the UI (Catalog system):
 
 ## @endpoint /metadata/{entity}/{id}
 
-Reads metadata of a specific entity.
+Reads (`GET`) or updates (`PATCH`) metadata values of a specific entity.
 
 ### Parameters
 - `entity` (path, required): Entity type (`application`, `build`, `namespace`)
@@ -124,6 +124,19 @@ Reads metadata of a specific entity.
 }
 ```
 
+### Body (PATCH)
+One key per metadata specification (`metadata` field of the spec), whose value must
+validate against that spec's `schema`:
+
+```json
+{
+  "finops": { "compute_cost": 700, "budget_assigned": 1000 },
+  "metadata_application": { "APPLICATION OWNER": "Jane Smith", "PCI": "No" }
+}
+```
+
+Returns `200` with the entity's full metadata after the update.
+
 ### Example
 ```bash
 # Read application metadata
@@ -131,8 +144,26 @@ np-api fetch-api "/metadata/application/489238271"
 
 # Read metadata for multiple entities by ID
 np-api fetch-api "/metadata/application?id=123,456,789"
+
+# Update metadata values (fetch-api is GET-only; PATCH needs a bearer token)
+curl -X PATCH "https://api.nullplatform.com/metadata/application/489238271" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"finops":{"compute_cost":700}}'
 ```
 
 ### Notes
 - Application metadata is also included in `GET /application/{id}` (`metadata` field)
 - But the list `GET /application` does NOT include metadata - requires individual fetch or using this endpoint
+- **`PATCH` merges per top-level key**: keys absent from the body are left untouched, but a
+  key present in the body is *replaced whole*, not deep-merged. To change one field, send
+  the whole document for that key — otherwise the omitted siblings are lost, and the request
+  fails outright if the spec lists them under `required`
+- **The path needs the `entity` segment.** `PATCH /metadata/{id}` returns
+  `404 Route PATCH:/{id} not found`
+- **`np metadata create` is create-only**, not an upsert: it returns
+  `400 FST_ERR_VALIDATION` / `Metadata for entity "X" with ID "Y" and metadata "Z" already
+  exists` when the key is already set. The CLI exposes no update verb (`np metadata` has only
+  `create` and `read`), so updating a value requires this `PATCH`
+- A payload whose top-level keys are not registered specs for that entity fails with
+  `400` / `body must NOT have additional properties`. Watch for passing a spec's *inner*
+  value instead of the `{<spec_key>: {...}}` envelope

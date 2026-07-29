@@ -157,3 +157,46 @@ tofu validate
   - `depends_on` pointing to deleted module
   - Output referencing deleted module
   - Orphaned local
+
+## Greenfield first apply (Azure)
+
+Two gotchas hit a from-scratch Azure apply (new RG + VNet + AKS + ACR in one run).
+Both are Azure-specific; handle them before/around step 7 of `SKILL.md`.
+
+### A. AcrPull role — `for_each` with an ACR created in the same run
+
+The `aks` module gates the AcrPull role on `acr_id`. When the ACR is created in the
+same apply, `acr_id` is unknown at plan time, so the `for_each` key set is unknown and
+the plan fails with **"Invalid for_each argument"**.
+
+- **tofu-modules with `attach_acr`**: set `attach_acr = true` on the `aks` module. That
+  fixes the `for_each` key set at plan time regardless of `acr_id`, so greenfield applies
+  in a single run. (Leaving it unset keeps the legacy `acr_id != null` gate, which still
+  fails on greenfield.)
+- **Older pins (e.g. `v6.2.2`)**: two-phase apply.
+
+  ```bash
+  # Phase 1 — everything except the ACR role assignment (acr_id still unknown)
+  tofu apply -var-file="../../common.tfvars" -var-file="terraform.tfvars" \
+    -exclude=module.aks.module.aks.azurerm_role_assignment.acr
+  # Phase 2 — normal apply; acr_id is now in state, role assignment resolves
+  tofu apply -var-file="../../common.tfvars" -var-file="terraform.tfvars"
+  ```
+
+### B. Perpetual route-table drift on the node-pool subnet (kubenet)
+
+With **kubenet**, AKS creates a route table in the managed (`MC_`) resource group and
+associates it with the node-pool subnet for pod-CIDR routing. The VNet module doesn't
+model it, so **every plan wants to remove it** (`routeTable.id` → null). Applying that
+**breaks pod networking**.
+
+- **Durable fix — wire the `aks_route_table` module** (present in tofu-modules since
+  `v6.2.2`). It discovers the AKS-managed route table from the node resource group and
+  re-associates it with the subnet on every apply, so the drift stops. Add it downstream
+  of `aks` (it needs `node_resource_group` and the subnet id).
+- **If not wired — never apply the route-table removal.** `-exclude` on the subnet does
+  not help (the subnet is upstream of AKS→agent→everything, so it drags almost the whole
+  graph). Use `-target` for the resources you actually want instead.
+- **For brand-new clusters with no kubenet requirement, prefer Azure CNI** — it doesn't
+  use a subnet route table, removing this whole class of drift. Evaluate network
+  semantics before choosing it for prod.

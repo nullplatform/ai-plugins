@@ -44,16 +44,105 @@ The `nullplatform/` folder contains **only central Nullplatform configuration** 
 ### Available modules
 
 ```hcl
-# Scope definitions (at organization level)
-module "scope_definition" { }                # nullplatform/scope_definition - ALWAYS included
-module "scope_definition_scheduled_task" { } # nullplatform/scope_definition - OPTIONAL
+# Scope definitions — ONE module block with for_each over the catalog
+module "scope_definitions" { }  # nullplatform/scope_definition
+
+# Service definitions — ONE module block with for_each over the catalog
+module "service_definitions" { }  # nullplatform/service_definition
 
 # Dimensions
 module "dimensions" { }  # nullplatform/dimensions
-
-# Service definitions (optional)
-module "service_definition_endpoint_exposer" { }  # nullplatform/service_definition - OPTIONAL
 ```
+
+### The catalog shape
+
+Scopes and services live in **their own repos** (`nullplatform/services` is an index now), so each
+entry carries `repository_org`, `repository_name` and `version`. That is too much per-entry data for
+one module block per scope, and the entries must stay in sync with the other two layers. So the
+layer uses a **code-owned catalog in `locals.tf`** plus a single `for_each` module.
+
+`locals.tf`:
+
+```hcl
+locals {
+  containers_definition = {
+    service_spec_name          = "Containers"
+    service_spec_description   = "Docker containers on pods"
+    service_path               = "k8s"
+    repository_org             = "nullplatform"
+    repository_name            = "scopes"
+    version                    = "main"
+    create_scope_configuration = false
+    action_spec_names          = ["create-scope", "delete-scope"]
+  }
+
+  static_files_definition = {
+    service_spec_name          = "Static Files"
+    service_spec_description   = "Deploy static assets to S3"
+    service_path               = "static-files"
+    repository_org             = "nullplatform"
+    repository_name            = "scopes-static-files"
+    version                    = "1.0.0"
+    create_scope_configuration = true
+    action_spec_names          = ["create-scope", "delete-scope"]
+  }
+
+  scope_definitions_catalog = {
+    containers   = local.containers_definition
+    static_files = local.static_files_definition
+  }
+
+  # Containers is always on; every other entry is gated by its enable_<slug> from common.tfvars.
+  enabled_flags = {
+    containers   = true
+    static_files = var.enable_static_files
+  }
+
+  scope_definitions_enabled = {
+    for k, v in local.scope_definitions_catalog : k => merge(v, {
+      version        = coalesce(try(var.scope_definitions[k].version, null), v.version)
+      repository_url = "https://raw.githubusercontent.com/${v.repository_org}/${v.repository_name}/refs/heads"
+
+      repository_service_spec         = try(var.scope_definitions[k].repository_service_spec, null)
+      repository_service_spec_version = try(var.scope_definitions[k].repository_service_spec_version, null)
+    })
+    if local.enabled_flags[k]
+  }
+}
+```
+
+`main.tf`:
+
+```hcl
+module "scope_definitions" {
+  source   = "git::https://github.com/nullplatform/tofu-modules.git//nullplatform/scope_definition?ref=vX.Y.Z"
+  for_each = local.scope_definitions_enabled
+
+  nrn        = var.nrn
+  np_api_key = var.np_api_key
+
+  service_spec_name          = each.value.service_spec_name
+  service_spec_description   = each.value.service_spec_description
+  service_path               = each.value.service_path
+  action_spec_names          = each.value.action_spec_names
+  create_scope_configuration = each.value.create_scope_configuration
+
+  repository_service_spec        = coalesce(each.value.repository_service_spec, each.value.repository_url)
+  repository_service_spec_branch = coalesce(each.value.repository_service_spec_version, each.value.version)
+}
+```
+
+Service definitions follow the same pattern with their own fields (`repository_org`,
+`repository_name`, `repository_branch`, `service_path`, `service_name`, `available_links`,
+`available_actions`) and their own `service_enabled_flags`.
+
+**Division of labour**: the catalog is code-owned data — it lives in `locals.tf` and is versioned
+with the repo. What goes to tfvars is the per-environment part: the `enable_<slug>` toggles (in
+`common.tfvars`, shared with the other two layers) and optional version pins (in this layer's
+`terraform.tfvars`, via `var.scope_definitions` / `var.service_definitions`).
+
+Repos, refs, `service_path` values and `create_scope_configuration` per entry:
+see the scope/service catalog referenced from `SKILL.md`.
 
 ### What does NOT go in nullplatform/
 
@@ -68,56 +157,38 @@ The following modules go in `nullplatform-bindings/`, NOT here:
 
 ## Question flow
 
-### Step 1: Optional Nullplatform modules
+### Do NOT ask which scopes and services to include
 
-Ask which additional modules to include:
+That decision was already made once, in the infrastructure layer, and lives in `common.tfvars` as
+`enable_<catalog_slug>` toggles. Read them from there:
 
-**Scope Definitions:**
-- [x] Containers (scope_definition) - **Always included**
-- [ ] Scheduled Tasks (scope_definition_scheduled_task) - Optional
-
-**Service Definitions:**
-- [ ] Endpoint Exposer (service_definition) - Optional
-
----
-
-## Interactive pattern with AskUserQuestion
-
-### Step 1: Scope definitions
-
-```json
-{
-  "questions": [
-    {
-      "question": "Which scope definitions to include?",
-      "header": "Scopes",
-      "options": [
-        {"label": "Containers (Recommended)", "description": "Scope definition for standard K8s deployments"},
-        {"label": "Scheduled Tasks", "description": "Scope definition for CronJobs/periodic Jobs"},
-        {"label": "Both", "description": "Containers + Scheduled Tasks"}
-      ],
-      "multiSelect": false
-    },
-    {
-      "question": "Include additional service definitions?",
-      "header": "Services",
-      "options": [
-        {"label": "None", "description": "Only basic scope definitions"},
-        {"label": "Endpoint Exposer", "description": "Service definition for exposing endpoints"}
-      ],
-      "multiSelect": true
-    }
-  ]
-}
+```bash
+grep -E '^enable_' ../common.tfvars
 ```
+
+Asking again is not just redundant — it produces a layer that disagrees with the one that already
+created the permissions roles and cloned the repos into the agent, which is the exact drift the shared
+catalog exists to prevent. If `common.tfvars` has no `enable_*` entries, the infrastructure layer was
+generated before this convention: ask the user which entries to enable, and write the toggles to
+`common.tfvars` so the bindings layer inherits the same answer.
+
+Containers has no toggle — it is always generated.
+
+### What this layer does ask about
+
+- **Dimensions**: names, order and values (`environment`, `region`, …). Not derived from the catalog.
+- **Version pins**, only if the user wants to override a catalog ref for this environment
+  (`var.scope_definitions[<slug>].version`).
 
 ### Show summary before generating
 
 ```markdown
 | Aspect | Value |
 |--------|-------|
-| **Scope Definitions** | Containers + Scheduled Tasks |
-| **Service Definitions** | Endpoint Exposer |
+| **Scopes** (from `common.tfvars`) | containers, scheduled_tasks, static_files |
+| **Services** (from `common.tfvars`) | aws_s3_bucket, rds_postgres_server |
+| **Dimensions** | environment (development, staging, production) |
+| **Version overrides** | none |
 ```
 
 ---
@@ -155,6 +226,7 @@ Ask which additional modules to include:
 6. **NEVER transform outputs between modules** - Pass outputs as-is (without `replace`, `regex`, `split`, etc.). If in doubt about the format a variable expects, read the module's internal code (main.tf, iam.tf, locals.tf) to see how it's used, don't infer by variable name
 
 7. **Alphabetical order in main.tf** - The `module` blocks in main.tf must be sorted alphabetically by name
+   - Does not apply to the `for_each` modules of this layer (`scope_definitions`, `service_definitions`, `dimensions`): there is one block each, and the ordering that matters is the catalog's in `locals.tf`
 
 8. **Order within each module block** - `source` goes first, then variables sorted alphabetically, and `depends_on` goes last separated by a blank line from the rest:
     ```hcl
@@ -171,8 +243,11 @@ Ask which additional modules to include:
 
 7. **Verify action_spec_names against the branch the module consumes, NOT the repo default branch** - DO NOT trust the module default or the patterns in this document. The `scope_definition` module fetches each action template via `data.http` from `repository_action_templates_branch` (**default `main`**). The `nullplatform/scopes` repo's *default* branch is `beta`, so a plain `gh api .../contents/...` (no `?ref`) queries **beta** and can return action names that do NOT exist on `main` (e.g. beta has `kill-instance`, main has `kill-instances`; the `scheduled_task` action set also differs between branches). Always pin the ref to the branch the module uses:
    ```bash
-   gh api "repos/nullplatform/scopes/contents/{service_path}/specs/actions?ref=main" --jq '.[].name'
+   gh api "repos/{repository_org}/{repository_name}/contents/{service_path}/specs/actions?ref={version}" --jq '.[].name'
    ```
+   - `{repository_org}`, `{repository_name}` and `{version}` come from the catalog entry — **not**
+     hardcoded to `nullplatform/scopes`. Only Containers and Scheduled Tasks live in `scopes`;
+     every other scope has its own repo with its own action set.
    - The `{service_path}` corresponds to the scope (e.g., `k8s`, `scheduled_task`)
    - Use `?ref=<branch>` matching the module's `repository_action_templates_branch` (default `main`)
    - Use the complete list from that branch as the value for `action_spec_names`
@@ -210,19 +285,98 @@ Ask which additional modules to include:
 
 The `nullplatform/` layer MUST export outputs in `outputs.tf` so that `nullplatform-bindings/` can consume them via `terraform_remote_state`.
 
-### Rule: 2 outputs per scope definition, 2 outputs per service definition
+### Canonical: map outputs (default for new setups)
 
-For each `scope_definition` included, generate **2 outputs**:
-- `scope_specification_id` (or with suffix if there's more than one: `_scheduled_task`)
-- `scope_specification_slug` (same suffix)
+Two outputs, each a map keyed by catalog slug:
 
-For each `service_definition` included, generate **2 outputs**:
-- `service_specification_id_{name}` (e.g., `_endpoint_exposer`)
-- `service_specification_slug_{name}`
+```hcl
+output "scope_definitions" {
+  description = "Enabled scope definitions keyed by catalog slug, with catalog metadata so bindings can derive paths and URLs."
+  value = {
+    for k, m in module.scope_definitions : k => {
+      id                          = m.service_specification_id
+      slug                        = m.service_slug
+      provider_specification_slug = try(m.provider_specification_slug, "")
+      repository_org              = local.scope_definitions_enabled[k].repository_org
+      repository_name             = local.scope_definitions_enabled[k].repository_name
+      service_path                = local.scope_definitions_enabled[k].service_path
+      version                     = local.scope_definitions_enabled[k].version
+    }
+  }
+}
 
-Each output takes its value from the module that created that scope or service in the generated `main.tf`. Read the downloaded module's `outputs.tf` in `.terraform/modules/` to know the real output names and map them to the contract names above.
+output "service_definitions" {
+  description = "Enabled service definitions keyed by catalog slug, with catalog metadata."
+  value = {
+    for k, m in module.service_definitions : k => {
+      id              = m.service_specification_id
+      slug            = m.service_specification_slug
+      repository_org  = local.service_definitions_enabled[k].repository_org
+      repository_name = local.service_definitions_enabled[k].repository_name
+      service_path    = local.service_definitions_enabled[k].service_path
+      version         = local.service_definitions_enabled[k].repository_branch
+    }
+  }
+}
+```
 
-**IMPORTANT**: These output names are a contract with `nullplatform-bindings/`. If they change, bindings will break.
+**Watch the asymmetry between the two modules' output names** — verified against the downloaded
+modules, not inferred:
+
+| Field | `scope_definition` exposes | `service_definition` exposes |
+|---|---|---|
+| id | `service_specification_id` | `service_specification_id` |
+| slug | `service_slug` | `service_specification_slug` |
+
+**Why maps and not one output per entry**: the comprehension iterates the `for_each` instances, so
+only enabled entries appear. Disabling a scope removes it from the map, whereas a per-entry output
+with a literal index (`module.scope_definitions["static_files"]`) fails to evaluate and breaks the
+whole layer.
+
+The metadata fields (`repository_org`, `repository_name`, `service_path`, `version`) exist so the
+bindings layer can **derive** its `repo_path` and notification-channel URLs instead of repeating the
+catalog. That derivation is what makes one `enable_<slug>` toggle govern all three layers.
+
+> **Status of the `version` field and the derivation it enables:** validated with `tofu validate`
+> (including the case of a disabled entry) but **not yet present in any applied setup** — the AWS
+> reference setup's outputs carry the other four metadata fields and hardcode branch strings in its
+> bindings layer instead. Everything else in this section matches applied HCL. Worth knowing before
+> you treat a mismatch with an existing setup as a bug in that setup.
+
+**These output names are a contract with `nullplatform-bindings/`.** If they change, bindings breaks.
+
+### Legacy: suffixed outputs (existing setups only)
+
+Setups generated before the catalog shape expose one output pair per entry, with a suffix:
+
+```hcl
+output "scope_specification_id" { }                 # containers
+output "scope_specification_slug" { }
+output "scope_specification_id_scheduled_task" { }
+output "scope_specification_slug_scheduled_task" { }
+output "service_specification_id_endpoint_exposer" { }
+output "service_specification_slug_endpoint_exposer" { }
+```
+
+**How to recognize it**: `nullplatform/outputs.tf` has suffixed outputs instead of the two maps.
+
+```bash
+grep -E '^output "(scope|service)_definitions"' outputs.tf
+```
+
+No match means legacy.
+
+**Do not mix the two shapes.** The bindings layer consumes one or the other; half-migrated, some
+associations read a map that does not exist yet.
+
+**Migration path** (three applies, all non-destructive — only outputs change, no resources):
+
+1. Add the two map outputs alongside the existing suffixed ones. `tofu plan` must show
+   `0 to add, 0 to change, 0 to destroy`.
+2. Migrate `nullplatform-bindings/locals.tf` to read the maps, and apply that layer.
+3. Delete the suffixed outputs from `nullplatform/outputs.tf` and apply again.
+
+Doing step 3 before step 2 breaks bindings until it is migrated.
 
 ---
 
@@ -251,6 +405,10 @@ Each output takes its value from the module that created that scope or service i
 
 Module blocks must be clean, without inline comments. Only use separation comments BEFORE the module block.
 
+**Scoped to `module` blocks.** The catalog in `locals.tf` does carry comments — it is the place that
+records why an entry pins a given repo and ref, and which entries are always on. Keep them concise:
+one line explaining the non-obvious *why*, not a paraphrase of the HCL.
+
 **Correct**: Separation comment BEFORE the block, no comments inside.
 ```hcl
 # =============================================================================
@@ -269,6 +427,12 @@ module "name" {
 ### 5. NEVER hardcode values - always use variables
 
 Every value in a module must come from a variable or local. DO NOT assign values directly (strings, lists). Declare the variable in `variables.tf`.
+
+**The catalog is the exception, and it is not a loophole.** Repo names, `service_path` values and
+`action_spec_names` are code-owned facts about the platform, not per-environment configuration — they
+belong as literals in the `locals.tf` catalog. What must never be hardcoded is anything that varies
+by environment: NRNs, API keys, the `enable_<slug>` toggles, and version pins. Those go to
+`common.tfvars` or this layer's `terraform.tfvars`.
 
 ### 6. Consistent variable structure
 
