@@ -129,13 +129,27 @@ get_valid_token() {
         return 1
     fi
 
-    echo "[auth] ERROR: No authentication configured. Set one of these environment variables:" >&2
+    # 3. Fall back to the `np login` session (only reached when neither
+    #    NP_API_KEY nor NP_TOKEN is set — env vars always take precedence).
+    if command -v np >/dev/null 2>&1; then
+        local np_token=$(np token get --format bash 2>/dev/null | sed -n 's/^export ACCESS_TOKEN="\(.*\)"$/\1/p')
+        if [ -n "$np_token" ] && is_jwt_valid "$np_token"; then
+            echo "[auth] Using the 'np login' session (np token get)." >&2
+            echo "$np_token"
+            return 0
+        fi
+    fi
+
+    echo "[auth] ERROR: No authentication configured. Use ONE of these:" >&2
     echo "" >&2
-    echo "  NP_API_KEY (recommended - never expires, token cached in ~/.claude/)" >&2
+    echo "  NP_API_KEY (recommended for CI/agents - never expires, token cached in ~/.claude/)" >&2
     echo "    export NP_API_KEY='your-api-key'" >&2
     echo "" >&2
     echo "  NP_TOKEN (bearer token - expires in ~24h)" >&2
     echo "    export NP_TOKEN='eyJ...'" >&2
+    echo "" >&2
+    echo "  np login (interactive browser SSO — picked up automatically via 'np token get')" >&2
+    echo "    np login --np-url https://<your-org>.app.nullplatform.io" >&2
     return 1
 }
 
@@ -207,6 +221,16 @@ check_auth() {
         fi
     fi
 
+    # 3. Fall back to the `np login` session (only when no env var was set)
+    if [ "$auth_valid" = false ] && [ -z "${NP_API_KEY:-}" ] && [ -z "${NP_TOKEN:-}" ] && command -v np >/dev/null 2>&1; then
+        local np_token=$(np token get --format bash 2>/dev/null | sed -n 's/^export ACCESS_TOKEN="\(.*\)"$/\1/p')
+        if [ -n "$np_token" ] && is_jwt_valid "$np_token"; then
+            echo "Found: np login session (np token get)"
+            auth_source="np login session (np token get)"
+            auth_valid=true
+        fi
+    fi
+
     echo ""
     if [ "$auth_valid" = true ]; then
         echo "Authentication configured via: $auth_source"
@@ -221,6 +245,9 @@ check_auth() {
         echo ""
         echo "  Option 2: NP_TOKEN (bearer token - expires in ~24h)"
         echo "    export NP_TOKEN='eyJ...'"
+        echo ""
+        echo "  Option 3: np login (interactive browser SSO — picked up automatically)"
+        echo "    np login --np-url https://<your-org>.app.nullplatform.io"
         echo ""
         echo "  To get an API Key:"
         echo "    1. Go to Nullplatform UI -> Settings -> API Keys"

@@ -13,6 +13,8 @@
 #   1. NULLPLATFORM_API_KEY (same variable the np CLI uses)
 #   2. NP_API_KEY (legacy alias)
 #   3. NP_TOKEN (JWT access token)
+#   4. `np login` session, via `np token get` (stored refresh token; only
+#      tried when no env var is set, so env/.env always win)
 
 # Configuration
 BASE_URL="https://api.nullplatform.com"
@@ -192,6 +194,19 @@ if [ "$AUTH_VALID" = false ] && [ -n "$NP_TOKEN" ]; then
     fi
 fi
 
+# 4. Fall back to the `np login` session (only when no env var was set).
+#    `np token get` renews the access token from the stored refresh token.
+if [ "$AUTH_VALID" = false ] && [ -z "$NULLPLATFORM_API_KEY" ] && [ -z "$NP_API_KEY" ] && [ -z "$NP_TOKEN" ] && command -v np >/dev/null 2>&1; then
+    np_session_token=$(np token get --format bash 2>/dev/null | sed -n 's/^export ACCESS_TOKEN="\(.*\)"$/\1/p')
+    if [ -n "$np_session_token" ]; then
+        echo "Found: np login session (np token get)"
+        if check_jwt_token "$np_session_token" "np login session"; then
+            AUTH_SOURCE="np login session (np token get)"
+            AUTH_VALID=true
+        fi
+    fi
+fi
+
 # Warn if NP_TOKEN is set and expired/invalid — it poisons the CLI even when API key is valid
 if [ "$AUTH_VALID" = true ] && [ -n "$NP_TOKEN" ] && [[ "$AUTH_SOURCE" != *"NP_TOKEN"* ]]; then
     # Auth succeeded via API key, but NP_TOKEN is also set — check if it's expired
@@ -267,5 +282,9 @@ else
     echo "    1. Go to nullplatform UI"
     echo "    2. Click your profile (top right)"
     echo "    3. Click 'Copy personal access token'"
+    echo ""
+    echo "  ALTERNATIVE: np login (interactive browser SSO — picked up automatically)"
+    echo "  ========================================================================"
+    echo "  np login --np-url https://<your-org>.app.nullplatform.io"
     exit 1
 fi

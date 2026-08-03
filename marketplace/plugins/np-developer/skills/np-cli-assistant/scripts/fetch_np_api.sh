@@ -10,10 +10,12 @@
 #   ./fetch_np_api.sh "/application/441069822"
 #   ./fetch_np_api.sh "/deployment/123456?include_messages=true"
 #
-# Authentication precedence (environment variables only):
+# Authentication precedence:
 #   1. NULLPLATFORM_API_KEY (same variable the np CLI uses)
 #   2. NP_API_KEY (legacy alias)
 #   3. NP_TOKEN (JWT access token)
+#   4. `np login` session, via `np token get` (stored refresh token; only
+#      tried when no env var is set, so env/.env always win)
 
 set -e
 
@@ -130,12 +132,24 @@ get_valid_token() {
         fi
     fi
 
+    # 4. Fall back to the `np login` session (only reached when no env var
+    #    was set — env vars always take precedence).
+    if command -v np >/dev/null 2>&1; then
+        local np_token=$(np token get --format bash 2>/dev/null | sed -n 's/^export ACCESS_TOKEN="\(.*\)"$/\1/p')
+        if [ -n "$np_token" ] && is_jwt_valid "$np_token"; then
+            echo "[auth] Using the 'np login' session (np token get)." >&2
+            echo "$np_token"
+            return 0
+        fi
+    fi
+
     echo "Error: No valid authentication found." >&2
     echo "" >&2
     echo "Run check_auth.sh for setup instructions, or configure one of:" >&2
     echo "  1. export NULLPLATFORM_API_KEY='your-api-key'  (recommended)" >&2
     echo "  2. export NP_API_KEY='your-api-key'" >&2
     echo "  3. export NP_TOKEN='your-jwt-token'" >&2
+    echo "  4. np login --np-url https://<your-org>.app.nullplatform.io  (browser SSO, picked up automatically)" >&2
     return 1
 }
 

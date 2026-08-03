@@ -36,22 +36,25 @@ If the script fails (exit code 1), **DO NOT stop**. Use `AskUserQuestion` to off
 
 | Option | Label | Description |
 |--------|-------|-------------|
-| 1 | I have the token | I can provide my nullplatform token |
-| 2 | Skip Data Lake | Continue without data lake |
+| 1 | np login | Log in via browser SSO with the np CLI; the skill picks up the session automatically |
+| 2 | I have the token | I can provide my nullplatform token |
+| 3 | Skip Data Lake | Continue without data lake |
 
 **Based on the response:**
 
-- **Option 1 (token)**: Ask whether they have an API key or a personal token. Configure `export NP_API_KEY="<key>"` (preferred) or `export NP_TOKEN="<token>"`. Re-run `check_ch_auth.sh` to confirm.
-- **Option 2 (skip)**: Inform the user that the data lake will not be available and continue using the REST API as fallback.
+- **Option 1 (np login)**: Have the user run `np login --np-url https://<their-org>.app.nullplatform.io` (requires an up-to-date np CLI; `np upgrade` if the command is missing). Re-run `check_ch_auth.sh` to confirm — the library resolves the session via `np token get`, no env var needed.
+- **Option 2 (token)**: Ask whether they have an API key or a personal token. Configure `export NP_API_KEY="<key>"` (preferred) or `export NP_TOKEN="<token>"`. Re-run `check_ch_auth.sh` to confirm.
+- **Option 3 (skip)**: Inform the user that the data lake will not be available and continue using the REST API as fallback.
 
 Token lookup priority (handled internally by `scripts/lib/np_auth.sh`):
 
-1. `NP_API_KEY` environment variable (recommended — exchanged for a JWT and cached in `~/.claude/`)
+1. `NP_API_KEY` environment variable (recommended for CI/agents — exchanged for a JWT and cached in `~/.claude/`)
 2. `NP_TOKEN` environment variable (personal JWT, ~24h expiry)
+3. `np login` session via `np token get` (stored refresh token; only when neither env var is set, so env/.env always win)
 
 **Token cache troubleshooting**: if the cached JWT gets corrupted or you rotate the API key, remove the cache files: `rm ~/.claude/.np-token-*.cache`. The next query re-exchanges the API key and repopulates the cache.
 
-**Getting credentials**: `NP_API_KEY` → Nullplatform UI → Platform Settings → API Keys → create a key scoped to the organization. `NP_TOKEN` → Nullplatform UI → Profile → Copy personal access token.
+**Getting credentials**: `NP_API_KEY` → Nullplatform UI → Platform Settings → API Keys → create a key scoped to the organization. `NP_TOKEN` → Nullplatform UI → Profile → Copy personal access token. Or simply `np login` — no credential copying needed.
 
 ## Organization Filter (Server-Side)
 

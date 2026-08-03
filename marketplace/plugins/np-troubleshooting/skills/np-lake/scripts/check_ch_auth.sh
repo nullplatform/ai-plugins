@@ -9,7 +9,8 @@
 #   0 - Authentication verified and lake reachable
 #   1 - Authentication or connectivity failed
 #
-# Reads NP_API_KEY (preferred) or NP_TOKEN env var. See scripts/lib/np_auth.sh.
+# Reads NP_API_KEY (preferred), NP_TOKEN, or falls back to the `np login`
+# session (`np token get`). See scripts/lib/np_auth.sh.
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -28,7 +29,7 @@ fi
 
 echo "Checking nullplatform authentication..."
 if ! BEARER_TOKEN=$(get_valid_token); then
-    echo -e "${RED}[FAIL]${NC} No valid credentials. Configure NP_API_KEY or NP_TOKEN and retry." >&2
+    echo -e "${RED}[FAIL]${NC} No valid credentials. Configure NP_API_KEY / NP_TOKEN, or run 'np login', and retry." >&2
     exit 1
 fi
 echo -e "${GREEN}[OK]${NC} Authentication token resolved"

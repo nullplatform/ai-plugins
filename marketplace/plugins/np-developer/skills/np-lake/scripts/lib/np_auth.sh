@@ -14,6 +14,8 @@
 # Token precedence:
 #   1. NP_API_KEY (exchanged for a JWT, cached in ~/.claude/)
 #   2. NP_TOKEN   (direct personal JWT, ~24h expiry)
+#   3. `np login` session, via `np token get` (uses the stored refresh token;
+#      only tried when neither env var is set, so env/.env always win)
 
 NP_BASE_URL="${NP_BASE_URL:-https://api.nullplatform.com}"
 NP_TOKEN_CACHE_DIR="$HOME/.claude"
@@ -132,12 +134,29 @@ get_valid_token() {
         return 1
     fi
 
-    echo "[auth] ERROR: No authentication configured. Set one of:" >&2
+    # 3. Fall back to the `np login` session (only reached when neither
+    #    NP_API_KEY nor NP_TOKEN is set — env vars always take precedence).
+    #    `np token get` renews the access token from the stored refresh token
+    #    and prints it; it exits non-zero / prints no token when not logged in.
+    if command -v np >/dev/null 2>&1; then
+        local np_token
+        np_token=$(np token get --format bash 2>/dev/null | sed -n 's/^export ACCESS_TOKEN="\(.*\)"$/\1/p')
+        if [ -n "$np_token" ] && _np_is_jwt_valid "$np_token"; then
+            echo "[auth] Using the 'np login' session (np token get)." >&2
+            echo "$np_token"
+            return 0
+        fi
+    fi
+
+    echo "[auth] ERROR: No authentication configured. Use ONE of these:" >&2
     echo "" >&2
-    echo "  NP_API_KEY (recommended - never expires, token cached in ~/.claude/)" >&2
+    echo "  NP_API_KEY (recommended for CI/agents - never expires, token cached in ~/.claude/)" >&2
     echo "    export NP_API_KEY='your-api-key'" >&2
     echo "" >&2
     echo "  NP_TOKEN (personal JWT - expires in ~24h)" >&2
     echo "    export NP_TOKEN='eyJ...'" >&2
+    echo "" >&2
+    echo "  np login (interactive browser SSO — this library picks up the session automatically)" >&2
+    echo "    np login --np-url https://<your-org>.app.nullplatform.io" >&2
     return 1
 }
