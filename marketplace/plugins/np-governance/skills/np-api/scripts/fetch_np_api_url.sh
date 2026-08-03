@@ -13,6 +13,8 @@
 # Authentication precedence:
 #   1. NP_API_KEY environment variable (exchanges for token, caches in ~/.claude/)
 #   2. NP_TOKEN environment variable (direct bearer token, no cache)
+#   3. `np login` session, via `np token get` (uses the stored refresh token;
+#      only tried when neither env var is set, so env/.env always win)
 #
 # Environment overrides (for use by other skills that share the same auth):
 #   NP_API_BASE_URL    Target API base URL (default: https://api.nullplatform.com).
@@ -232,6 +234,25 @@ exchange_api_key_for_token() {
     echo "$token"
 }
 
+# Print guidance for the `np login` auth tier, tailored to the np CLI state:
+# missing (install), too old to have `np login` (upgrade), or present (log in).
+# `np token get --help` exits 0 only on CLIs new enough to have np login.
+np_login_guidance() {
+    if ! command -v np >/dev/null 2>&1; then
+        echo "  np login (interactive browser SSO) — the np CLI is not installed:"
+        echo "    curl https://cli.nullplatform.com/install.sh | bash"
+        echo "    np login --np-url https://<your-org>.app.nullplatform.io   # or set NP_LOGIN_URL"
+    elif np token get --help >/dev/null 2>&1; then
+        echo "  np login (interactive browser SSO — stores an auto-renewed refresh token):"
+        echo "    np login --np-url https://<your-org>.app.nullplatform.io   # or set NP_LOGIN_URL"
+        echo "    Once logged in, this skill picks up the session automatically."
+    else
+        echo "  np login — your np CLI is outdated and has no 'np login'; update it first:"
+        echo "    np upgrade   # or: curl https://cli.nullplatform.com/install.sh | bash"
+        echo "    np login --np-url https://<your-org>.app.nullplatform.io   # or set NP_LOGIN_URL"
+    fi
+}
+
 # Function to get a valid Bearer token
 # Handles precedence and caching
 get_token_cache_file() {
@@ -284,13 +305,29 @@ get_valid_token() {
         return 1
     fi
 
-    echo "[auth] ERROR: No authentication configured. Set one of these environment variables:" >&2
+    # 3. Fall back to the `np login` session (only reached when neither
+    #    NP_API_KEY nor NP_TOKEN is set — env vars always take precedence).
+    #    `np token get` renews the access token from the stored refresh token
+    #    and prints it; it exits non-zero / prints no token when not logged in.
+    if command -v np >/dev/null 2>&1; then
+        local np_token
+        np_token=$(np token get --format bash 2>/dev/null | sed -n 's/^export ACCESS_TOKEN="\(.*\)"$/\1/p')
+        if [ -n "$np_token" ] && is_jwt_valid "$np_token"; then
+            echo "[auth] Using the 'np login' session (np token get)." >&2
+            echo "$np_token"
+            return 0
+        fi
+    fi
+
+    echo "[auth] ERROR: No authentication configured. Use ONE of these:" >&2
     echo "" >&2
-    echo "  NP_API_KEY (recommended - never expires, token cached in ~/.claude/)" >&2
+    echo "  NP_API_KEY (recommended for CI/agents - never expires, token cached in ~/.claude/)" >&2
     echo "    export NP_API_KEY='your-api-key'" >&2
     echo "" >&2
     echo "  NP_TOKEN (bearer token - expires in ~24h)" >&2
     echo "    export NP_TOKEN='eyJ...'" >&2
+    echo "" >&2
+    np_login_guidance >&2
     return 1
 }
 

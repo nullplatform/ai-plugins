@@ -27,6 +27,8 @@ Public endpoints (gateway):
 7. **`mode` filter on list-runs**: `GET /approval` accepts `?mode=policy|checklist`. Legacy rows have `mode = NULL` — to find them, use no `mode` filter and inspect the response field.
 8. **Condition paths carry NO `context.` prefix**: `query` and `applies_when` are the same mongo-like language *and the same addressing* as approval policies — write `build.metadata.coverage`, not `context.build.metadata.coverage`. A `context.`-rooted path is rejected at save time (`condition.query.context_rooted_path` / `item.applies_when.context_rooted_path`). The one exception is `external.inputs` mustache placeholders, which keep `{{ context.* }}` — that is the dispatch payload, not the query language.
 9. **Never name an item `and`, `or`, `not`, `true` or `false`**: the aggregation grammar reserves those words, so `or.passed` can't be parsed and the run resolves to `fail` / `aggregation_parse_error`. Rejected by the validator with `item.id.reserved`. (`nor` is fine.)
+10. **Manual items can declare `inputs` (JSON Schema + optional JSONForms `ui_schema`) and `validations` (same mongo-style query language as policies)** — feature branch, see `docs/concepts/inputs-and-validations.md`. Two traps: `ui_schema` is a JSONForms UISchema (layouts + `Control` scopes), NOT RJSF `"ui:*"` keys; and validations gate ONLY `status: passed` submits — a Reject always applies without running rules (uniform state machine, by design).
+11. **External validations dispatch with action `checklist:item:validation_dispatched`** (not `checklist:item:dispatched`) and resolve with `POST …/validations/{validationId}` body `{passed: boolean}` — a different contract from external items. Workflow-side, subscribe via `np-checklist-trigger` with that `action` and close with `np-checklist-validation-resolve`.
 
 ## Available Scripts
 
@@ -78,6 +80,7 @@ Public endpoints (gateway):
 @${CLAUDE_PLUGIN_ROOT}/skills/np-checklist/docs/concepts/modes.md
 @${CLAUDE_PLUGIN_ROOT}/skills/np-checklist/docs/concepts/item-types.md
 @${CLAUDE_PLUGIN_ROOT}/skills/np-checklist/docs/concepts/aggregation.md
+@${CLAUDE_PLUGIN_ROOT}/skills/np-checklist/docs/concepts/inputs-and-validations.md
 @${CLAUDE_PLUGIN_ROOT}/skills/np-checklist/docs/concepts/persistence.md
 
 ### Operational (how to use the scripts)

@@ -30,9 +30,16 @@ Run the verification script:
 ${CLAUDE_PLUGIN_ROOT}/skills/np-api/scripts/check_auth.sh
 ```
 
-Show the result to the user. If it fails, indicate the options:
+Show the result to the user. If it fails, indicate the options.
 
-**RECOMMENDED: NP_API_KEY (doesn't expire, token cached in ~/.claude/)**
+Authentication is resolved in this precedence (env/`.env` always win; the
+`np login` session is the fallback when no env var is set):
+
+1. **`NP_API_KEY`** env var
+2. **`NP_TOKEN`** env var
+3. **`np login` session** — picked up automatically via `np token get`
+
+**RECOMMENDED for CI/agents: NP_API_KEY (doesn't expire, token cached in ~/.claude/)**
 
 ```bash
 export NP_API_KEY='your-api-key'
@@ -51,6 +58,28 @@ export NP_TOKEN='eyJ...'
 1. Go to the Nullplatform UI
 2. Click on your profile (top right corner)
 3. Click on "Copy personal access token"
+
+**Interactive: np login (browser SSO, stores an auto-renewed refresh token)**
+
+When no env var is set and the `np` CLI is installed, the skill uses the session
+established by `np login`. The guidance adapts to the CLI state:
+
+- **CLI not installed** → suggests installing it (`curl https://cli.nullplatform.com/install.sh | bash`)
+- **CLI too old** (no `np login`/`np token get`) → suggests `np upgrade`
+- **CLI present, not logged in** → suggests logging in:
+
+```bash
+np login --np-url https://<your-org>.app.nullplatform.io   # or set NP_LOGIN_URL
+```
+
+This opens the browser for company SSO, stores a refresh token locally
+(OS keyring, or `~/.np`), and this skill then picks it up automatically —
+no token copy/paste needed. Ideal for interactive/agent sessions.
+
+**Selecting a profile:** `np login` can store several profiles. Set
+`NP_PROFILE=<name>` (default `default`) and the skill targets that profile's
+session automatically — `NP_PROFILE=prod` and the `np token get` fallback both
+resolve the same profile. Log a profile in with `np login --np-url ... --profile prod`.
 
 ---
 
