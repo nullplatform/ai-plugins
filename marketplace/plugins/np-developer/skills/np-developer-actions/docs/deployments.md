@@ -242,10 +242,31 @@ que no necesita la ventana de rollback.
 np-api fetch-api "/deployment/<deployment_id>?include_messages=true"
 ```
 
+**CRITICO - `creating_approval` NO se monitorea desde el deployment**: mientras haya una
+aprobacion abierta, `deployment.status` se queda CLAVADO en `creating_approval` — pollearlo
+no informa nada (ni siquiera cambia cuando la checklist termina de evaluar o falla). Al ver
+`creating_approval` UNA vez, dejar de pollear el deployment e ir DIRECTO al paso 10a: la
+señal de progreso y de terminacion vive en el approval (modo policy) o en el checklist run
+(modo checklist). Se vuelve a pollear el deployment recien cuando el approval quedo
+`approved`/`auto_approved` y el deployment arranco.
+
 #### Paso 10a: Si el deployment queda en `creating_approval`
 
-El status `creating_approval` significa que el deployment esta esperando aprobacion de **policies**.
-Las policies pueden auto-aprobar, auto-rechazar, o requerir aprobacion manual.
+El status `creating_approval` significa que el deployment esta esperando una aprobacion —
+que puede evaluarse por **policies** (modo clasico) o por **checklist** (el modo nuevo).
+
+**Paso previo OBLIGATORIO — detectar el modo ANTES de elegir flujo** (saltearlo es la causa
+tipica de quedarse esperando algo que nunca va a pasar):
+
+```bash
+# Buscar el approval del deployment y leer su modo (NRN URL-encoded: = → %3D, : → %3A)
+np-api fetch-api "/approval?nrn=<deployment_nrn_encoded>" \
+  | jq '.results[0] | {id, status, mode, checklist}'
+```
+
+- `mode: "checklist"` → ir DIRECTO al paso **10a-CHK** (mas abajo). No hay `policy_context`;
+  todo lo que sigue de policies (10a.1–10a.4) NO aplica.
+- `mode: "policy"` o `null` → seguir este flujo de policies (10a.1 en adelante).
 
 **IMPORTANTE**: La **aprobacion** en si NO se puede hacer desde este skill — es un proceso
 organizacional que pasa por canales externos (Slack, UI de Nullplatform, etc.). Sin embargo,
@@ -299,6 +320,106 @@ y que condiciones no se cumplieron (`evaluations[].result: "not_met"`).
 3. **`approved` + `execution_status: pending`**: El deployment fue aprobado pero necesita
    ser iniciado. Ejecutar via API o desde la UI de Nullplatform
 4. **`expired`**: Recrear el deployment si la ventana de aprobacion expiro
+
+##### 10a-CHK: Approvals en modo checklist
+
+Si el approval tiene `mode: "checklist"`, NO hay `policy_context` — la evaluacion vive en
+un **checklist run**. La fila del approval trae un resumen en `checklist` (`aggregate_status`,
+`final_outcome`, `outcome_reason`, `items_summary`) y el detalle completo se lee con:
+
+```bash
+np-api fetch-api "/approval/<approval_id>/checklist"
+```
+
+Del resultado importan:
+
+- `items[]`: cada item con `id`, `title`, `description`, `behavior` (`gate` bloquea,
+  `informational` no), `status` (`passed`/`failed`/`pending`/`skipped`) y — para condiciones —
+  `state.details.query`: la **condicion esperada** en formato mongo-like (ej.
+  `{"build.metadata.coverage": {"$gte": 80}}`). Esto es lo que la checklist valida y por que.
+- `context_snapshot`: el contexto contra el que se evaluo (mismo addressing que las queries:
+  `build.metadata.coverage` en la query se lee de `.build.metadata.coverage` aca). Comparar
+  query vs snapshot dice EXACTAMENTE que valor no cumplio.
+- `action_config.on_checklist_fail`: `manual` | `deny` — decide que pasa al fallar.
+- `action_config.checklist_fail_mode`: `on_request` (default) | `auto` — con `auto` un fail va
+  DERECHO a review clasica (no hay fail retomable: ya esta en la waiting room, solo queda
+  esperar aprobacion o cancelar); con `on_request` aplica el loop de agente de abajo.
+- `available_actions`: verbos disponibles (`ask_for_manual`, `cancel`, `override`).
+
+**Monitorear el RUN (no el deployment) hasta que resuelva:**
+
+Mientras la checklist evalua (items external corriendo analisis, agentes auditando, etc.)
+el deployment sigue clavado en `creating_approval` y el approval en `pending` — el UNICO
+lugar donde se ve progreso es el run:
+
+```bash
+# Repetir cada 10-15 segundos MIENTRAS aggregate_status sea pending_items / pending_aggregation
+np-api fetch-api "/approval/<approval_id>/checklist" | jq '{
+  aggregate_status, final_outcome, outcome_reason,
+  progreso: [.items[] | {id, status}] | group_by(.status) | map({(.[0].status): length}) | add
+}'
+```
+
+**Condicion de terminacion — el run TERMINO cuando `aggregate_status` es `resolved`**
+(o `pending_override`, que espera decision humana). Ahi `final_outcome` dice el resultado
+y se sigue con la tabla de abajo. Señales tipicas de que ya no hay que esperar mas:
+
+- `aggregate_status: resolved` + `final_outcome: approve` → el approval pasa a
+  `auto_approved` y el deployment ARRANCA solo (volver al paso 10 a monitorear el deployment).
+- `aggregate_status: resolved` + `final_outcome: fail` → NADA mas va a cambiar solo:
+  el deployment se queda en `creating_approval` para siempre. Pasar YA al loop de agente
+  o a `ask-for-manual` segun la tabla — seguir esperando es un error.
+- `aggregate_status: pending_override` → un gate fallo y hay item de override pendiente:
+  decision humana, no seguir polleando en loop.
+- Items individuales en `failed` con el run aun `pending_items` → todavia pueden faltar
+  items, pero ya se puede ir leyendo `state.details` de los fallidos para preparar el fix.
+
+**Interpretar estados (modo checklist):**
+
+| `status` approval | `checklist.final_outcome` | Significado | Accion |
+|---|---|---|---|
+| `auto_approved` | `approve` | Gates pasaron | `POST /approval/{id}/execute` para iniciar |
+| `pending` | `null` (aggregate `pending_items`) | Items manuales/external pendientes | Ver `items_summary.first_pending_actionable_by_me`; un reviewer resuelve items via el skill np-checklist |
+| `pending` | `fail` + `on_checklist_fail: manual` | **Fail retomable** — nadie fue notificado | Loop de agente (abajo) |
+| `pending` | `fail` + `outcome_reason: requested_manual_review` | Ya escalado a review clasica | Esperar aprobacion humana; luego execute |
+| `auto_denied` | `fail` (action con `deny`) | Gates fallaron, denegado | Corregir la causa y recrear deployment |
+
+**Loop de agente para el fail retomable** (el caso de diseño: la checklist es una gate
+educativa — p.ej. cumplimiento de decisiones de arquitectura — y un agente puede resolverla
+solo, sin molestar a un humano):
+
+```bash
+# 1. Leer QUE fallo y QUE se esperaba
+np-api fetch-api "/approval/<approval_id>/checklist" | jq '{
+  failed_gates: [.items[] | select(.status=="failed" and .behavior=="gate")
+    | {id, title, description, expected: .state.details.query}],
+  contexto: .context_snapshot | {build, release, user}
+}'
+
+# 2. Arreglar la causa en el codigo/metadata (cumplir la query esperada:
+#    subir cobertura, cumplir la politica de arquitectura, etc.)
+
+# 3. Retirar este intento y redeployar — el deployment nuevo re-evalua la checklist
+np-api fetch-api --method POST --data '{}' "/approval/<approval_id>/cancel"
+#    (luego POST /deployment normal con el build corregido)
+
+# 4. ULTIMO RECURSO — el gate genuinamente necesita excepcion humana:
+np-api fetch-api --method POST --data '{"reason": "<por que no puedo cumplirlo>"}'   "/approval/<approval_id>/checklist/ask-for-manual"
+#    Esto convierte el approval en la review CLASICA (waiting room), notifica a los
+#    reviewers (recien aca — el fail retomable no notifica a nadie), y al aprobarse
+#    se inicia con POST /approval/{id}/execute como siempre.
+```
+
+Reglas para el agente:
+
+1. **Preferir SIEMPRE arreglar-y-redeployar** sobre `ask-for-manual` — la checklist
+   existe para enseñar el estandar, no para generar pedidos de excepcion.
+2. `ask-for-manual` es requester-only: solo funciona con la misma identidad que creo
+   el deployment.
+3. Un item `informational` fallido NO bloquea — no gastar esfuerzo en el.
+4. Los items `manual` de la checklist los resuelve un reviewer (skill np-checklist,
+   `manual_approve_item.sh`); si `first_pending_actionable_by_me` no es null, el
+   PROPIO caller puede resolverlo.
 
 ##### 10a.2: Mostrar detalle de policies evaluadas
 
@@ -377,6 +498,7 @@ np-api fetch-api "/service/<instance_id>/action/<action_id>?include_messages=tru
 |---------|---------------|-------------|
 | Queda en `creating_approval` y luego `cancelled` | Policies rechazan (coverage, vulns) | Revisar build quality, desplegar desde UI |
 | Queda en `creating_approval` con `auto_denied` | Policies rechazaron automaticamente | Revisar `policy_context.policies[]` del approval para ver que fallo |
+| Approval `pending` con `checklist.final_outcome: fail` | Fail retomable de checklist (modo checklist, `on_checklist_fail: manual`) | Leer los gates fallidos del run, arreglar la causa, cancelar y redeployar (paso 10a-CHK) |
 | Approval `expired` | Ventana de aprobacion expiro sin respuesta | Recrear deployment si es necesario |
 | Status `failed` sin messages | El agent no proceso la notificacion | Verificar notification channels y agent |
 | BackOff events en messages | Container crashea al iniciar | Revisar logs: health check path, puerto, variables de entorno |

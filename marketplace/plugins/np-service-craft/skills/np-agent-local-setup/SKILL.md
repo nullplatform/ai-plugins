@@ -61,7 +61,7 @@ The key format is `base64.base64` (two segments separated by a dot).
 
 ### Step 2: Prepare the repo in ~/.np/
 
-The agent looks for scripts in `~/.np/` (default basepath). Derive org and repo from the project context (git remote, directory name, or ask the user). Create the symlink:
+The agent looks for scripts in `~/.np/` (default basepath). Derive org and repo from the git remote with `${CLAUDE_PLUGIN_ROOT}/skills/np-api/scripts/np-context.sh remote-url` (prints `https://<host>/<org>/<repo>`; falls back to the directory name or asking the user when there is no remote). Create the symlink:
 
 ```bash
 mkdir -p ~/.np/<org>

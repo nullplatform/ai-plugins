@@ -53,6 +53,25 @@ place_qs() {
 }
 
 fail_on_error_body() { # $1: response body; prints+exits when it's an error payload
+  # The engine reports failures as RFC7807 problem+json (.type/.title/.status/
+  # .detail), and the transport (fetch_np_api_url.sh runs `curl -s` with no
+  # --fail) exits 0 whatever the HTTP status — so a rejected write arrives here
+  # looking like an ordinary response. Matching only `.error` missed all of it:
+  # a 403 on `config.sh set` fell through and the renderer below printed `{}`
+  # with exit 0, telling the caller a secret had been stored when it had not.
+  #
+  # Guard on the NUMERIC .status so a config record carrying a string status is
+  # never mistaken for an error. (Verified: config payloads carry no top-level
+  # .status at all.)
+  if echo "$1" | jq -e '(.status? | numbers) >= 400' >/dev/null 2>&1; then
+    local status title detail
+    status=$(echo "$1" | jq -r '.status')
+    title=$(echo "$1" | jq -r '.title // "error"')
+    detail=$(echo "$1" | jq -r '.detail // ""')
+    echo "[config] ERROR: HTTP $status ($title)" >&2
+    [ -n "$detail" ] && echo "  $detail" >&2
+    exit 1
+  fi
   if echo "$1" | jq -e '.error? // empty' >/dev/null 2>&1; then
     echo "$1" | jq . >&2
     exit 1

@@ -10,6 +10,8 @@ allowed-tools: AskUserQuestion, Bash(${CLAUDE_PLUGIN_ROOT}/skills/np-infrastruct
 
 @${CLAUDE_PLUGIN_ROOT}/skills/np-rules/rules/iac-rule.md
 
+@${CLAUDE_PLUGIN_ROOT}/skills/np-rules/rules/ask-dont-infer-rule.md
+
 ## Prerequisites
 
 1. Verify that `organization.properties` exists and has the `organization_id`
@@ -52,7 +54,21 @@ ls -d infrastructure/*/ 2>/dev/null
 
 Configure BEFORE any `tofu init`.
 
-1. Read `infrastructure/{cloud}/backend.tf`
+1. **Check whether `infrastructure/{cloud}/backend.tf` exists.** Steps 3.2 and 3.3 assume it
+   does — they read it, comment it out, or complete it.
+
+   ```bash
+   ls infrastructure/{cloud}/backend.tf 2>/dev/null
+   ```
+
+   - **It exists** → read it and continue with 3.2.
+   - **It does NOT exist** → create it first, then continue with 3.2. On **Azure and Azure ARO**
+     this is the normal greenfield case: write the file with the `azurerm` backend block from
+     [references/azure-troubleshooting.md](references/azure-troubleshooting.md#8-azure-backend).
+     Azure has no `backend` module in `tofu-modules` (only `aws` and `oci` do) and the
+     orchestrator's scaffold does not write the file, so nothing else creates it. On other clouds,
+     write the skeleton block documented in that cloud's reference files (see the table in step 4);
+     3.3 fills in the real values.
 2. Ask: **"Do you want to store the tfstate in the cloud or locally?"**
    - **Local** → Comment out all content in `backend.tf` (leave the file but with everything commented). Tofu will use local state by default.
    - **Cloud** → Continue with 3.3
@@ -62,13 +78,33 @@ Configure BEFORE any `tofu init`.
      - **If AWS**: Ask: "Do you want to create it with tofu using the backend module from tofu-modules, or create it manually?"
        - **With tofu**: Clone the `nullplatform/tofu-modules` `infrastructure/aws/backend/` module, run `tofu init` and `tofu apply` (creates S3 bucket with versioning, encryption, and object lock). Then complete `backend.tf` with the output values.
        - **Manual**: Indicate to create the S3 bucket (with versioning and encryption) and come back when it's ready.
-     - **Other clouds**: Indicate to create it via the cloud console or CLI and come back when it's ready.
+     - **Other clouds**: Create it via the cloud console or CLI and come back when it's ready. Check the cloud's **reference files** first (see the table in step 4) — one of them documents that cloud's backend block and, where applicable, the exact commands to create the storage. On Azure and GCP it lives in the troubleshooting companion, not in the decision tree: `azure-troubleshooting.md` and `gcp-troubleshooting.md`.
      - The tfstate storage is NOT managed with the same Terraform that uses it (chicken-and-egg problem).
-4. If Azure ARO and there's no `backend.tf`, create one with `azurerm` backend
 
 ### 4. Generate or Customize main.tf
 
 The infrastructure `main.tf` is generated dynamically following [references/infrastructure-generation.md](references/infrastructure-generation.md).
+
+> **Always read the decision tree for the detected cloud — generating from scratch included.**
+> Why, and what breaks if you skip it, is in the note at the top of
+> [references/infrastructure-generation.md](references/infrastructure-generation.md).
+
+**Decision tree by cloud** — pick the one matching the cloud detected in step 2:
+
+| Cloud | Decision tree | Also read |
+|-------|---------------|-----------|
+| AWS | [references/aws.md](references/aws.md) | [references/agent-assume-role.md](references/agent-assume-role.md) (`aws.md` links its own troubleshooting) |
+| Azure | [references/azure.md](references/azure.md) | — (`azure.md` links its own companions) |
+| Azure ARO | [references/azure-aro.md](references/azure-aro.md) | — |
+| GCP | [references/gcp.md](references/gcp.md) | — (`gcp.md` links its own companions) |
+| OCI | [references/oci.md](references/oci.md) | — |
+
+> **On AWS**, `agent-assume-role.md` is not optional: the agent role is assume-only, and each
+> enabled scope/service needs its own requirements module, its entry in `agent_repos_extra`,
+> and its `*_assume_role_arn` output.
+>
+> If the cloud's decision tree is still a stub (it says `TODO`), say so explicitly before
+> generating, and fall back to the generic flow — do not silently apply AWS assumptions.
 
 1. **Check if `infrastructure/{cloud}/main.tf` exists**
 
@@ -76,15 +112,14 @@ The infrastructure `main.tf` is generated dynamically following [references/infr
    ls infrastructure/{cloud}/main.tf 2>/dev/null
    ```
 
-   - **If it does NOT exist** → Read [references/infrastructure-generation.md](references/infrastructure-generation.md) and follow its complete flow (user questions, wiring between modules, validation). **On AWS, also read [references/agent-assume-role.md](references/agent-assume-role.md)**: the agent role is assume-only, and each enabled scope/service needs its own requirements module, its entry in `agent_repos_extra`, and its `*_assume_role_arn` output.
+   - **If it does NOT exist** → Read the cloud's decision tree from the table above **and**
+     [references/infrastructure-generation.md](references/infrastructure-generation.md), then
+     follow the generation flow (user questions, wiring between modules, validation).
    - **If it exists** → Ask with AskUserQuestion:
-     - **Regenerate from scratch** → Delete the current one, read [references/infrastructure-generation.md](references/infrastructure-generation.md) and follow its flow
-     - **Customize the existing one** → Read the decision tree for the detected cloud:
-       - [references/azure.md](references/azure.md)
-       - [references/aws.md](references/aws.md)
-       - [references/azure-aro.md](references/azure-aro.md)
-       - [references/gcp.md](references/gcp.md)
-       - [references/oci.md](references/oci.md)
+     - **Regenerate from scratch** → Delete the current one, then same as above: cloud
+       decision tree + [references/infrastructure-generation.md](references/infrastructure-generation.md)
+     - **Customize the existing one** → Read the cloud's decision tree from the table above
+       and follow its steps in order — AWS and GCP start at a Step 0
      - **Leave it as is** → Go to step 5
 
 2. After generating/modifying, validate:
@@ -142,90 +177,151 @@ tofu init
 tofu apply -target=module.vpc -target=module.dns -var-file="../../common.tfvars" -var-file="terraform.tfvars"
 ```
 
-If there are two DNS zones (parent + child), include both: `-target=module.dns_parent -target=module.dns`.
+> **`module.dns` is the AWS name — check the real block names before running this.** The DNS
+> module is not called the same on every cloud: AWS uses `dns`, Azure `dns` + `private_dns`,
+> GCP `dns_public` + `dns_private`. Targeting a module that does not exist makes the apply a
+> no-op that looks like it succeeded. `grep -n '^module' infrastructure/{cloud}/main.tf` to
+> confirm, and target every public DNS zone the delegation needs.
+
+If there are two DNS zones (parent + child), include both, under the names this cloud actually uses — on AWS that is `-target=module.dns_parent -target=module.dns`.
 
 After this apply, VPC and DNS exist. The general apply (step 7) will create EKS and the remaining modules.
 
 #### 5.4 Get NS records
 
-Use the corresponding cloud command (AWS: `aws route53`, Azure: `az network dns zone show`, GCP: `gcloud dns`, OCI: `oci dns zone get`).
+**Skip this step if you are taking the automated path in 5.5.b** — `delegate-dns.sh` looks the nameservers up itself, for whichever cloud the child zone lives in, and prints them.
+
+For the manual path (5.5.c), read them with the cloud's own command: AWS `aws route53 list-resource-record-sets`, GCP `gcloud dns managed-zones describe --format=json`, Azure `az network dns zone show --query nameServers`, OCI `oci dns zone get`.
 
 #### 5.5 Delegate parent→child NS records
 
-This step creates the NS record in the parent zone that delegates authority to the child zone. Two paths: **automated via script** (AWS only, if the user has access to both accounts) or **manual request to Nullplatform** (fallback for every other case).
+This step creates the NS record in the parent zone that delegates authority to the child zone. Two paths: **automated via script** (AWS, GCP or Azure child zone, if the user has access to the parent account) or **manual request to Nullplatform** (fallback).
+
+**The delegation is always cross-account and often cross-cloud.** The child zone lives in whichever cloud the setup uses (Route 53 / Cloud DNS / Azure DNS), but the parent zone — `nullapps.io` and any of its subzones — is **always a Route 53 zone**. So the script reads the nameservers with the child cloud's CLI and writes the NS record with `aws route53`, every time.
 
 ##### 5.5.a Pre-check (analysis)
 
-Only if the cloud detected in step 2 is **AWS**, evaluate:
+Evaluate, for the cloud detected in step 2:
 
-1. `which aws` — AWS CLI installed.
-2. The script exists at `${CLAUDE_PLUGIN_ROOT}/skills/np-infrastructure-wizard/scripts/delegate-dns.sh`.
+1. `which aws` — always required, the parent zone is in Route 53.
+2. The child cloud's CLI: `which aws` (AWS) / `which gcloud` (GCP) / `which az` (Azure).
+3. The script exists at `${CLAUDE_PLUGIN_ROOT}/skills/np-infrastructure-wizard/scripts/delegate-dns.sh`.
 
-If the cloud is **not AWS**, or any check fails → jump directly to `5.5.c Manual request` (the existing flow).
+If any check fails → jump to `5.5.c Manual request`.
 
-> Profiles are not checked here: the script accepts default credentials (env vars, SSO, EC2 IAM role). Real credential validation happens in 5.5.b with `aws sts get-caller-identity` after the user picks which profile (or default) to use.
+> **OCI is not supported by the script** → always `5.5.c` for OCI setups.
+>
+> **Azure ARO** uses `--cloud azure`: the zone lives in Azure DNS regardless of whether the cluster is AKS or ARO.
+>
+> Credentials are not checked here. The script *can* fall back to whatever is active on the
+> machine, but that fallback is the user's explicit choice to make, not a default to assume — ask
+> which profile/project/subscription to use and pass it. Real validation happens inside the
+> script's own preflight in 5.5.b.
 
 ##### 5.5.b Automated delegation via script
 
-**Before the question**, show this notice so the user has a chance to log in:
+**Before the question**, show the notice for the detected cloud so the user has a chance to log in:
 
-> *"La delegación automática requiere credenciales AWS activas para la cuenta de la zona padre y la de la hija. Si usás SSO, ejecutá `aws sso login --profile <name>` antes de continuar. Si usás env vars / IAM role, verificá que la sesión siga activa."*
+> *AWS:* *"La delegación automática requiere credenciales AWS activas para la cuenta de la zona padre y la de la hija. Si usás SSO, ejecutá `aws sso login --profile <name>` antes de continuar. Si usás env vars / IAM role, verificá que la sesión siga activa."*
+>
+> *GCP:* *"La delegación automática requiere sesión activa de `gcloud` para leer los nameservers de Cloud DNS, y credenciales AWS activas para la cuenta de la zona padre en Route 53. Ejecutá `gcloud auth login` y `aws sso login --profile <name>` antes de continuar."*
+>
+> *Azure:* *"La delegación automática requiere sesión activa de `az` para leer los nameservers de Azure DNS, y credenciales AWS activas para la cuenta de la zona padre en Route 53. Ejecutá `az login` y `aws sso login --profile <name>` antes de continuar."*
 
 Then ask the single question with AskUserQuestion:
 
-> **"¿Querés delegar la zona (ej: `{slug}.playground.nullapps.io` → `playground.nullapps.io`) automáticamente vía script? Requiere acceso AWS a ambas cuentas (pueden ser la misma)."**
+> **"¿Querés delegar la zona (`{domain}` → `{parent_zone}`) automáticamente vía script? Requiere acceso a la cuenta de la zona padre en Route 53."**
+>
+> Substitute `{domain}` with the PoC domain and `{parent_zone}` with the zone derived from it (see the derivation note below). Do not name a specific parent domain — read it from `common.tfvars`.
 >
 > Options:
 > - **Sí, automatizar** → continue below
 > - **No, pedir a Nullplatform** → jump to 5.5.c
 
-If the user chooses automatic, ask for the variables with a single AskUserQuestion that has two **optional** free-text inputs. Use the **literal** text below — do not paraphrase:
+If the user chooses automatic, ask for the inputs with a single AskUserQuestion. **Ask only the inputs that apply to the detected cloud** — asking for a `--child-profile` on a GCP setup is noise. All inputs are **optional** free text. Use the **literal** text below — do not paraphrase:
+
+**Always ask (every cloud):**
+
+> **Profile AWS de la zona padre (parent_profile)**
+>
+> *Nombre del profile AWS que apunta a la cuenta donde vive la zona padre `{parent_zone}`. Es la cuenta que tiene autoridad sobre el dominio padre y donde se va a crear el NS record que hace la delegación. Esta cuenta es de AWS siempre, incluso si la PoC es de GCP o Azure.*
+>
+> *Si no usás un profile named —credenciales por env vars, SSO sin profile, o IAM role de la
+> workstation— decilo explícitamente y dejo el flag afuera. No lo asumo por lo que esté activo
+> en la máquina.*
+>
+> Ejemplo: `nullplatform-<cuenta-padre>` — o vacío.
+
+**Only if the cloud is AWS:**
 
 > **Profile AWS de la zona hija (child_profile)**
 >
 > *Nombre del profile AWS configurado localmente que apunta a la cuenta donde vive la zona hija — la misma que acaba de crearse en el `tofu apply` del step 5.3.*
 >
-> *Dejar vacío si usás credenciales AWS default (env vars `AWS_ACCESS_KEY_ID`, SSO sin profile named, o IAM role del EC2/workstation).*
+> *Si no usás un profile named, decilo explícitamente y dejo el flag afuera.*
+>
+> *Si la zona padre y la hija están en la **misma cuenta AWS**: repetir el mismo valor que en
+> `parent_profile`. Confirmalo, no lo doy por sentado.*
 >
 > Ejemplo: `my-training-account` — o vacío.
 
-> **Profile AWS de la zona padre (parent_profile)**
+**Only if the cloud is GCP:**
+
+> **Proyecto GCP de la zona hija (gcp_project)**
 >
-> *Nombre del profile AWS que apunta a la cuenta donde vive la zona padre `playground.nullapps.io`. Es la cuenta que tiene autoridad sobre el dominio padre y donde se va a crear el NS record que hace la delegación.*
+> *ID del proyecto donde vive la managed zone de Cloud DNS. **Decímelo** — no lo tomo de
+> `gcloud config get-value project`, porque el proyecto activo en la máquina de quien pregunta
+> no es necesariamente el de este setup.*
 >
-> *Dejar vacío si usás credenciales AWS default.*
+> Ejemplo: `acme-poc-123456` — o vacío.
+
+**Only if the cloud is Azure:**
+
+> **Suscripción Azure de la zona hija (subscription)**
 >
-> *Si la zona padre y la hija están en la **misma cuenta AWS**: repetir el mismo valor que en `child_profile`, o dejar ambos vacíos.*
+> *ID o nombre de la suscripción donde vive la zona de Azure DNS. **Decímelo** — no lo tomo de
+> `az account show`, porque la suscripción activa en la máquina de quien pregunta no es
+> necesariamente la de este setup.*
 >
-> Ejemplo: `nullplatform-playground` — o vacío.
+> Ejemplo: `acme-poc-sub` — o vacío.
 
-> **Derivación automática de la parent zone**: the script calculates the parent zone by cutting the first label of the subdomain (`cut -d. -f2-`). Example: if the subdomain is `grupo-4.playground.nullapps.io`, the parent is `playground.nullapps.io`. This derivation is fixed and **is not exposed as an editable question**. If the real parent zone does not match the one derived from the subdomain, automatic delegation will not work and you must fall back to 5.5.c.
+**Also ask (every cloud):**
 
-Validate before running. Omit the `--profile` flag when the value is empty:
+> **Zona padre en Route 53 (parent_zone)**
+>
+> *Zona que va a contener el NS record de la delegación. El script la deriva cortando la primera
+> etiqueta del subdominio (`cut -d. -f2-`) — para `{domain}` eso da `{derived_parent}`.*
+>
+> *Confirmalo o corregilo. **No asumas que la derivación es correcta**: con un subdominio anidado
+> o con una zona padre que no coincide con el sufijo, la derivación apunta a una zona que existe
+> pero no es la que delega, y el script escribe el NS en el lugar equivocado sin error.*
+>
+> Si el valor confirmado difiere del derivado, pasá `--parent-zone <zone>` explícito.
 
-```bash
-aws sts get-caller-identity [--profile <child_profile>]
-aws sts get-caller-identity [--profile <parent_profile>]
-aws route53 list-hosted-zones [--profile <child_profile>]  --query "HostedZones[?Name=='{subdomain}.']"
-aws route53 list-hosted-zones [--profile <parent_profile>] --query "HostedZones[?Name=='{parent_zone}.']"
-```
-
-Failure rules:
-- Any `get-caller-identity` that fails → offer 3 paths: (a) log in with `aws sso login --profile <name>` and retry, (b) retry with a different profile, (c) fall back to 5.5.c manual.
-- Child zone not found with child credentials → hard error (the `tofu apply` in 5.3 did not put the zone where those credentials point). Stop and ask the user to review.
-- Parent zone not found with parent credentials → fall back to 5.5.c (we cannot delegate automatically; Nullplatform has to do it).
-
-Execute the script:
+**Run the script with `--dry-run` first.** The script does its own preflight (CLI present, credentials valid on both sides, child zone found, parent zone found) and with `--dry-run` it writes nothing — so the dry run is the validation step. Do not hand-roll the `aws sts get-caller-identity` / `list-hosted-zones` checks; the script already does them and reports better errors.
 
 ```bash
 bash ${CLAUDE_PLUGIN_ROOT}/skills/np-infrastructure-wizard/scripts/delegate-dns.sh <subdomain> \
-  --child-profile <child_profile> \
-  --parent-profile <parent_profile>
+  --cloud <aws|gcp|azure> \
+  --parent-profile <parent_profile> \
+  [--child-profile <child_profile>]   # AWS only
+  [--gcp-project <gcp_project>]       # GCP only
+  [--subscription <subscription>]     # Azure only
+  --dry-run
 ```
 
-Where `<subdomain>` is the same one used in `dig NS` (step 5.2/5.6).
+Omit any flag whose value is empty — do not pass an empty string. `<subdomain>` is the same one used in `dig NS` (step 5.2/5.6).
 
-The script prints `Child Zone ID`, `Parent Zone ID`, nameservers, and the status of `change-resource-record-sets`. Return that output to the user.
+Show the dry-run output to the user: it prints the detected cloud, the child zone identifier, the nameservers found, the parent Zone ID, and the exact `change-batch` JSON that would be applied. **Ask for confirmation**, then re-run the identical command **without** `--dry-run`.
+
+> `--cloud` can be omitted when running from the project root — the script infers it from `infrastructure/{aws,gcp,azure}/`. Pass it explicitly anyway: it makes the command self-documenting in the transcript and immune to the cwd.
+
+Failure rules — the script exits non-zero with an actionable message; map it as follows:
+- **Missing CLI** (`Falta el CLI 'gcloud'`, etc.) → fall back to 5.5.c.
+- **Invalid credentials on either side** → offer 3 paths: (a) run the login command the script printed and retry, (b) retry with a different profile/project/subscription, (c) fall back to 5.5.c.
+- **Child zone not found** → hard error: the `tofu apply` in 5.3 did not create the zone where those credentials point. Stop and ask the user to review; do NOT fall back, this is a real problem with the setup.
+- **Parent zone not found** → fall back to 5.5.c. The user does not have access to the account that governs the parent domain, so Nullplatform has to do the delegation.
+- **Fewer than 2 nameservers** → hard error: the zone exists but exposes no NS records. Review the step 5.3 apply.
 
 ##### 5.5.c Manual request from Nullplatform (fallback)
 

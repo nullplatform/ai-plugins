@@ -10,7 +10,7 @@ Every item needs an `id` matching `^[a-z][a-z0-9_]{0,63}$`. The id is how
 the aggregation expression refers to the item (`coverage_gate.passed`),
 how `item_states` is keyed, and what you pass to `--item-id`. The
 validator enforces uniqueness among siblings; keep ids unique across the
-whole template anyway, since the expression and `item_states` address them
+whole specification anyway, since the expression and `item_states` address them
 globally.
 
 **Never use `and`, `or`, `not`, `true` or `false` as an item id.** The
@@ -18,7 +18,7 @@ aggregation grammar claims those five words as operators and literals, so
 `or.passed` tokenizes as the operator `or` followed by a stray `.` and the
 whole expression fails to parse — the run resolves to `fail` /
 `aggregation_parse_error`. The validator rejects them with
-`item.id.reserved`; before that guard existed the template saved cleanly
+`item.id.reserved`; before that guard existed the specification saved cleanly
 and only blew up at run time. Note `nor` is fine — the grammar does not
 claim it.
 
@@ -46,7 +46,7 @@ Conditions used to be evaluated against a `{ context: <catalog> }` wrapper
 that policies never had, so they needed the prefix. The wrapper is gone
 and the validator now **rejects** `context.`-rooted paths with
 `condition.query.context_rooted_path` / `item.applies_when.context_rooted_path`,
-naming the corrected path in the message. Any template written against the
+naming the corrected path in the message. Any specification written against the
 old contract fails at save time — which is the improvement: it used to
 save cleanly and then resolve nothing, so every `gate` silently failed on
 every approval request.
@@ -174,7 +174,7 @@ cancelled               →  run cancelled externally
 expired                 →  hit the action's allowed_time_to_execute window
 ```
 
-## YAML template skeleton
+## YAML specification skeleton
 
 ```yaml
 items:

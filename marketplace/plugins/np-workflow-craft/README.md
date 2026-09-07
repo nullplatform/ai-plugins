@@ -10,7 +10,7 @@ Build, publish, run, and debug workflows on the Nullplatform workflow engine via
 
 ### np-api
 
-description: This skill should be used when the user asks to "query the nullplatform API", "check authentication", "fetch API data", "search endpoints", "describe an endpoint", or needs to make any programmatic call to api.nullplatform.com. Provides centralized API access with authentication and token management.
+description: This skill should be used when the user asks to "query the nullplatform API", "check authentication", "fetch API data", "search endpoints", "describe an endpoint", "set up project context", "which application is this repo", "pin this repo to an application", mentions a .np folder, or needs to make any programmatic call to api.nullplatform.com. Provides centralized API access with authentication and token management.
 
 ### np-workflow
 
@@ -54,6 +54,7 @@ This plugin requires the following permissions:
   "Bash(./.claude/skills/np-api/scripts/check_auth.sh:*)",
   "Bash(./.claude/skills/np-api/scripts/fetch_np_api_url.sh:*)",
   "Bash(./.claude/skills/np-api/scripts/np-api.sh:*)",
+  "Bash(./.claude/skills/np-api/scripts/np-context.sh:*)",
   "Bash(./.claude/skills/np-workflow/scripts/execution.sh:*)",
   "Bash(./.claude/skills/np-workflow/scripts/ping.sh:*)",
   "Bash(./.claude/skills/np-workflow/scripts/plugins.sh:*)",

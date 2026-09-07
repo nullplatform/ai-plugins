@@ -148,24 +148,60 @@ WHERE _deleted = 0 AND length(provider) > 0
 
 ## Querying `audit_events` efficiently
 
-`audit_events` is the largest table in the lake (>180M rows, ~35 GiB compressed). It's **partitioned by day** (`PARTITION BY toYYYYMMDD(date)`), so a date filter is the single most impactful optimization — it discards entire daily partitions before any other work.
+`audit_events` is by far the largest table in the lake (233M rows, 42.8 GiB on disk, ~870 daily partitions across 1640 parts — measured 2026-08-14). It's **partitioned by day** (`PARTITION BY toYYYYMMDD(date)`), so a date filter is the single most impactful optimization — it discards entire daily partitions before any other work.
 
 ### Rule #1: ALWAYS filter by `date`
 
 ```sql
--- ✅ GOOD: partition pruning cuts ~1500 parts → ~7 parts
+-- GOOD: partition pruning cuts 1640 parts / 233M rows -> 43 parts / 6.5M rows
 SELECT entity, count() FROM audit_events
 WHERE date >= now() - INTERVAL 7 DAY
   AND entity = 'deployment'
 GROUP BY entity
 
--- ❌ BAD: full table scan (35 GiB, multiple minutes)
+-- BAD: full table scan (1640 parts, 233M rows, minutes)
 SELECT entity, count() FROM audit_events
 WHERE entity = 'deployment'
 GROUP BY entity
 ```
 
 Even when the user asks for "all time" data, prefer an explicit bound (e.g., `INTERVAL 1 YEAR`) rather than no filter. If you truly need a full scan, say so explicitly to the user before running it.
+
+### Rule #2: never use `audit_events` as a lookup table
+
+`audit_events` records *events*, not entities. Reaching into it to resolve an attribute of something
+else — most often a user's email — scans 233M rows to answer what a 43K-row table already answers.
+
+```sql
+-- BAD: builds a map of every user that ever existed, unbounded. Measured: 311.9 s
+WITH user_map AS (
+  SELECT user_id, argMax(user_email, date) AS email
+  FROM audit_events
+  WHERE notEmpty(user_email)
+  GROUP BY user_id
+)
+SELECT ... FROM core_entities_deployment AS d
+LEFT JOIN user_map AS ue ON toString(d.created_by) = ue.user_id
+
+-- GOOD: auth_user has id + email directly. Measured: 0.198 s, identical output
+SELECT ... FROM core_entities_deployment AS d FINAL
+LEFT JOIN auth_user AS u FINAL ON toString(u.id) = toString(d.created_by) AND u._deleted = 0
+WHERE notEmpty(coalesce(u.email, ''))   -- auth_user.email is Nullable(String)
+```
+
+Both numbers come from the same production report; the top-10 output was identical row for row.
+
+A date filter alone would **not** have saved it: bounding that CTE to the report's own 90-day window
+still reads 55M rows across 292 parts — a 4x improvement on a query that needed 1500x. When a date
+filter is not enough, the question is whether `audit_events` belongs in the query at all.
+
+`auth_user` does not cover every historical actor — a couple of test accounts present in
+`audit_events` are missing from it — so per-user totals become "known users". For attribution
+reporting that is the desired scope, not a loss. `auth_user` also carries `user_type`, which is how
+you keep `machine` accounts (API keys, workflow managers) out of anything that ranks people.
+
+**The general form:** entity attributes live in `core_entities_*` / `auth_*`. Use `audit_events` to
+answer *what happened*, never *what is this thing*.
 
 ### Skip-indexes available on `audit_events`
 
@@ -239,6 +275,7 @@ Use subcolumn access whenever you know the path. Reserve `JSONExtractString` for
 - `entity LIKE '%foo%'` — the skip-index can't help with a leading wildcard. Prefer `entity IN ('login_success','login_failure',...)` if you know the values.
 - `SELECT * FROM audit_events` — always project specific columns; `headers`, `request_body`, `response_body`, `entity_data` are large JSON columns.
 - `JOIN audit_events ... ON toString(u.id) = a.user_id` — the cast prevents efficient join. If joining with `auth_user`, project `toInt32OrZero(user_id)` once in a subquery first.
+- Using it to resolve a user's email, name, or type — join `auth_user` instead. See Rule #2 above; this one cost a production report 311.9 s.
 
 ---
 

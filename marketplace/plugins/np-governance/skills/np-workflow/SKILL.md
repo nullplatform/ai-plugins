@@ -336,6 +336,15 @@ the agent's tools, e.g. `${{ secrets.np_token }}`), `skillsEnabled` /
 `/np-workflow scaffold <id> claude-agent`, then `plugin describe` to confirm the
 exact fields for your deployment.
 
+**Moving large data in/out of the agent**: on sandboxed deployments whose
+config schema shows `inputFiles`/`outputFiles`, declare payloads and artifacts
+as FILES and the engine moves the bytes mechanically — never ask the agent to
+relay a large payload through a prompt/tool-call or to copy a produced
+artifact into its structured output (models summarize, truncate, or mangle the
+escaping silently; measured). Rules, collision caveat (`outputSchema` beats a
+harvested file on a same-named key) and size caps:
+@docs/yaml-cheat.md § "Moving DATA in and out".
+
 ## Reference
 
 - @${CLAUDE_PLUGIN_ROOT}/skills/np-workflow/docs/api-shapes.md

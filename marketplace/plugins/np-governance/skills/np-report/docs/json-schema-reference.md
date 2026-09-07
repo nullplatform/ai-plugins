@@ -140,6 +140,96 @@ Properties supported by DynamicForm (JSON Schema draft-07 + nullplatform extensi
 
 For reports, the most common `schema` patterns are:
 
+### The binding contract — EVERY query target MUST be a declared property
+
+**Non-negotiable invariant: for every entry in `queries`, its `target` must resolve to a property
+that exists in `schema.properties`.** A widget whose `scope` points at an undeclared property does
+not error — it renders blank, and the failure is invisible everywhere you would look for it.
+
+The frontend decides what to do with a query result by looking the target property up in the schema:
+
+| Declared as | Result handling |
+| --- | --- |
+| `type: "array"` | all rows are kept; fields typed `number`/`integer` in `items.properties` get cast from strings |
+| `type: "number"` | the scalar is taken from the first row and cast |
+| **absent** | falls into the scalar branch — **the whole result collapses to the first cell of the first row** |
+
+So a chart query returning 12 rows becomes the single string `"Cost Optimization"`, and the chart
+renders its empty state. The query itself succeeded, the Lake returned 200, and the query inspector
+shows all 12 rows — nothing reports a problem. KPIs are the cruel exception: they *want* a scalar, so
+they keep working, which makes a dashboard look "half broken" rather than misconfigured.
+
+Checklist before persisting, for every `queries[*].target`:
+
+- The property exists in `schema.properties`.
+- Array widgets (every chart, every `data-table`) → `type: "array"` **with** `items.properties`
+  declaring each column, and every numeric column typed `number` or `integer` (the Lake returns
+  numbers as JSON **strings** — without the type there is no cast, and charts get strings).
+- KPI widgets → `type: "number"`.
+- URL columns → `type: "string"` with `format: "uri"`.
+- Timestamp columns → `type: "string"` with `format: "date-time"`.
+
+### Naming — three independent conventions, do not mix them
+
+Schema property names drift out of alignment with their scopes because the definition legitimately
+contains **both** casings, for different reasons. Keep them apart:
+
+| What | Casing | Why |
+| --- | --- | --- |
+| schema property names, and the `#/properties/<name>` in every `scope` and `target` | **camelCase** | they are one identifier used in three places and must match character-for-character |
+| `params` keys | **snake_case when the SQL placeholder is** | ClickHouse resolves `{namespace_id:String}` by exact name, so the key mirrors the placeholder |
+| top-level API fields (`ui_schema`, `category_id`, `nrn_level`) | snake_case | the API contract |
+
+So this is correct and NOT an inconsistency to "tidy up":
+
+```json
+{"params":{"namespace_id":{"scope":"#/properties/namespaceId"}}}
+```
+
+The param key is snake because the SQL says `{namespace_id:String}`; the property is camel because the
+schema declares `namespaceId`. **Never let the param/SQL casing leak into property names** — writing
+`"kpi_total"` in `schema.properties` while the scope says `#/properties/kpiTotal` leaves the target
+unresolvable, and the widget renders blank with no error (see the binding contract above).
+
+Prefer camelCase for property names even when the SQL column is snake_case: alias in the query
+(`SELECT count() AS kpiTotal`) rather than renaming the property. Property names kept in camelCase
+behave identically in the editor and the published view; snake_case property names only work in
+whichever surface happens to translate them.
+
+This applies to **property names only** — do NOT extend it to `params` keys or the top-level API
+fields. Those follow the two rules above and are not inconsistencies to normalise away.
+
+### Result keys MUST match what the widget reads
+
+The schema says what SHAPE arrives; the SQL column aliases must match the KEYS each widget reads.
+A mismatch is **never** an error, and only sometimes a blank widget. Two widgets fall back silently
+instead, which is worse than blank: they render something plausible off the wrong column.
+
+| Widget | Keys it reads | What a mismatch does |
+| --- | --- | --- |
+| `donut-chart` / `pie-chart` | `labelKey`, `valueKey` (default `label`, `value`) | **silently auto-detects** — first non-numeric field becomes the label, first numeric the value. Renders fine off a column you did not choose. |
+| cartesian (`bar`, `line`, `area`) | `categoryKey`, `series[].dataKey` | blank — categories become `''`, data points `null`. (Omitting `series` altogether auto-detects every numeric field instead.) |
+| `data-table` | each column's `accessor` | that cell renders empty |
+| `kpi` | the target property name | **silently positional** — with no matching key the FIRST column is used, so a multi-column KPI query shows the wrong metric under the right label |
+
+Because the fallbacks are silent, matching the alias is the only way to know *which* column a widget is
+showing. Keep the aliases, the `items.properties` keys and the widget keys spelled identically —
+`SELECT categoria_nombre AS label, count() AS value` for a donut declaring
+`"labelKey": "label", "valueKey": "value"`, and `SELECT count() AS kpiTotal` for a KPI on
+`#/properties/kpiTotal`.
+
+### One target per query
+
+A `query` writes to exactly one `target`. A `SELECT` computing two metrics does **not** populate two
+KPIs — the second is never written, and a widget that is never written renders a **loading skeleton
+forever** (not a blank, not a zero), because the orchestrator cannot distinguish "no query" from
+"query still running".
+
+Give each metric its own `queries` entry. Reusing the identical `source` and `params` is free: the
+orchestrator strips `queryKey`/`scope`/`target`/`mapping` before building its coalescing key, so two
+entries differing only in `target` collapse into a **single** Lake call and each extracts its own
+column from the shared result.
+
 ### KPI Value
 
 ```json

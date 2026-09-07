@@ -1,0 +1,12 @@
+{
+  "name": "np-catalog",
+  "version": "1.3.0",
+  "description": "Manage the nullplatform catalog: entity specifications, entity instances, relations, search/facets, interceptors/events, custom actions and authorization",
+  "author": {
+    "name": "Nullplatform",
+    "email": "support@nullplatform.com",
+    "url": "https://nullplatform.com"
+  },
+  "repository": "https://github.com/nullplatform/np-claude-skills",
+  "license": "Apache-2.0"
+}

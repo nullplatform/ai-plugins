@@ -6,7 +6,7 @@
 #   get_run.sh --approval-id <approval_request_id>
 #
 # Returns the full run: aggregate_status, final_outcome, outcome_reason,
-# item_states (per-item status + message + details), template_snapshot,
+# item_states (per-item status + message + details), specification_snapshot,
 # context_snapshot, started_at, resolved_at.
 
 set -e

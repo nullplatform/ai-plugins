@@ -7,7 +7,7 @@
 
 Manual items can declare **structured inputs** (what the user must fill in)
 and **validation rules** (whether the submission *counts*). Both live in the
-template definition and are snapshotted into the run like everything else.
+specification definition and are snapshotted into the run like everything else.
 
 ## `inputs` — JSON Schema + optional JSONForms ui_schema
 
@@ -69,7 +69,7 @@ Key semantics (all server-side, evaluated on item submit):
   (e.g. `"$approval.requested_by.id"`) are resolved as value references
   before evaluation.
 - Failures → `422` with `errors[]` (`validation.<id>.failed` + the
-  template's `message`). Authorization stays separate: a rule failure is
+  specification's `message`). Authorization stays separate: a rule failure is
   never a `403`.
 - `aggregation: any | all` on groups composes with this — e.g. "either a
   peer developer or an account admin signs off" is a group with

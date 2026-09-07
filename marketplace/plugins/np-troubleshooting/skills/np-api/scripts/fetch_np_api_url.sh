@@ -49,11 +49,30 @@ ALLOWED_MODIFY=(
     "governance/action_item_category/*"
     "data/lake/query"
 
-    # Checklist approvals (np-checklist skill)
+    # Checklist approvals (np-checklist skill). The canonical entity name is
+    # "specification"; the template paths are the API's deprecated aliases,
+    # kept here so older installed copies of np-checklist keep working.
+    "approval/checklist/specification"
+    "approval/checklist/specification/*"
+    "approval/action/*/checklist_specification"
     "approval/checklist/template"
     "approval/checklist/template/*"
     "approval/action/*/checklist_template"
-    "approval/*/checklist/items/*/approve"
+    # Checklist pre-evaluation (dry_run_specification.sh): POST /approval/dry-run
+    "approval/dry-run"
+    # Manual item resolve: PATCH .../items/:itemId {status,message,inputs}.
+    # (The old .../items/*/approve endpoint never shipped - kept out on purpose.)
+    "approval/*/checklist/items/*"
+    "approval/*/checklist/ask-for-manual"
+    # Cancel a pending approval request (withdraw a failed deploy to fix the
+    # cause and redeploy - the resumable-fail loop in deployments.md 10a-CHK).
+    "approval/*/cancel"
+    "approval/checklist/migrate_from_policy/preview"
+    "approval/checklist/migrate_from_policy/apply"
+    "approval/checklist/migrate_from_policy/rollback"
+    # Hyphenated migrate-from-policy paths are the API's deprecated aliases,
+    # kept here so older installed copies of np-checklist keep working.
+    "approval/checklist/migrate-from-policy/preview"
     "approval/checklist/migrate-from-policy/apply"
     "approval/checklist/migrate-from-policy/rollback"
 
@@ -71,6 +90,20 @@ ALLOWED_MODIFY=(
     # Reports API
     "report"
     "report/*"
+
+    # Nullplatform catalog (np-catalog skill), addressed by its public
+    # /catalog path. Covers specification CRUD + nested handler CRUD
+    # (catalog/specifications/*), instance + relation CRUD
+    # (catalog/instances/*), action execution/updates (catalog/actions/*),
+    # and retrieval/graph POSTs (catalog/search, catalog/traverse — POST
+    # /search takes the same query object as the GET form, since large id
+    # sets do not fit in a URL; POST is the only form of /traverse).
+    "catalog/specifications"
+    "catalog/specifications/*"
+    "catalog/instances/*"
+    "catalog/actions/*"
+    "catalog/search"
+    "catalog/traverse"
 )
 
 is_modify_allowed() {

@@ -61,7 +61,7 @@ Returns:
 {
   "id": "crun_xxx",
   "approval_request_id": 99421,
-  "template_id": "tmpl_xxx",
+  "specification_id": "spec_xxx",
   "aggregate_status": "pending_override",
   "final_outcome": null,
   "outcome_reason": "Coverage gate failed; awaiting CAB override.",
@@ -84,15 +84,18 @@ Returns:
     },
     ...
   },
-  "template_snapshot": { /* full template as of run creation */ },
+  "specification_snapshot": { /* full specification as of run creation */ },
   "context_snapshot": { /* full evaluated context */ },
   "started_at": "...",
   "resolved_at": null
 }
 ```
 
-The `context_snapshot` and `template_snapshot` are usually large — pipe
-through `jq` to project the parts you need:
+(During the rename transition the read also mirrors the legacy
+`template_id` / `template_snapshot` keys — same values.)
+
+The `context_snapshot` and `specification_snapshot` are usually large —
+pipe through `jq` to project the parts you need:
 
 ```bash
 ${CLAUDE_PLUGIN_ROOT}/skills/np-checklist/scripts/get_run.sh --approval-id 99421 \

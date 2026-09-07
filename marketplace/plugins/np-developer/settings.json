@@ -4,6 +4,7 @@
       "Bash(./.claude/skills/np-api/scripts/check_auth.sh:*)",
       "Bash(./.claude/skills/np-api/scripts/fetch_np_api_url.sh:*)",
       "Bash(./.claude/skills/np-api/scripts/np-api.sh:*)",
+      "Bash(./.claude/skills/np-api/scripts/np-context.sh:*)",
       "Bash(./.claude/skills/np-cli-assistant/scripts/check_auth.sh:*)",
       "Bash(./.claude/skills/np-cli-assistant/scripts/fetch_np_api.sh:*)",
       "Bash(./.claude/skills/np-developer-actions/scripts/action-api.sh:*)",

@@ -45,6 +45,7 @@ Governance and workflow authoring: query and operate on action items, categories
 - **np-workflow** - Build, publish, run, and debug workflows on the Nullplatform workflow engine
 - **np-report** - Generate and persist dynamic reports and dashboards backed by the Customer Lake
 - **np-checklist** - Manage approval checklist templates, action associations, runs, and manual approvals
+- **np-catalog** - Build and query the nullplatform catalog: specifications, entities, relations, and knowledge-base ingestion
 
 ### np-workflow-craft
 
@@ -53,6 +54,14 @@ Focused toolkit for the Nullplatform workflow engine: author YAML, publish, trig
 **Skills included:**
 - **np-api** - Explore and query the Nullplatform API
 - **np-workflow** - Build, publish, run, and debug workflows on the Nullplatform workflow engine
+
+### np-catalog
+
+Manage the nullplatform catalog: entity specifications, entity instances, relations, search/facets, interceptors/events, custom actions and authorization.
+
+**Skills included:**
+- **np-api** - Explore and query the Nullplatform API
+- **np-catalog** - Build and query the nullplatform catalog: specifications, entities, relations, and knowledge-base ingestion
 
 ### np-service-craft
 
@@ -142,6 +151,8 @@ claude plugin install np-governance@nullplatform
 # or
 claude plugin install np-workflow-craft@nullplatform
 # or
+claude plugin install np-catalog@nullplatform
+# or
 claude plugin install np-service-craft@nullplatform
 # or
 claude plugin install np-setup-organization@nullplatform
@@ -164,6 +175,8 @@ claude plugin install np-setup-organization@nullplatform
    cp -r marketplace/plugins/np-governance ~/.claude/plugins/
    # or
    cp -r marketplace/plugins/np-workflow-craft ~/.claude/plugins/
+   # or
+   cp -r marketplace/plugins/np-catalog ~/.claude/plugins/
    # or
    cp -r marketplace/plugins/np-service-craft ~/.claude/plugins/
    # or

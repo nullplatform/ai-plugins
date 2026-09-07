@@ -289,14 +289,54 @@ Remote state connection data (bucket, key, region, profile) is read from each la
 
 ### Consumed outputs
 
-**From infrastructure/outputs.tf:**
+**From infrastructure/outputs.tf — the set differs per cloud.** The `cloud_provider` and
+`asset_repository` modules are not the same module across clouds, and neither are the values
+they take. Verified against `tofu-modules` `v7.1.0`:
 
-| Local variable | Description | Where used |
-|---------------|-------------|------------|
-| `cluster_name` | K8s cluster name | asset_repository |
-| `domain_name` | Application domain | cloud_provider |
-| `public_zone_id` | Public DNS zone ID | cloud_provider |
-| `private_zone_id` | Private DNS zone ID | cloud_provider |
+| Cloud | `cloud_provider` module | Consumes |
+|-------|-------------------------|----------|
+| AWS | `nullplatform/cloud/aws/cloud` | `domain_name`, `hosted_private_zone_id` (**required**), `hosted_public_zone_id` — Route53 zone **IDs** |
+| Azure | `nullplatform/cloud/azure/cloud` | `azure_resource_group_name`, `private_dns_resource_group_name` — **no zone identifier at all** |
+| GCP | `nullplatform/cloud/gcp/cloud` | `domain_name`, `project_id`, `public_dns_zone_name`, `private_dns_zone_name` — Cloud DNS zone **resource names**, not IDs |
+
+| Cloud | `asset_repository` module | Consumes |
+|-------|---------------------------|----------|
+| AWS | `nullplatform/asset/ecr` | `application_role_arn` + the CI user's access keys |
+| GCP / Azure | `nullplatform/asset/docker_server` | `login_server`, `path`, `password` |
+
+> **Do not emit `public_zone_id` / `private_zone_id` on a GCP setup.** GCP takes zone *names*
+> (`module.dns_*.zone_name`); handing it an id gives the bindings layer a value it cannot use.
+> And note AWS requires the **private** zone id while treating the public one as optional —
+> the reverse of what the naming suggests.
+
+### `application_domain` is a bool, not a domain
+
+Every `nullplatform/cloud/*/cloud` module declares it as `type = bool, default = false`, in all
+three clouds. The name invites the wrong guess:
+
+```hcl
+# WRONG — fails with "a bool is required"
+application_domain = local.domain_name
+
+# RIGHT — omit it; the default is what a normal setup wants
+module "cloud_provider" {
+  domain_name = local.domain_name
+  # application_domain deliberately not passed
+}
+```
+
+It is a flag — the AWS module describes it as *"Add account name in domain"* — that controls
+whether nullplatform inserts the account name into generated application hostnames. The domain
+itself goes in `domain_name`. Observed failure:
+
+```
+Error: Invalid value for input variable
+  The given value is not suitable for module.cloud_provider.var.application_domain:
+  a bool is required.
+```
+
+This is the generic rule biting on a specific variable: **read the module's `variables.tf` for
+the type; never infer it from the name.**
 
 **From infrastructure/outputs.tf — assume-role ARNs (AWS):**
 

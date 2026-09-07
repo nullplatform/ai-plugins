@@ -11,6 +11,13 @@ Cada operacion es un flujo multi-paso con discovery, confirmacion y verificacion
 
 ## Comando: $ARGUMENTS
 
+## Pre-flight: contexto del proyecto (`.np/`)
+
+Antes de resolver en que aplicacion, namespace o account opera una tarea, aplicar
+el pre-flight de `np-api`: si el repo tiene `.np/application.yaml`, sus IDs son los
+defaults y no se pregunta "¿que aplicacion?". Si el usuario nombra otra app en la
+sesion, se le hace caso. → Ver `/np-api` (seccion "Pre-flight: project context").
+
 ## Cuando usar este skill
 
 Usar este skill cuando el usuario quiera:

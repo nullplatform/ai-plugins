@@ -23,6 +23,19 @@ export NP_WORKFLOW_BASE_PATH=/wf
 
 Internally a call like `workflow-api.sh GET /plugins` resolves to `GET ${NP_WORKFLOW_URL}${NP_WORKFLOW_BASE_PATH}/plugins`.
 
+**The tables below list the full wire path** (prefix included, as the engine sees
+it). Strip the leading `/workflows` when passing the path to `workflow-api.sh`:
+
+| Wire path (tables below) | Argument to `workflow-api.sh` |
+|---|---|
+| `GET /workflows/definitions` | `GET /definitions` |
+| `GET /workflows/definitions/:id` | `GET /definitions/:id` |
+
+Passing the wire path through verbatim double-prefixes it
+(`/workflows/workflows/...`) and the engine answers `404 no route`. Dropping the
+wrong half — `/workflows` instead of `/definitions` — fails the same way; there
+is no `/workflows` resource on the engine.
+
 ## Discovery
 
 | Method | Path | Purpose |
@@ -50,9 +63,10 @@ never ambiguous.
 
 | Method | Path | Body | Purpose |
 |---|---|---|---|
+| GET | `/workflows/definitions?limit=&offset=` | — | **List** definitions → `{ data: [...], limit, offset, total }` |
 | POST | `/workflows/definitions` | `{ definition: {...} }` | Create workflow (new id) at revision 1 |
 | PUT | `/workflows/definitions/:id` | `{ definition: {...} }` | Push a new revision (N+1) |
-| GET | `/workflows/definitions/:id` | — | Workflow + latestRevision |
+| GET | `/workflows/definitions/:id` | — | One workflow → `{ workflow, revision, resolvedVia }` (see below) |
 | GET | `/workflows/definitions/:id/revisions` | — | All revisions |
 | GET | `/workflows/definitions/:id/revisions/:n` | — | Specific revision definition |
 | GET | `/workflows/definitions/:id/aliases` | — | All aliases + triggerStates |
@@ -60,6 +74,56 @@ never ambiguous.
 | POST | `/workflows/definitions/:id/aliases/:alias/activate` | `{}` | Activate (registers triggers) |
 | POST | `/workflows/definitions/:id/aliases/:alias/deactivate` | `{}` | Deactivate |
 | POST | `/workflows/definitions/:id/validate` | `{ definition }` | Validate against the server's schema |
+
+### Definition response envelopes
+
+The list and single-item reads do **not** share a shape — verified against the
+engine on 2026-08-27.
+
+`GET /definitions` — paginated envelope; `limit` is a page size, so compare
+`.data | length` against `.total` before reporting a count:
+
+```json
+{ "data": [ { "id": "wf_…", "key": "deploy-change-analysis", "name": "…",
+              "organizationId": "4", "nrn": "…", "path": "/", "description": null,
+              "metadata": {}, "createdAt": "…", "updatedAt": "…" } ],
+  "limit": 200, "offset": 0, "total": <n> }
+```
+
+List records carry `key` (nullable) but **no revision field** — there is no
+`latestRevision` on a list record, so a column bound to it renders empty for
+every row.
+
+`GET /definitions/:id` — the record is nested under `.workflow`, with the
+resolved revision alongside it. Reading `id`/`name` off the top level yields
+`null`:
+
+```json
+{ "workflow":  { "id": "wf_…", "name": "…", "organizationId": "4",
+                 "nrn": "…", "path": "/", "createdAt": "…", "updatedAt": "…",
+                 "key": "…", "description": "…" },   // key/description: optional
+  "revision":  { "workflowId": "wf_…", "revision": 7, "createdBy": "…",
+                 "createdAt": "…", "definition": { … } },
+  "resolvedVia": "latest" }
+```
+
+`.workflow` **never** carries `latestRevision` — the current revision number is
+`.revision.revision`, which is always present.
+
+The engine omits some fields per record rather than sending them null, so
+`.workflow`'s key set varies. Across 11 sampled definitions in one org:
+
+| Field on `.workflow` | Present |
+|---|---|
+| `id`, `name`, `nrn`, `organizationId`, `path`, `createdAt`, `updatedAt` | always |
+| `description` | 6 / 11 |
+| `key` | 3 / 11 |
+| `latestRevision` | 0 / 11 — never |
+
+Treat `description` and `key` as **optional**: read them with a `// default`
+rather than assuming either the presence or the absence seen on one record.
+Presence does not track the list record either — a definition can carry a
+`description` in `GET /definitions` and omit it in `GET /definitions/:id`.
 
 A `publish` is the orchestration of:
 

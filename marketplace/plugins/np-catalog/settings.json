@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./.claude/skills/np-api/scripts/check_auth.sh:*)",
+      "Bash(./.claude/skills/np-api/scripts/fetch_np_api_url.sh:*)",
+      "Bash(./.claude/skills/np-api/scripts/np-api.sh:*)",
+      "Bash(./.claude/skills/np-api/scripts/np-context.sh:*)",
+      "Bash(./.claude/skills/np-catalog/scripts/catalog-api.sh:*)",
+      "Skill(np-api)",
+      "Skill(np-api:*)",
+      "Skill(np-catalog)",
+      "Skill(np-catalog:*)"
+    ]
+  }
+}

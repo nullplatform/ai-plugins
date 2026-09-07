@@ -10,7 +10,7 @@ Investigation and diagnosis of nullplatform issues
 
 ### np-api
 
-description: This skill should be used when the user asks to "query the nullplatform API", "check authentication", "fetch API data", "search endpoints", "describe an endpoint", or needs to make any programmatic call to api.nullplatform.com. Provides centralized API access with authentication and token management.
+description: This skill should be used when the user asks to "query the nullplatform API", "check authentication", "fetch API data", "search endpoints", "describe an endpoint", "set up project context", "which application is this repo", "pin this repo to an application", mentions a .np folder, or needs to make any programmatic call to api.nullplatform.com. Provides centralized API access with authentication and token management.
 
 ### np-investigation-diagnostic
 
@@ -22,7 +22,7 @@ description: Query nullplatform Customer Lake. Use for cross-entity relationship
 
 ### np-checklist
 
-description: Operate on Nullplatform Approval Checklists — create and manage checklist templates, associate them with approval actions, inspect checklist runs (state, items, events, logs), apply manual approvals and overrides, and migrate existing policy-based actions to checklist mode. Use when the user asks to "create a checklist template", "associate a checklist with an action", "view checklist run state", "approve a manual checklist item", "migrate from policies to checklist", or anything about checklist-mode approvals on the approval-api.
+description: Operate on Nullplatform Approval Checklists — create and manage checklist specifications (formerly "checklist templates"), associate them with approval actions, inspect checklist runs (state, items, events, logs), apply manual approvals and overrides, and migrate existing policy-based actions to checklist mode. Use when the user asks to "create a checklist specification", "create a checklist template", "associate a checklist with an action", "view checklist run state", "approve a manual checklist item", "migrate from policies to checklist", or anything about checklist-mode approvals on the approval-api.
 
 ## Installation
 
@@ -62,6 +62,7 @@ This plugin requires the following permissions:
   "Bash(./.claude/skills/np-api/scripts/check_auth.sh:*)",
   "Bash(./.claude/skills/np-api/scripts/fetch_np_api_url.sh:*)",
   "Bash(./.claude/skills/np-api/scripts/np-api.sh:*)",
+  "Bash(./.claude/skills/np-api/scripts/np-context.sh:*)",
   "Bash(./.claude/skills/np-checklist/scripts/*.sh:*)",
   "Bash(./.claude/skills/np-lake/scripts/ch_query.sh:*)",
   "Bash(./.claude/skills/np-lake/scripts/check_ch_auth.sh:*)",

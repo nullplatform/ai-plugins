@@ -40,6 +40,8 @@ mixed. Narrate to the user in the language they are writing to you.
 
 - Table prefixes: `core_entities_deployment`, `core_entities_build`, `core_entities_scope`, …
 - Always `FINAL` and `_deleted = 0` (except `audit_events`, `scm_code_commits`, `scm_code_repositories`).
+- **`audit_events` REQUIRES a `date` filter.** It is partitioned by day (233M rows, 42.8 GiB) — without a bound the engine opens all ~870 daily partitions. A shipped report had an unfiltered CTE over it and took **312 s per widget**; the same read bounded to 7 days is 43 parts / 6.5M rows instead of 1640 / 233M. Bind it to the dashboard's own date-range filter, and never widen it past what the widget shows.
+- **Never read `audit_events` to resolve a user's email — join `auth_user` instead.** `auth_user` has `id` and `email` directly (43K rows): `LEFT JOIN auth_user FINAL AS u ON toString(u.id) = toString(d.created_by) AND u._deleted = 0`. Its `email` is `Nullable(String)`, so filter with `notEmpty(coalesce(u.email, ''))`. Building a `user_id → email` map out of `audit_events` is what cost that report its 312 s; `auth_user` returned **identical rows in 0.2 s**. It also carries `user_type`, which is how you exclude `machine` accounts (API keys) from anything ranking people.
 - Deployment success = `status = 'finalized'`; build success = `status = 'successful'`.
 - Environment lives in `core_entities_scope_dimension` (`dimension_slug = 'environment'`, column `value_slug`).
 - Time: `now() - INTERVAL N DAY` (or HOUR).
@@ -111,6 +113,12 @@ tool, in the confirmed language and visibility. Shape (see `docs/json-schema-ref
 {"name":"...","slug":"...","description":"...","schema":{"type":"object","properties":{}},"ui_schema":{"type":"VerticalLayout","elements":[]},"queries":{},"visibility":"user","category_id":null,"nrn_level":"organization"}
 ```
 
+**Every `queries[*].target` MUST name a property that exists in `schema.properties`** — charts and
+data-tables as `type: "array"` with `items.properties` (numeric columns typed `number`/`integer`),
+KPIs as `type: "number"`. An undeclared target does not error: the result collapses to the first cell
+of the first row and the widget renders blank. See `docs/json-schema-reference.md` § "The binding
+contract", which also covers matching SQL aliases to the keys each widget reads.
+
 Use `docs/widget-cookbook.md` for widget shapes and enrichment rules, `docs/filters-reference.md` for
 filters, `docs/lake-query-recipes.md` for SQL. Apply the enrichment rules (backgrounds, thresholds,
 axis labels, chip formatters, section headers). To assign a category, run
@@ -131,8 +139,13 @@ Default to updating. Use only exact slug matching — never fuzzy subject matchi
 This gate does not apply to an explicit `/np-report update <id>` (the id is already known).
 
 ### 5. Validate queries and show a checklist
-Every query MUST be validated before it is persisted. Show the user a per-query checklist as you go,
-e.g.:
+Every query MUST be validated before it is persisted. **Run the binding check first** — it is static
+(no Lake, no token) and catches what no amount of query running can: every `target` resolves to a
+declared property of the right shape, and every data widget is targeted by some query. See
+`docs/verification.md` § "Step 0". A binding failure caught here costs nothing; caught after `POST`
+it costs a `PATCH`.
+
+Then show the user a per-query checklist as you go, e.g.:
 
 ```
 Queries:
@@ -191,11 +204,14 @@ and pass it with `--data @<file>`.
   ```
 
 ### 7. Post-persist render verification (mandatory before Confirm)
-"Saved" is not "renders". Re-fetch the saved report and run each query through the render
-verification in `docs/verification.md`: once with every filter placeholder EMPTY (what the FE sends
-on first load) and once with the defaults. Report the per-widget status table (✓ renders / ⚠ empty /
-✗ error) and the real KPI values the user will see.
+"Saved" is not "renders". Re-fetch the saved report and run the verification in
+`docs/verification.md`: first the static **binding check** (every `target` resolves and its shape
+matches its widget), then each query twice — once with every filter placeholder EMPTY (what the FE
+sends on first load) and once with the defaults. Report the per-widget status table
+(binding / ✓ renders / ⚠ empty / ✗ error) and the real KPI values the user will see.
 
+- Any **✗ binding** means the widget renders blank however well the query runs — fix the schema and
+  `PATCH`, then re-verify. A returning query is not evidence that its widget renders.
 - Any **✗ error** means the dashboard is broken in the UI — fix the SQL and `PATCH` the report, then
   re-verify. Never declare a report done while a query errors.
 - Apply the **empty / anomalous data guards** from `docs/verification.md`: explain 0-row widgets and

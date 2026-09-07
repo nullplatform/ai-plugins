@@ -90,7 +90,7 @@ Replace `{account_slug}` with the actual organization/account slug (e.g., `k8s-n
 
 > **CRITICAL**: Never rely on the module defaults for these names. Always pass explicit values with the account slug, regardless of whether there are currently multiple setups in the same cloud account.
 
-These variables are additional to the rest of the base module variables (`nrn`, `np_api_key`, `k8s_provider`, etc.) — they do not replace them.
+These variables are additional to the rest of the base module variables (`np_api_key`, `k8s_provider`, etc.) — they do not replace them.
 
 ## Backend by Cloud
 

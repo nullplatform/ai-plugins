@@ -151,3 +151,13 @@ Create and manage approvals, approval actions, and approval policies.
 |-----------|-------------|
 | `approval approve` | Use `POST /approval/approve` via API |
 | `approval deny` | Use `POST /approval/deny` via API |
+
+## Checklist mode (nota)
+
+El CLI `np` hoy NO tiene subcomandos para checklists (templates, runs, items).
+Un approval con `mode: "checklist"` no trae `policy_context` — su evaluacion vive
+en el checklist run (`GET /approval/:id/checklist` via API). Para operar
+checklists usar el skill `np-checklist` (plugin np-governance); para el flujo de
+deploy con checklist (fail retomable, ask-for-manual, execute) ver
+`np-developer-actions/docs/deployments.md` paso 10a-CHK. Sugerir la API como
+alternativa cuando el usuario pida "CLI para checklist".

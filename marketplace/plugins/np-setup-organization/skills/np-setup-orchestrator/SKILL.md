@@ -17,12 +17,18 @@ For ANY query to the Nullplatform API, you MUST use:
 - `/np-api check-auth` - To verify authentication
 - The `np-api` skill - For programmatic operations (invoke via `/np-api`)
 
-**Allowed exceptions (NOT the Nullplatform API):**
+**Allowed exceptions:**
 
 - `curl` to deployed application endpoints (`*.nullapps.io`) for health checks
 - `curl` to external services (AWS, Azure, GCP)
+- **Account and API-key creation** (step 1b below, and `/np-organization-create`). These run
+  before `NP_API_KEY` exists — there is no key for `/np-api` to authenticate with yet, so they
+  are the one place a direct `curl` to `api.nullplatform.com` is correct. Everything after that
+  point goes through `/np-api`.
 
 @${CLAUDE_PLUGIN_ROOT}/skills/np-rules/rules/iac-rule.md
+
+@${CLAUDE_PLUGIN_ROOT}/skills/np-rules/rules/ask-dont-infer-rule.md
 
 ## Available Commands
 
@@ -41,11 +47,26 @@ For ANY query to the Nullplatform API, you MUST use:
 
 ---
 
-## Command: $ARGUMENTS
+## Dispatch
+
+**Raw input**: `$ARGUMENTS`
+
+Route on the **first whitespace-delimited token** of that input, not on the whole string. The
+subcommand is one of: `init`, `check-status`, `check-tools`, `check-cloud`, `check-k8s`,
+`check-np`, `check-telemetry`, `check-services`, `check-tf-key`.
+
+- **No input** → the *empty* branch below.
+- **First token is one of the subcommands** → that branch. Anything after it is free-text
+  context (a target directory, a cloud, an NRN) — carry it into the flow, do not try to match it.
+- **First token is anything else** → treat the whole input as context and take the *empty*
+  branch, which starts by checking what is already configured. Say which branch you picked before
+  running it.
+
+> The branch headings below are literal. Do not expect them to contain the caller's input.
 
 ---
 
-## If $ARGUMENTS is empty → Check Status and Initialization
+## Subcommand: (none) → Check Status and Initialization
 
 ### Flow
 
@@ -66,7 +87,7 @@ ls common.tfvars infrastructure/*/terraform.tfvars nullplatform/terraform.tfvars
 
 ---
 
-## If $ARGUMENTS is "init" → Step-by-Step Initial Wizard
+## Subcommand: `init` → Step-by-Step Initial Wizard
 
 ### Pre-check
 
@@ -118,7 +139,8 @@ curl -s -L 'https://api.nullplatform.com/account' \
 
 The `repository_provider` defaults to `github` unless the user specifies otherwise.
 
-**Domain**: The default application domain is `{account_slug}.nullapps.io`. Ask the user to confirm: "The application domain will be `{account_slug}.nullapps.io`. Is this correct, or do you want to use a different domain?". Do NOT offer invented alternatives.
+**The domain is asked in step 4**, not here — it is needed on both paths of this step (existing
+account and new account), and step 4 is where `common.tfvars` is written.
 
 Save the account info: `echo "account_id={ACCOUNT_ID}" >> organization.properties`
 
@@ -150,7 +172,17 @@ Check with `ls -d infrastructure/ nullplatform/ nullplatform-bindings/`. If miss
 
 Use AskUserQuestion for cloud provider: AWS, Azure (then AKS or ARO), GCP, OCI.
 
-Create the following folder and file structure. The source of truth for each file's content is the `nullplatform/tofu-modules` repository (branch `main`):
+Create the folder structure below. **Create the directories only** — do not try to source the
+`.tf` files from anywhere. `tofu-modules` holds modules, not layer scaffolding: it has no
+layer-level `variables.tf`, `provider.tf` or `backend.tf` to copy, and its only `templates/`
+directories belong to `nullplatform/agent` and `nullplatform/base`.
+
+Each layer's `.tf` files are **generated** by that layer's wizard from the module contracts it
+reads out of `.terraform/modules/` after `tofu init -backend=false` — which is what rule 3 of
+`np-infrastructure-wizard`'s `references/infrastructure-generation.md` requires, and why the
+generated code matches the pinned module version instead of a snapshot in a document.
+
+The file names below are the expected end state, not files to create now:
 
 ```
 {output}/
@@ -193,28 +225,48 @@ If `common.tfvars` doesn't exist, create it with default values and then let the
 2. Generate `common.tfvars` with these defaults:
 
 ```hcl
-nrn               = ""
-np_api_key        = "<plain value read from np-api-skill.key>"
-organization_slug = ""
+nrn                 = ""
+np_api_key          = "<plain value read from np-api-skill.key>"
+organization_slug   = ""
+domain_name         = ""
+private_domain_name = ""
 tags_selectors = {
   "environment" = "development"
 }
 ```
 
-3. Show the user the generated file and ask with AskUserQuestion:
+3. Ask the user for the empty ones with AskUserQuestion. **Ask — do not fill any of them in from
+   the environment or from the account slug.** For the two domains, offer the convention as a
+   default the user confirms or replaces:
 
-> I generated `common.tfvars` with default values. I need you to complete:
-> - `nrn`: Resource NRN (e.g., `organization=123:account=456`)
-> - `organization_slug`: Organization slug
+> `nrn` — Resource NRN, e.g. `organization=123:account=456`
+>
+> `organization_slug` — the slug as it exists in the nullplatform API, not a free-form label
+>
+> `domain_name` — the **public** application domain. For an internal PoC the convention is
+> `{account_slug}.nullapps.io`; offer that as a default. A client that owns its own domain uses
+> theirs instead. **This is also what the DNS delegation in the infrastructure layer depends on**,
+> so a wrong value here surfaces much later, as a certificate that never issues.
+>
+> `private_domain_name` — the **private** domain backing the internal gateway. The right value is
+> cloud-dependent, so read the cloud's reference before suggesting one: GCP wants the *same value*
+> as `domain_name` (split horizon), and on Azure it has to sit inside the public zone. If the setup
+> has no internal gateway, say so and leave it empty rather than inventing a value.
 
 4. Update the file with the values the user provides
 
 | Variable | Default | Notes |
 |----------|---------|-------|
 | `np_api_key` | Read from `np-api-skill.key` | Auto-completed, do not ask the user |
-| `nrn` | Empty | The user must provide it |
-| `organization_slug` | Empty | The user must provide it |
+| `nrn` | Empty | **Ask.** Never read it from `~/.np` or a cached session |
+| `organization_slug` | Empty | **Ask.** Never infer it from the only org the caller can see |
+| `domain_name` | Empty | **Ask**, offering `{account_slug}.nullapps.io` as a default to confirm |
+| `private_domain_name` | Empty | **Ask.** Cloud-dependent — check the cloud's reference first |
 | `tags_selectors` | `{ "environment" = "development" }` | Reasonable default, user can change it |
+
+> **Both domains are read by all three layers**, which is why they live here. And the values must
+> exist before `/np-infrastructure-wizard` runs: its DNS step and its `cert_manager` wiring both
+> consume them, so an empty `domain_name` fails the layer rather than prompting again.
 
 > The full `nrn` may not be available yet if it's a new org. Fill in partially and update later.
 
@@ -247,7 +299,7 @@ Show a table with the status of all components and suggest `/np-setup-orchestrat
 
 ---
 
-## If $ARGUMENTS is "check-status" → Full Diagnostic
+## Subcommand: `check-status` → Full Diagnostic
 
 Runs ALL checks in sequence and generates a consolidated report.
 
@@ -281,7 +333,7 @@ Runs ALL checks in sequence and generates a consolidated report.
 
 ---
 
-## If $ARGUMENTS is "check-tools" → Verify Tools
+## Subcommand: `check-tools` → Verify Tools
 
 ### Tools to Verify
 
@@ -304,7 +356,7 @@ If any tool is missing, indicate how to install it.
 
 ---
 
-## If $ARGUMENTS is "check-tf-key" → Verify Terraform API Key
+## Subcommand: `check-tf-key` → Verify Terraform API Key
 
 Verify that `common.tfvars` exists and contains a valid `np_api_key`.
 
@@ -328,30 +380,30 @@ Verify that `common.tfvars` exists and contains a valid `np_api_key`.
 
 ---
 
-## If $ARGUMENTS is "check-cloud" → Verify Cloud
+## Subcommand: `check-cloud` → Verify Cloud
 
 See [references/check-cloud.md](references/check-cloud.md) for the complete flow.
 
 ---
 
-## If $ARGUMENTS is "check-k8s" → Verify Kubernetes
+## Subcommand: `check-k8s` → Verify Kubernetes
 
 See [references/check-k8s.md](references/check-k8s.md) for the complete flow.
 
 ---
 
-## If $ARGUMENTS is "check-np" → Verify Nullplatform API
+## Subcommand: `check-np` → Verify Nullplatform API
 
 See [references/check-np.md](references/check-np.md) for the complete flow.
 
 ---
 
-## If $ARGUMENTS is "check-telemetry" → Verify Telemetry
+## Subcommand: `check-telemetry` → Verify Telemetry
 
 See [references/check-telemetry.md](references/check-telemetry.md) for the complete flow.
 
 ---
 
-## If $ARGUMENTS is "check-services" → Verify Services
+## Subcommand: `check-services` → Verify Services
 
 See [references/check-services.md](references/check-services.md) for the complete flow.

@@ -367,7 +367,7 @@ provider "helm" {
 
 ## AWS Module Reference
 
-For source format and versioning see [tofu-modules-patterns.md](tofu-modules-patterns.md#git-ref-module-source). For `agent_api_key` see [tofu-modules-patterns.md](tofu-modules-patterns.md#agent-api-key-module).
+For source format and versioning see [tofu-modules-patterns.md](tofu-modules-patterns.md#module-source-git-ref). For `agent_api_key` see [tofu-modules-patterns.md](tofu-modules-patterns.md#agent-api-key-module).
 
 ### IAM Modules (inputs and outputs)
 
@@ -440,7 +440,7 @@ module "cert_manager" {
   aws_sa_arn          = module.cert_manager_iam.nullplatform_cert_manager_role_arn
   private_domain_name = module.dns.private_zone_name
   hosted_zone_name    = module.dns.public_zone_name
-  account_slug        = var.account
+  account_slug        = var.organization_slug
   depends_on          = [module.alb_controller]
 }
 ```
@@ -450,7 +450,6 @@ module "cert_manager" {
 ```hcl
 module "base" {
   source       = "git::https://github.com/nullplatform/tofu-modules.git//nullplatform/base?ref={version}"
-  nrn          = var.nrn
   np_api_key   = module.agent_api_key.api_key
   k8s_provider = "eks"
   aws_region   = var.aws_region
@@ -467,8 +466,42 @@ module "base" {
 }
 ```
 
-> `metrics_server_enabled = true` installs Kubernetes metrics-server (needed for HPA and `kubectl top`).
-> `gateway_security_enabled` is `false` by default. Only if enabled are Azure/GCP provider stubs needed.
+> **`metrics_server_enabled = true` is mandatory on AWS and is written as a literal.** EKS ships
+> no Metrics API, so this flag is what provides it — HPA and `kubectl top` do not work without
+> it. Never route it through a tfvars variable and never ask the user: it is a property of EKS,
+> not a preference. The module's own default is `false`, so omitting it is wrong on AWS. GCP and
+> Azure take the opposite value for the opposite reason — see
+> [generation rule 35](infrastructure-generation.md#35-metrics_server_enabled-depends-on-cloud-provider).
+>
+> **`base` takes no `nrn`.** The module does not declare the variable (verified at `v7.1.0`
+> and on `main`); it derives its scope from the API key. Passing it is a hard
+> `Unsupported argument` at plan time. `nrn` is still required by `agent` and `agent_api_key`.
+> Note the `nullplatform/base/security/README.md` examples upstream still show it — the
+> module's `variables.tf` is the source of truth, not its README.
+
+### Gateway security groups (optional)
+
+Restricting the Istio gateway health-check port is **not** a flag on `base`. Those resources
+were extracted out of `base` into per-cloud submodules precisely so `base` stops requiring
+the `aws` / `azurerm` / `google` providers — so there are no provider stubs to add either.
+
+If you want them, call the AWS submodule and feed its outputs to `base`:
+
+```hcl
+module "base_security" {
+  source       = "git::https://github.com/nullplatform/tofu-modules.git//infrastructure/aws/security?ref={version}"
+  cluster_name = module.eks.eks_cluster_name
+}
+
+module "base" {
+  # ...
+  gateway_public_aws_security_group_id  = module.base_security.public_gateway_security_group_id
+  gateway_private_aws_security_group_id = module.base_security.private_gateway_security_group_id
+}
+```
+
+Both `base` variables default to `""` and the gateways work without them, so skip the whole
+thing unless the user asks for the port restriction.
 
 ## Critical AWS Patterns
 

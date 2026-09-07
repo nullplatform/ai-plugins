@@ -2,6 +2,14 @@
 
 Generator for the `main.tf` of the **infrastructure/** layer in Nullplatform with OpenTofu.
 
+> **This file is the cross-cloud flow — always pair it with the detected cloud's decision tree**
+> (`aws.md`, `azure.md`, `gcp.md`, `azure-aro.md`, `oci.md`), from-scratch generation included.
+> The examples here are AWS-shaped (ALB Controller, IRSA, Route53). The per-cloud file is where
+> the real module set, the wiring between modules and that cloud's failure modes live, and some
+> of it must happen *before* the first apply — GCP, for one, has to enable its project APIs, and
+> a disabled API surfaces as a 403 that reads like a permissions problem. Reading only this file
+> on a greenfield GCP or Azure run produces an AWS-shaped `main.tf`.
+
 > **IMPORTANT**: Do not assume values or configurations. When in doubt, divergence, or ambiguity, **always ask the user** before generating code.
 
 > **MANDATORY VALIDATION**: Before generating or modifying any code, checklist:
@@ -307,22 +315,29 @@ Then generate the assume-role wiring per [agent-assume-role.md](agent-assume-rol
 ## tfvars rules
 
 1. **`common.tfvars`** (in root): Variables shared between layers
-   - `aws_region`, `organization`, `account`, `domain_name`, `np_api_key`, `nrn`, `tags_selectors`, `backend_bucket`
+   - `aws_region`, `organization_slug`, `domain_name`, `np_api_key`, `nrn`, `tags_selectors`, `backend_bucket`
 2. **`terraform.tfvars`** (in infrastructure/{cloud}/): Only infrastructure-specific variables
    - Include header: `# Usage: tofu plan -var-file=../../common.tfvars -var-file=./terraform.tfvars`
    - DO NOT duplicate variables from common.tfvars
 
 ## Cluster name
 
-The cluster name defaults to the account slug from the previous steps. Define it as a local in `locals.tf`:
+The cluster name defaults to the organization slug from the previous steps. Define it as a local in `locals.tf`:
 
 ```hcl
 locals {
-  cluster_name = var.account  # account slug from common.tfvars
+  cluster_name = var.organization_slug  # slug written to common.tfvars by the orchestrator
 }
 ```
 
-The cluster name must be **32 characters or less** (AWS EKS limit). If the account slug exceeds 32 characters, truncate it. Always verify before generating.
+The cluster name must be **32 characters or less** (AWS EKS limit). If the slug exceeds 32 characters, truncate it. Always verify before generating.
+
+> **There is exactly one slug variable: `organization_slug`.** It is what
+> `/np-setup-orchestrator init` writes to `common.tfvars`. Do not emit `var.account` or
+> `var.account_slug` — neither is generated, so referencing them fails at plan time with an
+> undefined variable. Note that `account_slug` **is** a legitimate *module input name* on
+> `commons/cert_manager`; it is fed from `var.organization_slug`. Keep the distinction:
+> module input names come from the module, tofu variable names come from `common.tfvars`.
 
 ---
 
@@ -474,13 +489,47 @@ When the user selects Istio, the agent HTTPRoute template variables MUST be set 
 
 Determined automatically, NOT asked to the user.
 
+### 35. metrics_server_enabled depends on cloud provider
+
+`nullplatform/base` takes `metrics_server_enabled`. The correct value is a property of the
+managed Kubernetes service, never a user preference:
+
+| Cloud | metrics_server_enabled | Why |
+|-------|------------------------|-----|
+| **AWS** (EKS) | `true` | EKS ships no Metrics API. This flag is what provides it — without it HPA and `kubectl top` do not work |
+| **GCP** (GKE) | `false` | GKE ships metrics-server as a managed addon. `true` fails the `base` release at apply — [details](gcp-modules.md#metrics_server_enabled-must-be-false-on-gke) |
+| **Azure** (AKS, ARO) | `false` | Same as GKE: AKS and ARO ship metrics-server managed. `true` hits the same APIService ownership conflict |
+
+Write it as a **literal** in the `module "base"` block — `metrics_server_enabled = true` /
+`= false`. Do NOT route it through a tfvars variable and do NOT ask the user: a wrong value
+is an apply failure on GKE/AKS and a silently missing Metrics API on EKS. The module's own
+default is `false` (`nullplatform/base/variables.tf`), so an omitted value is wrong on AWS
+and accidentally right elsewhere — always be explicit.
+
+Determined automatically, NOT asked to the user.
+
 ---
 
-## Provider stubs for nullplatform/base
+## Gateway security for nullplatform/base
 
-Provider stubs are **only needed if `gateway_security_enabled = true`**. By default it's `false`:
-- **gateway_security_enabled = false (default)**: You DON'T need stubs or `providers` block
-- **gateway_security_enabled = true**: Add Azure and GCP stubs in provider.tf and `providers` block in the base module
+**Do not add provider stubs, and do not look for `gateway_security_enabled` — neither exists.**
+The cloud-specific gateway security resources (Security Groups / NSGs / firewall rules) were
+extracted out of `nullplatform/base` into per-cloud submodules, so `base` requires only the
+`nullplatform` and `helm` providers. There is no `providers` block to pass and nothing to stub.
+
+If gateway health-check port restriction is wanted, call the submodule for the cloud and feed
+its outputs into `base`:
+
+| Cloud | Submodule | Outputs | `base` variables |
+|-------|-----------|---------|------------------|
+| AWS | `infrastructure/aws/security` | `public_gateway_security_group_id`, `private_gateway_security_group_id` | `gateway_public_aws_security_group_id`, `gateway_private_aws_security_group_id` |
+| Azure | `infrastructure/azure/security` | `public_gateway_nsg_id`, `private_gateway_nsg_id` | `gateway_public_azure_nsg_id`, `gateway_private_azure_nsg_id` |
+| GCP | `infrastructure/gcp/security` | `public_gateway_firewall_name`, `private_gateway_firewall_name` | `gateway_public_gcp_firewall_name`, `gateway_private_gcp_firewall_name` |
+
+On AWS and Azure the corresponding `base` variables default to `""` and the gateways work
+without them — skip the submodule unless the user asks for the restriction. **GCP is the
+exception**: `base` references the firewall rules by name and the submodule is what creates
+them, so on GKE the `security` module is part of the normal path, not an opt-in.
 
 Read the `nullplatform/base` module's `variables.tf` for the complete variable list.
 
@@ -537,8 +586,11 @@ Read `variables.tf` of the downloaded module to know current variables. DO NOT a
 ### 8. Gateways namespace
 The `gateways` namespace must exist before applying cert_manager. Apply order is: infrastructure -> nullplatform -> nullplatform-bindings.
 
-### 9. Provider stubs don't require authentication
-For Azure stub: use `resource_provider_registrations = "none"` (not `skip_provider_registration`).
+### 9. No provider stubs for base
+`nullplatform/base` requires only the `nullplatform` and `helm` providers — the cloud-specific
+gateway security resources live in `infrastructure/{cloud}/security` submodules. Do not add
+`azurerm`/`google` stubs or a `providers` block to the base module. See "Gateway security for
+nullplatform/base" above.
 
 ### 10. Use existing IAM modules
 NEVER create `aws_iam_policy` or `aws_iam_role` directly. Use modules from `infrastructure/{cloud}/iam/`.
@@ -602,14 +654,42 @@ After generating: `tofu init -backend=false && tofu validate`. Fix before consid
 
 ### 29. Mandatory outputs for downstream layer consumption
 
-The `infrastructure/` layer MUST export these outputs in `outputs.tf` so that `nullplatform-bindings/` can consume them via remote state:
+The `infrastructure/` layer MUST export in `outputs.tf` whatever `nullplatform-bindings/`
+consumes via remote state. **What that is differs per cloud** — the bindings modules are not
+the same across clouds, and neither are the values they take. Verified against `v7.1.0`.
 
-| Required output | Description | Consumer in bindings |
-|----------------|-------------|---------------------|
-| `cluster_name` | K8s cluster name | asset_repository |
-| `domain_name` | Application domain | cloud_provider |
-| `public_zone_id` | Public DNS zone ID | cloud_provider |
-| `private_zone_id` | Private DNS zone ID | cloud_provider |
+**Always exported, every cloud**: `cluster_name`, `domain_name`.
+
+> `private_domain_name` is **not** universal — do not add it blindly. AWS has no such variable at
+> all: `infrastructure/aws/dns` gives the public and private zones the *same* `domain_name`, so
+> there is no second domain to name (see "Split horizon" in [gcp-modules.md](gcp-modules.md)). On
+> GCP it exists but does not travel through remote state — it lives in `common.tfvars`, which all
+> three layers read directly. On Azure the `cloud` module takes it as an *optional* input, as the
+> table below shows.
+
+### `nullplatform/cloud/{cloud}/cloud`
+
+| Cloud | Required inputs | Optional inputs | Export from `infrastructure/` |
+|-------|-----------------|-----------------|-------------------------------|
+| AWS | `nrn`, `domain_name`, `hosted_private_zone_id` | `hosted_public_zone_id` | Route53 zone **IDs** (`public_zone_id`, `private_zone_id`) |
+| Azure | `nrn`, `azure_resource_group_name`, `private_dns_resource_group_name` | `domain_name`, `private_domain_name`, `subscription_id`, `tenant_id`, `client_id`, `client_secret` | The **resource group names** — Azure takes no zone identifier at all |
+| GCP | `nrn`, `domain_name`, `project_id` | `public_dns_zone_name`, `private_dns_zone_name` | `gcp_project_id` and the Cloud DNS zone **resource names** (`module.dns_*.zone_name`), not IDs |
+
+> Two traps here. **AWS requires the *private* zone id and treats the public one as optional** —
+> the reverse of what the naming suggests. And **GCP takes zone *names*, AWS takes zone *ids***:
+> Cloud DNS distinguishes the managed zone's resource name (`module.dns_*.zone_name`) from its
+> id and from the DNS domain, and the bindings layer wants the resource name. Exporting
+> `zone_id` on a GKE setup hands it a value it cannot use.
+
+### Asset repository
+
+| Cloud | Module | Required inputs | Export from `infrastructure/` |
+|-------|--------|-----------------|-------------------------------|
+| AWS | `nullplatform/asset/ecr` | `nrn`, `application_role_arn`, `build_workflow_access_key_id`, `build_workflow_access_key_secret` | The role ARN; the access keys come from the CI user, not from this layer |
+| GCP / Azure | `nullplatform/asset/docker_server` | `nrn`, `login_server`, `path`, `password` | GCP: `artifact_registry_repository_url` + the writer service account (`artifact_registry_service_account_email`) whose key becomes `password`. Azure: `acr_login_server` + the ACR admin credentials |
+
+> On GCP this is why `roles/iam.serviceAccountKeyAdmin` appears in the step 0 permission list —
+> the bindings layer mints a key for that service account.
 
 Output values depend on the modules used. Read `outputs.tf` of each downloaded module to know real names. If a resource is added that other layers need, always export it as output.
 

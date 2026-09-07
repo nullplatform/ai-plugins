@@ -10,7 +10,7 @@ Captured at run creation, never mutated:
 
 | Field | Lives in | Purpose |
 |---|---|---|
-| `template_snapshot` | `checklist_run.template_snapshot` (JSONB) | The full template (`id`, `name`, `version`, `definition`, `derived_expression`) as of trigger time. Editing the live template afterwards does **not** affect this run. |
+| `specification_snapshot` | `checklist_run.specification_snapshot` (JSONB; dual-written with its legacy twin `template_snapshot`, which stays authoritative and NOT NULL until Phase 4 — see `model.md`) | The full specification (`id`, `name`, `version`, `definition`, `derived_expression`) as of trigger time. Editing the live specification afterwards does **not** affect this run. |
 | `context_snapshot` | `checklist_run.context_snapshot` (JSONB) | The context that was evaluated: release, build, application, namespace, account, organization, user, deployment group, etc. — built once by `buildContext` and frozen. Condition paths address this object directly, so `build.metadata.coverage` in a query is `.build.metadata.coverage` here — no `context.` root. |
 | `idempotency_key` | `checklist_run.idempotency_key` | Used by the trigger path to dedupe re-tries; UNIQUE in the schema. |
 
@@ -108,7 +108,7 @@ rows / minute / run by default).
 | | Policy mode | Checklist mode |
 |---|---|---|
 | Snapshot of evaluated context | `approval_request.policy_context` | `checklist_run.context_snapshot` |
-| Snapshot of the gate config | not persisted — current policy is re-read | `checklist_run.template_snapshot` (NOT NULL) |
+| Snapshot of the gate config | not persisted — current policy is re-read | `checklist_run.specification_snapshot` (NOT NULL on its legacy twin `template_snapshot` during the transition) |
 | Per-predicate / per-item outcome | not persisted | `item_states` (with `message` + `details`) |
 | Outcome | `approval_request.status` (binary approve/deny) | `final_outcome` + `outcome_reason` (5 values + text) |
 | Audit trail | none | `checklist_event` (with `sequence_number` and `actor`) |

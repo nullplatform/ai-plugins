@@ -201,6 +201,57 @@ Timeout handling for `signal-wait` (and module plugins in general):
 **Run `/np-workflow plugin claude-code-agent` to see the live config schema** —
 optional fields and how the engine runs the agent are deployment-specific.
 
+#### Moving DATA in and out: `inputFiles` / `outputFiles` (sandboxed deployments)
+
+Never ask the agent to RELAY a large payload — pasting 60KB of JSON into a
+prompt and asking the model to pass it through a tool call, or asking it to
+copy a produced artifact into its structured output, fails silently: the model
+summarizes, truncates, or mangles the escaping (measured on more than one
+model). On deployments whose `claude-code-agent` runs in a sandbox and whose
+config schema shows these fields, declare the files instead and the ENGINE
+moves the bytes mechanically — no model in the loop:
+
+```yaml
+- id: agent
+  type: module
+  pluginType: claude-code-agent
+  config:
+    systemPrompt: "..."
+    userPrompt: |
+      The payload is already on disk at in/payload.json — read it from there.
+      Write your report to out/report.md.
+    # Written INTO the sandbox BEFORE the agent starts. Values may be
+    # ${{ }} expressions; an expression resolving to an object/array is
+    # serialized to JSON; one resolving to null/undefined FAILS the step
+    # loudly (that is the unresolved-expression signature).
+    inputFiles:
+      "in/payload.json": "${{ steps.fetch.outputs.body }}"
+    # Read FROM the sandbox AFTER the agent finishes; each file's raw text
+    # lands in the step outputs under its key (steps.agent.outputs.report).
+    outputFiles:
+      report: "out/report.md"
+```
+
+Rules that bite:
+
+- **Paths are relative to the agent's in-sandbox workdir** and must stay under
+  it — `..`, absolute paths outside it, and directory paths are rejected at
+  validation time, before any sandbox is created.
+- **Key collision: the model's `outputSchema` answer WINS over a harvested
+  file.** If `outputFiles` declares `report` and the `outputSchema` also has a
+  `report` field, the model's (typically a summary) overwrites the mechanical
+  copy. Keep harvested keys OUT of the outputSchema.
+- **A missing/oversized output file does not fail the step** — it is reported
+  under `steps.agent.outputs.output_files_errors` (key → reason). Check that
+  field downstream when an artifact is load-bearing.
+- Size caps are enforced with named errors (~10MB per input file, ~20MB per
+  output, ~32MB total each way). For heavier payloads (zips, datasets) the
+  pattern is a pre-signed URL the agent downloads/uploads INSIDE the sandbox
+  — remember to add the storage host to `allowedHosts`.
+- Availability is per-deployment: if `/np-workflow plugin claude-code-agent`
+  does not show `inputFiles`/`outputFiles`, the deployment's runner does not
+  support them (host-side runners never will — by design).
+
 ### code-exec that needs network or npm packages
 
 `code-exec` runs inline and isolated by default (no network, no packages).

@@ -5,7 +5,7 @@
 # Usage:
 #   run.sh <workflow-id> [--alias=live] [--input key=value ...] [--timeout=120]
 #
-# Spawns the execution via POST /workflows/:id/execute, then polls
+# Spawns the execution via POST /definitions/:id/execute, then polls
 # /executions/:id until status is one of completed|failed|canceled or
 # the timeout expires. Prints a compact step summary at the end.
 

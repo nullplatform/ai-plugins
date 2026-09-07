@@ -392,9 +392,10 @@ LIMIT 20
 
 ## Audit Events
 
-> ⚠️ **`audit_events` is partitioned by `date` (daily) and has 180M+ rows.**
-> **Every query MUST include a `date` filter** — without it, the engine scans the full ~35 GiB table. Even an `INTERVAL 1 YEAR` is far better than no bound.
+> ⚠️ **`audit_events` is partitioned by `date` (daily) and has 233M rows / 42.8 GiB across ~870 partitions.**
+> **Every query MUST include a `date` filter** — without it, the engine opens all 1640 parts and reads 233M rows. Even an `INTERVAL 1 YEAR` is far better than no bound.
 > Skip-indexes also exist for `entity`, `method`, `status`, `user_email`, `user_id`, `entity_id`, `affected_nrn` — filtering by these is cheap.
+> **And do not use it as a lookup table:** to resolve a user's email/name/type, join `auth_user` (43K rows) instead of aggregating `user_email` here. See `docs/SQL_GUIDE.md` § Rule #2.
 
 ### Recent events (last 24h)
 

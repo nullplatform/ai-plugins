@@ -89,7 +89,25 @@ module "agent_api_key" {
 }
 ```
 
-Then use `module.agent_api_key.api_key` only in the `agent` module (instead of `var.np_api_key` directly). The `base` module still uses `var.np_api_key`.
+Then pass `module.agent_api_key.api_key` to **both** `base` and `agent`, instead of
+`var.np_api_key` directly:
+
+```hcl
+module "base"  { np_api_key = module.agent_api_key.api_key   # ... }
+module "agent" { api_key    = module.agent_api_key.api_key   # ... }
+```
+
+`base`'s `np_api_key` is described upstream as "account level" and lands in the chart values as
+`nullplatform.apiKey`, consumed by the chart's own components (including its `controlPlane.agent`
+section) — a runtime credential, not a provisioning one. The runtime-generated agent key is the
+least-privilege choice and it is what the production AWS setup uses.
+
+> `var.np_api_key` stays in use for the `nullplatform` **provider** and for modules that only
+> need to authenticate the Terraform run itself.
+>
+> This page previously said `base` still takes `var.np_api_key`, which contradicted
+> [infrastructure-generation.md](infrastructure-generation.md) and both cloud references.
+> Corrected here; the cloud references were already right.
 
 ## Running tofu commands
 

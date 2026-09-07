@@ -138,6 +138,12 @@ ORDER BY date
 FORMAT JSON
 ```
 
+**This is per-entity DURATION, not lead time.** The same expression on a deployment
+(`dateDiff(d.created_at, d.updated_at)`) is how long that deploy took, which is a different metric —
+call it "duration", never "lead time". Lead time is build → deployment; see **Lead Time** below.
+`updated_at` is only a proxy for the finish: it is the row's last-update timestamp, so anything that
+touches the row later inflates it.
+
 ## Top Applications by Deploy Count
 
 Deployments have no `application_id` — join deployment → scope → application:
@@ -179,7 +185,10 @@ for the canonical join snippet. Never join `scope.app_id` (that column doesn't e
 ## Lead Time (Deployment → Release → Build)
 
 Lead time = time from build creation to a finalized deployment of the release built from it.
-Only successful deployments (`status = 'finalized'`) count:
+Only successful deployments (`status = 'finalized'`) count — a deploy that never reached production
+has no lead time, so `failed`/`cancelled`/`rolled_back` are excluded. Use THIS join whenever a request
+says "lead time": do not substitute a single deployment row's `created_at`/`updated_at`, which is that
+deploy's duration (see **Builds: Duration**).
 
 ```sql
 SELECT round(avg(dateDiff('second', b.created_at, d.created_at)) / 3600, 2) AS avgLeadTimeHours,
@@ -215,10 +224,43 @@ If the date-range picker uses a custom preset (e.g. `last90Days`), the `coalesce
 MUST match that preset's duration — see `docs/filters-reference.md` § Date Range Picker Filter
 ("Custom ranges").
 
+## User Attribution (contributors, "who did what")
+
+Resolve the acting user through `auth_user`, never by aggregating `user_email` out of
+`audit_events` — see the recap below for why.
+
+```sql
+SELECT replaceRegexpOne(u.email, '@.*$', '') AS colaborador, count(*) AS deploys
+FROM core_entities_deployment AS d FINAL
+LEFT JOIN auth_user AS u FINAL ON toString(u.id) = toString(d.created_by) AND u._deleted = 0
+WHERE d._deleted = 0
+  AND u.user_type = 'person'
+  AND notEmpty(coalesce(u.email, ''))
+  AND d.created_at >= coalesce(parseDateTimeBestEffortOrNull({startDate:String}), now() - INTERVAL 90 DAY)
+  AND (parseDateTimeBestEffortOrNull({endDate:String}) IS NULL OR d.created_at <= parseDateTimeBestEffortOrNull({endDate:String}))
+GROUP BY u.email
+ORDER BY deploys DESC
+LIMIT 10
+FORMAT JSON
+```
+
+Two things that bite here:
+
+- `auth_user.email` is `Nullable(String)`, so the guard is `notEmpty(coalesce(u.email, ''))` —
+  plain `notEmpty(u.email)` does not filter NULLs.
+- Keep `u.user_type = 'person'` on anything that ranks people. Of the users that deploy, ~7% are
+  `machine` (API keys, workflow managers), and they dominate a raw ranking by an order of magnitude.
+
+`auth_user` does not cover every historical actor: a couple of test accounts that appear in
+`audit_events` are absent from it. Any per-user total is therefore "known users", which is what a
+contributor report wants anyway.
+
 ## Global Constraints Recap
 
 - Table names have prefixes: `core_entities_deployment`, `core_entities_build`, `core_entities_scope`, etc.
 - ALWAYS use `FINAL` and `_deleted = 0` (except `audit_events`, `scm_code_commits`, `scm_code_repositories`).
+- **`audit_events` ALWAYS needs a `date` filter.** It is partitioned by day (233M rows, 42.8 GiB); with no bound the engine opens all ~870 partitions. A shipped report scanned it unfiltered and took **312 s per widget** — bounded to 7 days the same read is 43 parts / 6.5M rows instead of 1640 / 233M. Bind the bound to the dashboard's own date-range filter.
+- **Never build a `user_id → email` map from `audit_events` — join `auth_user`** (43K rows, has `id`, `email`, `user_type`). That single substitution took the report above from **312 s to 0.2 s with identical output**. See § User Attribution.
 - Deployment success = `status = 'finalized'` (NOT `successful`). Build success = `status = 'successful'`.
 - Environment (and every scope dimension) lives in `core_entities_scope_dimension` — never a JSON column on the entity.
 - Time filtering: `now() - INTERVAL N DAY` (or `HOUR`) — never `TIMESTAMP_SUB`.

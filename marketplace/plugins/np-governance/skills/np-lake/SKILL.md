@@ -265,7 +265,8 @@ ${CLAUDE_PLUGIN_ROOT}/skills/np-lake/scripts/ch_query.sh \
 5. **Column names vary by table** — `app_id`/`app_name` (applications), `account_id`/`account_name` (accounts), `namespace_id`/`namespace_name` (namespaces), `org_id`/`org_name` (organizations). Other tables use `id`/`name`.
 6. **Deployment has NO `application_id`** — Use `nrn LIKE '%application={app_id}%'` to filter by app, or query separately and correlate.
 7. **JOINs require `AS alias FINAL` syntax** — Use `table AS alias FINAL` (alias BEFORE `FINAL`). `FINAL` deduplicates `ReplacingMergeTree` rows. Example: `FROM core_entities_deployment AS d FINAL JOIN core_entities_scope AS s FINAL ON d.scope_id = s.id`
-8. **`audit_events`: ALWAYS filter by `date`** — The table is partitioned by day (180M+ rows). Even an `INTERVAL 1 YEAR` filter is vastly better than none. Skip-indexes also exist for `entity`, `method`, `status`, `user_email`, `user_id`, `entity_id`, `affected_nrn`. See [docs/SQL_GUIDE.md](docs/SQL_GUIDE.md) for the full guide.
+8. **`audit_events`: ALWAYS filter by `date`** — The table is partitioned by day (233M rows, 42.8 GiB, ~870 partitions). Even an `INTERVAL 1 YEAR` filter is vastly better than none. Skip-indexes also exist for `entity`, `method`, `status`, `user_email`, `user_id`, `entity_id`, `affected_nrn`. See [docs/SQL_GUIDE.md](docs/SQL_GUIDE.md) for the full guide.
+9. **`audit_events` is not a lookup table** — It answers *what happened*, never *what is this thing*. To resolve a user's email/name/type join `auth_user` (43K rows) instead of aggregating `user_email`; on one production report that swap went from **311.9 s to 0.198 s** with identical output. Entity attributes live in `core_entities_*` / `auth_*`. See [docs/SQL_GUIDE.md](docs/SQL_GUIDE.md) § Rule #2.
 
 ### User Filtering (My Resources)
 

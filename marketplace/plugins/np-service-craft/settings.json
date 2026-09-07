@@ -4,6 +4,7 @@
       "Bash(./.claude/skills/np-api/scripts/check_auth.sh:*)",
       "Bash(./.claude/skills/np-api/scripts/fetch_np_api_url.sh:*)",
       "Bash(./.claude/skills/np-api/scripts/np-api.sh:*)",
+      "Bash(./.claude/skills/np-api/scripts/np-context.sh:*)",
       "Bash(./.claude/skills/np-service-craft/scripts/resend_notification.sh:*)",
       "Skill(np-agent-local-setup)",
       "Skill(np-agent-local-setup:*)",

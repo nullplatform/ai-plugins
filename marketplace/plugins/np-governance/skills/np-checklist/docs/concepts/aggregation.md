@@ -18,7 +18,7 @@ per-item states.
 
 2. Re-aggregate (after every state change: callback, manual decision, expiry)
    ├─ Walk all items, collecting their status + behavior
-   ├─ Compute derived_expression  (template's stored expression OR auto-derived)
+   ├─ Compute derived_expression  (specification's stored expression OR auto-derived)
    ├─ If all items resolved:
    │    ├─ All gate=passed    → final_outcome = approve, status = resolved
    │    ├─ Any gate=failed:
@@ -55,7 +55,7 @@ the whole expression fails to parse and the run resolves to `fail` with
 (`item.id.reserved`). `nor` is not reserved.
 
 Authors can override this by setting a custom `aggregation.expression` in
-the template's `definition` (and `derived_expression` is set explicitly
+the specification's `definition` (and `derived_expression` is set explicitly
 rather than computed). Use the override sparingly — it's an escape hatch
 for combinations the auto-derivation doesn't express.
 

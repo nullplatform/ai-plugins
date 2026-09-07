@@ -273,19 +273,53 @@ Update the state file phase to `api-key-created`.
 
 #### Available roles (reference)
 
-| Role | Description | Required for setup |
-|------|-------------|-------------------|
-| Admin | Manage all the resources | Yes |
-| Agent | Role to be used by nullplatform agents | Yes |
-| CI | Machine user that performs continuous integration | No |
-| Developer | Create builds, releases, scopes, start deployments | Yes |
-| Member | Read access to resource information | No |
-| Ops | Modify environments and infrastructure-related resources | Yes |
-| SecOps | Modify security ops related resources | Yes |
-| Secrets Reader | Read secret parameters | Yes |
-| Troubleshooting | Inspect and gather information to diagnose issues |
+The names in the left column are what the **UI** shows. The `slug` column is what the **API**
+takes, and the two do not always match — `Agent` is `controlplane:agent`, not `agent`. Guessing
+the slug from the display name fails on that one row.
+
+| Role (UI) | API slug | Description | Required for setup |
+|------|------|-------------|-------------------|
+| Admin | `admin` | Manage all the resources | Yes |
+| Agent | **`controlplane:agent`** | Role to be used by nullplatform agents | Yes |
+| CI | `organization:machine:ci` | Machine user that performs continuous integration | No |
+| Developer | `developer` | Create builds, releases, scopes, start deployments | Yes |
+| Member | `member` | Read access to resource information | No |
+| Ops | `ops` | Modify environments and infrastructure-related resources | Yes |
+| SecOps | `secops` | Modify security ops related resources | Yes |
+| Secrets Reader | `secrets-reader` | Read secret parameters | Yes |
+| Troubleshooting | `troubleshooting` | Inspect and gather information to diagnose issues | No |
 
 For the initial setup, **Admin** is recommended. For later use, create keys with the minimum required permissions.
+
+#### Creating an API key programmatically
+
+The UI flow above is the normal path. If a key has to be created by API instead, note that
+**there is no `/role` endpoint** — it returns `404`, so the numeric `role_id` each grant needs
+cannot be looked up directly. Read them off any existing key's grants:
+
+```bash
+/np-api fetch-api "/api_key?page_size=30"
+# each result carries: grants[].role_slug and grants[].role_id
+```
+
+Then POST the key with one grant per role, all scoped to the same NRN:
+
+```json
+{
+  "name": "<setup>-setup",
+  "grants": [
+    { "nrn": "organization=<org>:account=<acct>", "role_id": <admin> },
+    { "nrn": "organization=<org>:account=<acct>", "role_id": <controlplane:agent> },
+    { "nrn": "organization=<org>:account=<acct>", "role_id": <developer> },
+    { "nrn": "organization=<org>:account=<acct>", "role_id": <ops> },
+    { "nrn": "organization=<org>:account=<acct>", "role_id": <secops> },
+    { "nrn": "organization=<org>:account=<acct>", "role_id": <secrets-reader> }
+  ]
+}
+```
+
+The response carries the key **once**, in `api_key`. An API key is not a bearer token: exchange
+it at `POST /token` with `{"api_key": "<key>"}` before using it as `Authorization: Bearer`.
 
 ### Step 9: Post-creation verification
 

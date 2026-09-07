@@ -10,7 +10,7 @@ Governance & workflow authoring on the Nullplatform engine: query and operate on
 
 ### np-api
 
-description: This skill should be used when the user asks to "query the nullplatform API", "check authentication", "fetch API data", "search endpoints", "describe an endpoint", or needs to make any programmatic call to api.nullplatform.com. Provides centralized API access with authentication and token management.
+description: This skill should be used when the user asks to "query the nullplatform API", "check authentication", "fetch API data", "search endpoints", "describe an endpoint", "set up project context", "which application is this repo", "pin this repo to an application", mentions a .np folder, or needs to make any programmatic call to api.nullplatform.com. Provides centralized API access with authentication and token management.
 
 ### np-lake
 
@@ -34,7 +34,11 @@ description: Generate, modify, and persist nullplatform dynamic reports (dashboa
 
 ### np-checklist
 
-description: Operate on Nullplatform Approval Checklists — create and manage checklist templates, associate them with approval actions, inspect checklist runs (state, items, events, logs), apply manual approvals and overrides, and migrate existing policy-based actions to checklist mode. Use when the user asks to "create a checklist template", "associate a checklist with an action", "view checklist run state", "approve a manual checklist item", "migrate from policies to checklist", or anything about checklist-mode approvals on the approval-api.
+description: Operate on Nullplatform Approval Checklists — create and manage checklist specifications (formerly "checklist templates"), associate them with approval actions, inspect checklist runs (state, items, events, logs), apply manual approvals and overrides, and migrate existing policy-based actions to checklist mode. Use when the user asks to "create a checklist specification", "create a checklist template", "associate a checklist with an action", "view checklist run state", "approve a manual checklist item", "migrate from policies to checklist", or anything about checklist-mode approvals on the approval-api.
+
+### np-catalog
+
+description: The nullplatform catalog — building it and reading it. Building — specifications, instances (entities), relations (belongs_to, has_one, has_many, many_to_many), interceptors, events, custom actions, authorization, modeling an org's data as a graph, ingesting repos, docs, runbooks or services into a knowledge base, semantic fields and embeddings. Reading — any question answerable from records already in the catalog — analysing, reporting on, counting, comparing, auditing or explaining deployments, releases, services, applications, incidents or documents. Covers "give me the deployment analysis", "what shipped last month", "what changed across our services", "how many X by Y", "is this field trustworthy". Use it whenever a question could be answered from catalog data, even if the user never says "catalog", never names the API, and only asks for an analysis, summary or report. Also use when a spec change or ingest misbehaves. Requires NP_TOKEN or NP_API_KEY (same auth as np-api).
 
 ## Installation
 
@@ -74,6 +78,8 @@ This plugin requires the following permissions:
   "Bash(./.claude/skills/np-api/scripts/check_auth.sh:*)",
   "Bash(./.claude/skills/np-api/scripts/fetch_np_api_url.sh:*)",
   "Bash(./.claude/skills/np-api/scripts/np-api.sh:*)",
+  "Bash(./.claude/skills/np-api/scripts/np-context.sh:*)",
+  "Bash(./.claude/skills/np-catalog/scripts/catalog-api.sh:*)",
   "Bash(./.claude/skills/np-checklist/scripts/*.sh:*)",
   "Bash(./.claude/skills/np-governance-action-items/scripts/*.sh:*)",
   "Bash(./.claude/skills/np-governance-agent-builder/scripts/*.sh:*)",
@@ -90,6 +96,8 @@ This plugin requires the following permissions:
   "Bash(./.claude/skills/np-workflow/scripts/workflows.sh:*)",
   "Skill(np-api)",
   "Skill(np-api:*)",
+  "Skill(np-catalog)",
+  "Skill(np-catalog:*)",
   "Skill(np-checklist)",
   "Skill(np-checklist:*)",
   "Skill(np-governance-action-items)",

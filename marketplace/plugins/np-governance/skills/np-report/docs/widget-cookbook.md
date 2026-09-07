@@ -83,63 +83,183 @@ Precise date range selection with environment filter, KPIs, and trend chart.
 ## Pattern 10: Rich Dashboard (fully enriched)
 
 Complete dashboard applying all enrichment rules: widget backgrounds, KPI thresholds, axis labels, chip formatters, fixed columns, section subtitles, donut totals, semantic colors, and layout proportions.
+The status/environment chips carry no `mapping`: a table chip renders the CELL VALUE, so per-value
+labels come from the query (`multiIf(...) AS estado`). See "Chips in tables" below.
 
 ```json
-{"schema":{"type":"object","properties":{"startDate":{"type":"string","format":"date-time","default":""},"endDate":{"type":"string","format":"date-time","default":""},"totalDeploys":{"type":"number","title":"Total Deployments"},"successRate":{"type":"number","title":"Success Rate"},"avgDuration":{"type":"number","title":"Avg Duration"},"failedCount":{"type":"number","title":"Failed"},"dailyTrend":{"type":"array","items":{"type":"object","properties":{"date":{"type":"string"},"successful":{"type":"number"},"failed":{"type":"number"}}}},"byStatus":{"type":"array","items":{"type":"object","properties":{"status":{"type":"string"},"count":{"type":"number"}}}},"recentDeploys":{"type":"array","items":{"type":"object","properties":{"appName":{"type":"string"},"environment":{"type":"string"},"status":{"type":"string"},"duration":{"type":"number"},"createdAt":{"type":"string"}}}}}},"ui_schema":{"type":"VerticalLayout","elements":[{"type":"HorizontalLayout","elements":[{"type":"Control","scope":"#/properties/startDate","label":"Period","options":{"format":"date-range","endDateScope":"#/properties/endDate","initialPreset":"last30Days","allowedRanges":["today","last7Days","thisWeek","last30Days","thisMonth"],"disableFuture":true}}]},{"type":"Label","text":"##### Impact Summary","options":{"format":"markdown"}},{"type":"HorizontalLayout","options":{"columns":[3,3,3,3]},"elements":[{"type":"Control","scope":"#/properties/totalDeploys","options":{"widget":"kpi","showBackground":true}},{"type":"Control","scope":"#/properties/successRate","options":{"widget":"kpi","showBackground":true,"unit":"%","thresholds":[{"value":90,"color":"success"},{"value":70,"color":"warning"},{"value":0,"color":"error"}]}},{"type":"Control","scope":"#/properties/avgDuration","options":{"widget":"kpi","showBackground":true,"unit":"min","thresholds":[{"value":0,"color":"success"},{"value":10,"color":"warning"},{"value":30,"color":"error"}]}},{"type":"Control","scope":"#/properties/failedCount","options":{"widget":"kpi","showBackground":true,"thresholds":[{"value":0,"color":"success"},{"value":5,"color":"warning"},{"value":20,"color":"error"}]}}]},{"type":"Label","text":"##### Deployment Trend\nDaily activity broken down by result over the selected period.","options":{"format":"markdown"}},{"type":"HorizontalLayout","options":{"columns":[8,4]},"elements":[{"type":"Control","scope":"#/properties/dailyTrend","label":"Daily Activity","options":{"widget":"area-chart","showBackground":true,"categoryKey":"date","series":[{"dataKey":"successful","name":"Successful"},{"dataKey":"failed","name":"Failed"}],"xAxisLabel":"Date","yAxisLabel":"Deployments","height":320,"fillOpacity":0.3,"showLegend":true,"colors":["#22c55e","#ef4444"]}},{"type":"Control","scope":"#/properties/byStatus","label":"By Status","options":{"widget":"donut-chart","showBackground":true,"labelKey":"status","valueKey":"count","height":320,"showTotal":true,"totalLabel":"Total","colors":["#22c55e","#ef4444","#f59e0b","#3b82f6"]}}]},{"type":"Label","text":"##### Recent Deployments\nLatest deployments sorted by date.","options":{"format":"markdown"}},{"type":"Control","scope":"#/properties/recentDeploys","label":"Detail","options":{"widget":"data-table","features":["sorting","pagination"],"columns":[{"id":"appName","header":"Application","accessor":"appName","fixed":{"position":"left"}},{"id":"environment","header":"Environment","accessor":"environment","formatter":{"type":"chip","config":{"mapping":{"production":{"label":"Production","color":"error"},"staging":{"label":"Staging","color":"warning"},"development":{"label":"Development","color":"info"}}}}},{"id":"status","header":"Status","accessor":"status","formatter":{"type":"chip","config":{"mapping":{"finalized":{"label":"Successful","color":"success","variant":"tonal"},"failed":{"label":"Failed","color":"error","variant":"tonal"},"in_progress":{"label":"In Progress","color":"warning","variant":"tonal"}}}}},{"id":"duration","header":"Duration","accessor":"duration"},{"id":"createdAt","header":"Date","accessor":"createdAt","formatter":{"type":"date","format":"relative","config":{"tooltip":{"enabled":true,"format":"absolute","placement":"top"}}}}]}}]}}
+{"schema":{"type":"object","properties":{"startDate":{"type":"string","format":"date-time","default":""},"endDate":{"type":"string","format":"date-time","default":""},"totalDeploys":{"type":"number","title":"Total Deployments"},"successRate":{"type":"number","title":"Success Rate"},"avgDuration":{"type":"number","title":"Avg Duration"},"failedCount":{"type":"number","title":"Failed"},"dailyTrend":{"type":"array","items":{"type":"object","properties":{"date":{"type":"string"},"successful":{"type":"number"},"failed":{"type":"number"}}}},"byStatus":{"type":"array","items":{"type":"object","properties":{"status":{"type":"string"},"count":{"type":"number"}}}},"recentDeploys":{"type":"array","items":{"type":"object","properties":{"appName":{"type":"string"},"environment":{"type":"string"},"status":{"type":"string"},"duration":{"type":"number"},"createdAt":{"type":"string"}}}}}},"ui_schema":{"type":"VerticalLayout","elements":[{"type":"HorizontalLayout","elements":[{"type":"Control","scope":"#/properties/startDate","label":"Period","options":{"format":"date-range","endDateScope":"#/properties/endDate","initialPreset":"last30Days","allowedRanges":["today","last7Days","thisWeek","last30Days","thisMonth"],"disableFuture":true}}]},{"type":"Label","text":"##### Impact Summary","options":{"format":"markdown"}},{"type":"HorizontalLayout","options":{"columns":[3,3,3,3]},"elements":[{"type":"Control","scope":"#/properties/totalDeploys","options":{"widget":"kpi","showBackground":true}},{"type":"Control","scope":"#/properties/successRate","options":{"widget":"kpi","showBackground":true,"unit":"%","thresholds":[{"value":90,"color":"success"},{"value":70,"color":"warning"},{"value":0,"color":"error"}]}},{"type":"Control","scope":"#/properties/avgDuration","options":{"widget":"kpi","showBackground":true,"unit":"min","thresholds":[{"value":0,"color":"success"},{"value":10,"color":"warning"},{"value":30,"color":"error"}]}},{"type":"Control","scope":"#/properties/failedCount","options":{"widget":"kpi","showBackground":true,"thresholds":[{"value":0,"color":"success"},{"value":5,"color":"warning"},{"value":20,"color":"error"}]}}]},{"type":"Label","text":"##### Deployment Trend\nDaily activity broken down by result over the selected period.","options":{"format":"markdown"}},{"type":"HorizontalLayout","options":{"columns":[8,4]},"elements":[{"type":"Control","scope":"#/properties/dailyTrend","label":"Daily Activity","options":{"widget":"area-chart","showBackground":true,"categoryKey":"date","series":[{"dataKey":"successful","name":"Successful"},{"dataKey":"failed","name":"Failed"}],"xAxisLabel":"Date","yAxisLabel":"Deployments","height":320,"fillOpacity":0.3,"showLegend":true,"colors":["#22c55e","#ef4444"]}},{"type":"Control","scope":"#/properties/byStatus","label":"By Status","options":{"widget":"donut-chart","showBackground":true,"labelKey":"status","valueKey":"count","height":320,"showTotal":true,"totalLabel":"Total","colors":["#22c55e","#ef4444","#f59e0b","#3b82f6"]}}]},{"type":"Label","text":"##### Recent Deployments\nLatest deployments sorted by date.","options":{"format":"markdown"}},{"type":"Control","scope":"#/properties/recentDeploys","label":"Detail","options":{"widget":"data-table","features":["sorting","pagination"],"columns":[{"id":"appName","header":"Application","accessor":"appName","fixed":{"position":"left"}},{"id":"environment","header":"Environment","accessor":"environment","formatter":{"type":"chip","config":{"size":"small"}}},{"id":"status","header":"Status","accessor":"status","formatter":{"type":"chip","config":{"size":"small"}}},{"id":"duration","header":"Duration","accessor":"duration"},{"id":"createdAt","header":"Date","accessor":"createdAt","formatter":{"type":"date","format":"relative","config":{"tooltip":{"enabled":true,"format":"absolute","placement":"top"}}}}]}}]}}
 ```
 
 ## Pattern 11: Date Range Picker with Custom Ranges
 
-Custom date presets (90 days, 6 months) alongside built-in ranges. The `initialPreset` references a custom range key — it MUST exist in `customRanges`. The SQL `coalesce` default MUST match the `initialPreset` duration (90 days here).
+Custom date presets (90 days, 6 months) alongside built-in ranges. Note the two KPI queries: one `SELECT`
+computing both metrics cannot fill both tiles, so each KPI gets its own entry with the same `source`
+and a different `target` — identical source+params coalesce into a single Lake call. A KPI with no
+query of its own renders a tile reading `--`, which reads as a real zero rather than as a
+misconfiguration — it never gets a `queryStates` entry, so no skeleton and no error is shown.
+Use `unit`, never `suffix`: a `suffix` in a KPI's `options` is not read — only `unit`, `precision`
+and `thresholds` reach the tile — so the unit silently never appears. The `initialPreset` references a custom range key — it MUST exist in `customRanges`. The SQL `coalesce` default MUST match the `initialPreset` duration (90 days here).
 
 ```json
-{"schema":{"type":"object","properties":{"startDate":{"type":"string","format":"date-time","default":""},"endDate":{"type":"string","format":"date-time","default":""},"avgLeadTimeHours":{"type":"number","title":"Avg Lead Time"},"medianLeadTimeHours":{"type":"number","title":"Median Lead Time"},"leadTimeTrend":{"type":"array","items":{"type":"object","properties":{"day":{"type":"string"},"avgLeadTimeHours":{"type":"number"}}}}}},"ui_schema":{"type":"VerticalLayout","elements":[{"type":"HorizontalLayout","elements":[{"type":"Control","scope":"#/properties/startDate","label":"Period","options":{"format":"date-range","endDateScope":"#/properties/endDate","initialPreset":"last90Days","allowedRanges":["last7Days","last30Days"],"customRanges":[{"key":"last90Days","label":"Last 90 days","diffDays":90},{"key":"last6Months","label":"Last 6 months","diffDays":180}],"disableFuture":true}}]},{"type":"Label","text":"##### Summary","options":{"format":"markdown"}},{"type":"HorizontalLayout","elements":[{"type":"Control","scope":"#/properties/avgLeadTimeHours","options":{"widget":"kpi","suffix":"hours"}},{"type":"Control","scope":"#/properties/medianLeadTimeHours","options":{"widget":"kpi","suffix":"hours"}}]},{"type":"Control","scope":"#/properties/leadTimeTrend","label":"Lead Time Trend","options":{"widget":"line-chart","categoryKey":"day","series":[{"dataKey":"avgLeadTimeHours","name":"Lead Time (hrs)"}],"xAxisLabel":"Date","yAxisLabel":"Hours","height":300}}]},"queries":{"avg-lead-time":{"source":"SELECT round(avg(dateDiff('second',b.created_at,d.created_at))/3600,2) AS avgLeadTimeHours,round(median(dateDiff('second',b.created_at,d.created_at))/3600,2) AS medianLeadTimeHours FROM core_entities_deployment AS d FINAL JOIN core_entities_release AS r FINAL ON d.release_id=r.id AND r._deleted=0 JOIN core_entities_build AS b FINAL ON r.build_id=b.id AND b._deleted=0 WHERE d._deleted=0 AND d.status='finalized' AND d.created_at>=coalesce(parseDateTimeBestEffortOrNull({startDate:String}),now()-INTERVAL 90 DAY) AND (parseDateTimeBestEffortOrNull({endDate:String}) IS NULL OR d.created_at<=parseDateTimeBestEffortOrNull({endDate:String})) FORMAT JSON","target":"#/properties/avgLeadTimeHours"},"lead-time-trend":{"source":"SELECT toDate(d.created_at) AS day,round(avg(dateDiff('second',b.created_at,d.created_at))/3600,2) AS avgLeadTimeHours FROM core_entities_deployment AS d FINAL JOIN core_entities_release AS r FINAL ON d.release_id=r.id AND r._deleted=0 JOIN core_entities_build AS b FINAL ON r.build_id=b.id AND b._deleted=0 WHERE d._deleted=0 AND d.status='finalized' AND d.created_at>=coalesce(parseDateTimeBestEffortOrNull({startDate:String}),now()-INTERVAL 90 DAY) AND (parseDateTimeBestEffortOrNull({endDate:String}) IS NULL OR d.created_at<=parseDateTimeBestEffortOrNull({endDate:String})) GROUP BY day ORDER BY day FORMAT JSON","target":"#/properties/leadTimeTrend"}}}
+{"schema":{"type":"object","properties":{"startDate":{"type":"string","format":"date-time","default":""},"endDate":{"type":"string","format":"date-time","default":""},"avgLeadTimeHours":{"type":"number","title":"Avg Lead Time"},"medianLeadTimeHours":{"type":"number","title":"Median Lead Time"},"leadTimeTrend":{"type":"array","items":{"type":"object","properties":{"day":{"type":"string"},"avgLeadTimeHours":{"type":"number"}}}}}},"ui_schema":{"type":"VerticalLayout","elements":[{"type":"HorizontalLayout","elements":[{"type":"Control","scope":"#/properties/startDate","label":"Period","options":{"format":"date-range","endDateScope":"#/properties/endDate","initialPreset":"last90Days","allowedRanges":["last7Days","last30Days"],"customRanges":[{"key":"last90Days","label":"Last 90 days","diffDays":90},{"key":"last6Months","label":"Last 6 months","diffDays":180}],"disableFuture":true}}]},{"type":"Label","text":"##### Summary","options":{"format":"markdown"}},{"type":"HorizontalLayout","elements":[{"type":"Control","scope":"#/properties/avgLeadTimeHours","options":{"widget":"kpi","unit":"hours"}},{"type":"Control","scope":"#/properties/medianLeadTimeHours","options":{"widget":"kpi","unit":"hours"}}]},{"type":"Control","scope":"#/properties/leadTimeTrend","label":"Lead Time Trend","options":{"widget":"line-chart","categoryKey":"day","series":[{"dataKey":"avgLeadTimeHours","name":"Lead Time (hrs)"}],"xAxisLabel":"Date","yAxisLabel":"Hours","height":300}}]},"queries":{"avg-lead-time":{"source":"SELECT round(avg(dateDiff('second',b.created_at,d.created_at))/3600,2) AS avgLeadTimeHours,round(median(dateDiff('second',b.created_at,d.created_at))/3600,2) AS medianLeadTimeHours FROM core_entities_deployment AS d FINAL JOIN core_entities_release AS r FINAL ON d.release_id=r.id AND r._deleted=0 JOIN core_entities_build AS b FINAL ON r.build_id=b.id AND b._deleted=0 WHERE d._deleted=0 AND d.status='finalized' AND d.created_at>=coalesce(parseDateTimeBestEffortOrNull({startDate:String}),now()-INTERVAL 90 DAY) AND (parseDateTimeBestEffortOrNull({endDate:String}) IS NULL OR d.created_at<=parseDateTimeBestEffortOrNull({endDate:String})) FORMAT JSON","target":"#/properties/avgLeadTimeHours"},"median-lead-time":{"source":"SELECT round(avg(dateDiff('second',b.created_at,d.created_at))/3600,2) AS avgLeadTimeHours,round(median(dateDiff('second',b.created_at,d.created_at))/3600,2) AS medianLeadTimeHours FROM core_entities_deployment AS d FINAL JOIN core_entities_release AS r FINAL ON d.release_id=r.id AND r._deleted=0 JOIN core_entities_build AS b FINAL ON r.build_id=b.id AND b._deleted=0 WHERE d._deleted=0 AND d.status='finalized' AND d.created_at>=coalesce(parseDateTimeBestEffortOrNull({startDate:String}),now()-INTERVAL 90 DAY) AND (parseDateTimeBestEffortOrNull({endDate:String}) IS NULL OR d.created_at<=parseDateTimeBestEffortOrNull({endDate:String})) FORMAT JSON","target":"#/properties/medianLeadTimeHours"},"lead-time-trend":{"source":"SELECT toDate(d.created_at) AS day,round(avg(dateDiff('second',b.created_at,d.created_at))/3600,2) AS avgLeadTimeHours FROM core_entities_deployment AS d FINAL JOIN core_entities_release AS r FINAL ON d.release_id=r.id AND r._deleted=0 JOIN core_entities_build AS b FINAL ON r.build_id=b.id AND b._deleted=0 WHERE d._deleted=0 AND d.status='finalized' AND d.created_at>=coalesce(parseDateTimeBestEffortOrNull({startDate:String}),now()-INTERVAL 90 DAY) AND (parseDateTimeBestEffortOrNull({endDate:String}) IS NULL OR d.created_at<=parseDateTimeBestEffortOrNull({endDate:String})) GROUP BY day ORDER BY day FORMAT JSON","target":"#/properties/leadTimeTrend"}}}
 ```
 
 ## Pattern: Clickable links
 
-The FE `LinkFormatterCell` renders the anchor from **static** `config.targetUrl` / `config.displayText`. The row's own value is never used as the `href`. There is no templating in the JSON UI schema path today.
+The FE `LinkFormatterCell` uses `config.targetUrl` / `config.displayText` when given, and **falls back
+to the row's own cell value** for both the `href` and the visible text when they are omitted. So per-row
+links DO work — whenever the cell value itself is the URL. What is not supported is templating
+(`targetUrl: "https://.../${row.id}"` renders literally) or taking the `href` from a *different* column
+than the one being rendered. Compose the full URL in SQL instead.
 
-### A. Static link column (same URL every row) — WORKS
+**Contract — the only keys a link formatter's `config` accepts:**
 
-Only useful when every row genuinely points to the same URL (e.g., a "Docs" column linking to the same runbook). Every row will render the same `displayText` with the same `href`:
+| Key | Type | Notes |
+| --- | --- | --- |
+| `targetUrl` | string | Optional static `href`, shared by every row. **Omit for per-row links** so the cell value is used. |
+| `displayText` | string | Optional static anchor text, shared by every row. Omit to show the cell value. |
+| `target` | `"_blank"` \| `"_self"` | Defaults to `_self`. |
+| `underline` | `"always"` \| `"hover"` \| `"none"` | Defaults to `hover`. |
+| `color` | `"primary"` \| `"secondary"` \| `"error"` \| `"info"` \| `"success"` \| `"warning"` | Defaults to `primary`. |
+
+**Do NOT emit** `href_accessor`, `hrefAccessor`, `href`, `url`, `text`, or `label` inside `config` — none
+are recognised. They are silently ignored, and the cell then falls back to its own value as the `href`,
+which turns a title column into a link pointing at the title text.
+
+### A. Per-row URLs (one link per row) — WORKS
+
+The common ask: "one row per action item, with a clickable link to that item". Build the whole URL in
+SQL, expose it as its own column, and declare a link formatter with no `targetUrl`/`displayText`:
+
+```sql
+SELECT
+  action_item_id,
+  title,
+  concat('https://nullplatform.app.nullplatform.io/account/', toString(account_id),
+         '/namespace/', toString(namespace_id), '/action-item/', toString(action_item_id)) AS url
+FROM governance_action_items_action_items FINAL
+WHERE _deleted = 0
+FORMAT JSON
+```
+
+```json
+{"id":"url","header":"Action Item","accessor":"url","formatter":{"type":"link","config":{"target":"_blank"}}}
+```
+
+Also declare `"format": "uri"` on that property in the JSON Schema. It states intent, and the frontend
+applies the link formatter from it on its own: for auto-detected columns (no explicit `columns` on the
+table) and, in react-material-renderers 0.0.56, as a backfill for a declared column that carries no
+`formatter` of its own. Declare both anyway — the explicit formatter is what makes the link work
+regardless of which renderer version is deployed.
+
+```json
+{"url":{"type":"string","format":"uri"}}
+```
+
+The value must be a whole `http(s)` URL. Anything else renders as plain text instead of an anchor, by
+design: dangerous schemes (`javascript:`, `data:`) are dropped, and so is an **empty string** (an
+`href=""` would reload the app). Neither `''` nor `NULL` produces a link, so a `concat(...)` wrapped in an
+`if(<ids resolvable>, ..., '')` guard silently yields unlinked rows wherever that guard fires. Make the
+URL derivable for every row if you can; otherwise verify how many rows come back with a non-empty URL and
+tell the user that the rest will show no link.
+
+### B. Static link column (same URL every row) — WORKS
+
+Only useful when every row genuinely points to the same URL (e.g. a "Docs" column linking to one runbook):
 
 ```json
 {"id":"docs","header":"Runbook","accessor":"docs","formatter":{"type":"link","config":{"targetUrl":"https://docs.nullplatform.com/runbooks/migration","displayText":"View runbook","target":"_blank","underline":"hover"}}}
 ```
 
-The data query still needs to return *something* for the `docs` accessor per row — any non-null value will do; the cell ignores it for the href.
+The query still needs to return *something* for the `docs` accessor per row — any non-null value will do;
+the cell ignores it for the href.
 
-### B. Static link in a Label (documentation / context) — WORKS
+### C. Static link in a Label (documentation / context) — WORKS
 
-Use a `Label` with `format: "markdown"` when you want a single link outside the table (e.g. a "Full migration report" link below the KPIs):
+Use a `Label` with `format: "markdown"` for a single link outside the table:
 
 ```json
-{"type":"Label","text":"##### Lambda Migration\nProject details in [Confluence](https://nullplatform.atlassian.net/wiki/.../migration) · Tracking board in [Jira](https://nullplatform.atlassian.net/.../JIRA-123).","options":{"format":"markdown"}}
+{"type":"Label","text":"##### Lambda Migration\nProject details in [Confluence](https://nullplatform.atlassian.net/wiki/.../migration) - Tracking board in [Jira](https://nullplatform.atlassian.net/.../JIRA-123).","options":{"format":"markdown"}}
 ```
 
 `Label.text` is static — it does NOT read from any schema property and cannot render SQL output.
 
-### C. Per-row URLs — NOT SUPPORTED (today)
+### D. Link text from one column, href from another — NOT SUPPORTED
 
-The common ask — "one row per action item with a clickable link to that item" — does not have a working JSON pattern. The FE `LinkFormatterCell` cannot resolve `targetUrl` from row data via JSON config; that requires a function formatter, which is not JSON-serialisable.
+Rendering the `title` column as an anchor pointing at a separate `url` column has no JSON pattern: the
+`href` always comes from the rendered cell's own value (or from static `targetUrl`). Per-row anchor text
+is unavailable for the same reason — `displayText` is static.
 
-**Workaround**: emit the URL as a plain text column and inform the user:
+**What to do instead:** keep the title as its own text column and add a dedicated link column (pattern A).
+If the user specifically wants the title itself clickable, say so plainly — it needs a frontend change in
+`react-ui-components` (`LinkFormatterCell` would have to accept a per-row href accessor) — and offer the
+separate link column meanwhile. Reply in the language the user is writing to you (see the Language rule
+in `SKILL.md`).
 
-```json
-{"id":"url","header":"URL","accessor":"url","formatter":{"type":"text","typography":{"maxLines":1}}}
-```
+## Pattern: Chips in tables
+
+`mapping` is **not** a key the data-table chip formatter accepts. In `@nullplatform/react-ui-components`
+both `ChipFormatterCell` implementations (new design and legacy) read only `content`, `color`, `size`
+and `clickable` from `config`, and render `config.content ?? value`. A `config.mapping` is passed
+through and silently ignored, so the column shows the **raw database value in a single grey chip** —
+`pending_deferral` instead of "Pend. diferir", every row the same colour.
+
+**Contract — the only keys a table chip formatter's `config` accepts:**
+
+| Key | Type | Notes |
+| --- | --- | --- |
+| `color` | `default` \| `primary` \| `secondary` \| `error` \| `info` \| `success` \| `warning` | One colour for the whole column. Defaults to `default`. |
+| `size` | `small` \| `medium` | Defaults to `small`. |
+| `clickable` | boolean | Renders the chip as clickable. The click handler (`onChipClick`) is a function, so it is not reachable from JSON — the chip looks clickable and does nothing. Leave it off unless you only want the affordance. |
+| `content` | string | Static label for every row. Rarely what you want. |
+
+### A. Human labels in a table column — do the mapping in SQL
+
+Since the chip renders the cell value, translate the value in the query and the chip is correct:
 
 ```sql
-SELECT
-  action_item_id,
-  nrn,
-  concat('https://nullplatform.app.nullplatform.io/account/', account_id,
-         '/namespace/', namespace_id, '/action-item/', action_item_id) AS url
-FROM governance_action_items_action_items
+SELECT multiIf(priority = 'critical', 'Crítica',
+               priority = 'high',     'Alta',
+               priority = 'medium',   'Media',
+               priority = 'low',      'Baja', 'Otra') AS prioridad
+FROM governance_action_items_action_items FINAL WHERE _deleted = 0 FORMAT JSON
 ```
 
-When the user asks for a clickable link column, explain the limitation explicitly: the `link` formatter currently only accepts static URL/text — per-row URLs are not supported. Keep the URL as a text column; making it clickable per row requires a frontend fix (`frontend-packages/react-material-renderers/DataTableControl.utils.ts` → resolve templates like `${row.<accessor>}` before passing `config` to the cell). Reply to the user in the language they are writing to you (see the Language rule in `SKILL.md`).
+```json
+{"id":"prioridad","header":"Prioridad","accessor":"prioridad","formatter":{"type":"chip","config":{"size":"small"}}}
+```
+
+**Per-value colours in a table are NOT supported** — `color` is one static value for the column. Pick
+the colour that fits the column's meaning, or leave it `default`. If the user asks for red criticals
+and amber highs in the same column, say it needs a frontend change and offer the SQL-label version.
+
+### B. Per-value labels AND colours — only on a scalar Control
+
+`mapping` works on a standalone `Control` bound to a **scalar** property (string/number/integer/
+boolean), declared with `options.format: "chip"` — not `formatter`. It maps one value, so it suits a
+status field, never a table column:
+
+```json
+{"type":"Control","scope":"#/properties/estadoActual","options":{"format":"chip","mapping":{"open":{"label":"Abierto","color":"warning"},"resolved":{"label":"Resuelto","color":"success"}}}}
+```
+
+Each mapping entry accepts `label`, `color`, `variant`, `size`, `icon` and `style`; an unmapped value
+falls back to the raw value. `variant` is only `filled` or `outlined` — anything else (`tonal`) reaches
+MUI's Chip as an unsupported value.
+
+### C. On route B, never key a mapping on a snake_case value
+
+This caveat is specific to the scalar-Control route above. In a table it does not arise at all —
+`mapping` is ignored there whatever its keys look like, so no casing makes route A work.
+
+On route B, mapping keys are **data values sitting where field names normally sit**, so the response
+key-casing transform rewrites them in the published view: `pending_deferral` becomes
+`pendingDeferral` while the value from the Lake stays `pending_deferral`, and the entry never matches.
+The editor preserves the key, so the same control can look correct while editing and lose its chip
+once published. Single-word values (`open`, `failed`, `resolved`) are unaffected.
+
+For multi-word statuses, map them in SQL (pattern A) — that keeps them out of a key position
+entirely, and works the same in both surfaces.
 
 ## Dashboard Enrichment Rules
 
@@ -181,16 +301,20 @@ Omitting `precision` defaults to 2 decimal places. Always set it explicitly for 
 
 **CRITICAL: Always use `"type": "datetime"` for date/timestamp columns** in the `columns` array (e.g., `createdAt`, `date`, `updatedAt`, `day`, `eventDate`). This generates `format: "date-time"` in the JSON Schema, which auto-applies relative date formatting with absolute tooltip on hover. Using `"type": "string"` for date columns causes raw date strings to display as-is (garbled output).
 
+For URL columns, declare `"format": "uri"` on the schema property and give the column a
+`{"type": "link", "config": {"target": "_blank"}}` formatter — see "Pattern: Clickable links".
+
 ### Table Column Formatters
 
 When defining explicit `tableColumns` on a data-table, apply formatters based on the data type:
 
 | Data pattern                                                                                                                             | Formatter                                                                                                                                                                                                   |
 | ----------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Status/state values (`finalized`, `failed`, `pending`, `active`)                                                                         | `{"type": "chip", "config": {"mapping": {"finalized": {"label": "Successful", "color": "success"}, "failed": {"label": "Failed", "color": "error"}, "pending": {"label": "Pending", "color": "warning"}}}}` |
-| URLs or links (see "Clickable links" above — per-row URLs in tables are NOT supported via JSON UI schema today)                          | `{"type": "link", "config": {"targetUrl": "<static url>", "displayText": "<static text>", "target": "_blank"}}`                                                                                             |
+| Status/state values (`finalized`, `failed`, `pending`, `active`)                                                                         | `{"type": "chip", "config": {"color": "info", "size": "small"}}` — the chip label is the CELL VALUE. Per-value labels/colors via `config.mapping` do NOT work in tables; see "Pattern: Chips in tables" below.                                              |
+| URLs or links — the cell value IS the URL (per-row links, see "Clickable links" above)                                      | `{"type": "link", "config": {"target": "_blank"}}` — omit `targetUrl`/`displayText` so each row's value becomes both the `href` and the visible text. Use `targetUrl`/`displayText` only for a link that is identical on every row.                    |
 | Date/day columns (any column containing dates, days, timestamps — including columns named `day`, `date`, `createdAt`, `eventDate`, etc.) | `{"type": "date", "format": "relative", "config": {"tooltip": {"enabled": true, "format": "absolute", "placement": "top"}}}`                                                                                |
-| Percentage/rate columns (success rate, error rate, etc.)                                                                                 | `{"type": "text", "config": {"suffix": "%"}}` combined with `"typography": {"color": "success.main"}` for high values or use chip with thresholds                                                           |
+| Percentage/rate columns (success rate, error rate, etc.)                                                                                 | Keep the value NUMERIC and put the unit in the `header` (`"Success rate (%)"`). `config.suffix` is **not read** — `TextFormatterCell` ignores `config` entirely and renders `String(value)`. Appending `'%'` in SQL works but makes the column a string, so sorting goes lexical (`"9%"` after `"10%"`). |
+| Value-dependent colour in a table cell                                                                                                  | **Not supported.** `typography.color` is applied, but as ONE static colour for the whole column; table chips have no `thresholds` (that is a `kpi` option). Say so and offer a SQL-derived label column instead. |
 | Long text                                                                                                                                | Add `"typography": {"maxLines": 2}` to truncate                                                                                                                                                             |
 
 ### Fixed Columns in Tables

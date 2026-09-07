@@ -3,6 +3,12 @@
 Operations on items that require a human decision: `type: manual` items
 (any behavior) and any item with `behavior: override`.
 
+Wire contract: `PATCH /approval/:id/checklist/items/:itemId` with body
+`{status: "passed" | "failed", message?, inputs?}` — `approve` maps to
+`passed`, `reject` to `failed`. The decision is attributed to the
+**caller's JWT** (no actor in the body). There is no `…/items/:id/approve`
+endpoint.
+
 ## Approve a manual item
 
 ```bash
@@ -10,7 +16,6 @@ ${CLAUDE_PLUGIN_ROOT}/skills/np-checklist/scripts/manual_approve_item.sh \
   --approval-id 99421 \
   --item-id security_signoff \
   --decision approve \
-  --actor "alice@acme.com" \
   --message "Threat model reviewed, no auth surface changes."
 ```
 
@@ -18,7 +23,7 @@ What happens server-side:
 
 1. Loads the run by `approval_request_id` (404 if missing or not in
    checklist mode).
-2. Validates the item exists in `template_snapshot` and is `type: manual`
+2. Validates the item exists in `specification_snapshot` and is `type: manual`
    (or `behavior: override` for the override flow).
 3. Validates the caller's authz allows acting on this item's NRN.
 4. Updates `item_states[itemId]` to:
@@ -37,7 +42,6 @@ ${CLAUDE_PLUGIN_ROOT}/skills/np-checklist/scripts/manual_approve_item.sh \
   --approval-id 99421 \
   --item-id security_signoff \
   --decision reject \
-  --actor "alice@acme.com" \
   --message "Auth changes require a full pentest first."
 ```
 
@@ -64,12 +68,11 @@ ${CLAUDE_PLUGIN_ROOT}/skills/np-checklist/scripts/manual_approve_item.sh \
   --approval-id 99421 \
   --item-id cab_override \
   --decision approve \
-  --actor "cab-chair@acme.com" \
   --message "P0 incident — hotfix needed by EOD, security re-review queued."
 ```
 
 The aggregation engine routes the decision based on the item's
-behavior declared in `template_snapshot`, not on a special endpoint —
+behavior declared in `specification_snapshot`, not on a special endpoint —
 hence the same script handles both manual approvals and overrides.
 
 ## Common failure modes
@@ -80,7 +83,7 @@ hence the same script handles both manual approvals and overrides.
 | `403` | (authz) | Caller not allowed to act on this NRN |
 | `404` | `APPROVAL_REQUEST.NOT_FOUND` | No request with that id |
 | `404` | `CHECKLIST_RUN.NOT_FOUND` | The request exists but is not in checklist mode |
-| `404` | `CHECKLIST_ITEM.NOT_FOUND` | No item with that id in the run's template snapshot |
+| `404` | `CHECKLIST_ITEM.NOT_FOUND` | No item with that id in the run's specification snapshot |
 | `409` | `CHECKLIST_ITEM.NOT_ACTIONABLE` | Item is not `type: manual` or is already resolved |
 | `409` | `CHECKLIST_RUN.ALREADY_RESOLVED` | Run is already in a terminal `aggregate_status` |
 | `409` | `CHECKLIST_RUN.NOT_AWAITING_OVERRIDE` | Override approve attempted but `aggregate_status != pending_override` |
@@ -115,3 +118,34 @@ After any approval / reject, the call also produces:
 
 Use `list_events.sh --types item.status_changed` to get just the
 human-driven transitions.
+
+## Escalation: ask for manual review (`ask_for_manual.sh`)
+
+`POST /approval/:id/checklist/ask-for-manual` (body `{reason?}`) hands the
+run to the CLASSIC boolean review. Requester-only (`ONLY_REQUESTER`) and
+only for actions with `on_policy_fail=manual` (`NO_MANUAL_FALLBACK`
+otherwise). It works in two windows:
+
+- **Mid-run**: the checklist is still evaluating (e.g. stuck external
+  item). Pending items are cancelled with `subStatus:
+  early_routed_to_manual`.
+- **Resumable fail**: the run already resolved `fail` and the review was
+  not requested yet. Nothing is actionable in the checklist, but the
+  request is still `pending` — the requester chooses between fixing the
+  failed gates and redeploying (cancel + retry), cancelling, or this
+  escalation. On this path the run's original `resolved_at` is preserved.
+
+Effect: `outcome_reason` becomes `requested_manual_review`, the front
+switches the approval to the classic review view (waiting room), and
+**this call is what notifies reviewers** — a resumable fail sits silent
+until someone asks.
+
+```bash
+${CLAUDE_PLUGIN_ROOT}/skills/np-checklist/scripts/ask_for_manual.sh \
+  --approval-id 99421 \
+  --reason "Gate de cobertura imposible en este repo legacy."
+```
+
+Additional failure modes: `409 ALREADY_REPLIED` when the run resolved with
+any outcome other than a not-yet-escalated `fail` (approve, cancelled,
+expired, or review already requested).

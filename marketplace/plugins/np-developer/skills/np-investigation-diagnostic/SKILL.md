@@ -63,6 +63,11 @@ No uses uno sin el otro. La API da el estado actual, la auditoría da el histori
 | Timeline | ¿Cuándo empezó? ¿Es intermitente o constante? |
 | Impacto | ¿Qué está afectando? ¿Producción? |
 
+**Antes de preguntar**: aplicar el pre-flight de `np-api`. Si el repo tiene
+`.np/application.yaml`, la aplicación, el namespace y el account ya están
+resueltos y solo falta el síntoma. Si el usuario nombra otra entidad, manda el
+usuario. → Ver `/np-api` (sección "Pre-flight: project context").
+
 **Si falta información**: Preguntar antes de continuar.
 
 ---

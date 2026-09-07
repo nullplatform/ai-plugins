@@ -5,7 +5,7 @@ The approval-api supports two evaluation modes for an `ApprovalAction`:
 | Mode | Configured via | Evaluated by | UI |
 |---|---|---|---|
 | **Policy** (legacy, default) | `approval_action_policy` rows linking to one or more `policy` records | The policy engine on each `ApprovalRequest`, against `policy_context` | Classic approve/deny modal |
-| **Checklist** | `approval_action.checklist_template_id` pointing to a `checklist_template` | The checklist run engine — items evaluated, aggregated into a final outcome | Runner UI (per-item status, manual approvals, events) |
+| **Checklist** | `approval_action.checklist_specification_id` pointing to a `checklist_specification` | The checklist run engine — items evaluated, aggregated into a final outcome | Runner UI (per-item status, manual approvals, events) |
 
 The two modes differ in orchestration, not in how a condition is written:
 a checklist `condition` item and a policy predicate use the same
@@ -18,14 +18,17 @@ verbatim.
 
 An action is **either policy-driven OR checklist-driven, never both**.
 
-- `POST /action/:id/checklist_template` fails with `409
+- `POST /action/:id/checklist_specification` fails with `409
   APPROVAL_ACTION_HAS_POLICIES_XOR` if any live (`deleted_at IS NULL`)
   policy is still associated with the action.
 - The recommended path to switch an existing policy-action to checklist is
-  `POST /migration/:action_id`, which performs the swap (soft-delete
-  policies + associate template + create derived expression) inside a
-  single transaction.
-- `POST /migration/:action_id/rollback` reverses the swap.
+  the migrate_from_policy flow (`POST /checklist/migrate_from_policy/preview`
+  then `…/apply`, wrapped by `migrate_action.sh`), which performs the swap
+  (soft-delete policies + associate specification + create derived
+  expression) inside a single transaction.
+- `POST /checklist/migrate_from_policy/rollback` reverses the swap.
+- The hyphenated `migrate-from-policy` paths remain in the API as deprecated
+  aliases — you may still see them in older logs.
 
 ## How the backend decides which path to take
 
@@ -33,8 +36,8 @@ When an `ApprovalRequest` is created, the backend looks at the resolved
 `ApprovalAction`:
 
 ```
-if approvalAction.checklistTemplateId is set:
-    → create a ChecklistRun (snapshots template + context)
+if approvalAction.checklistSpecificationId is set:
+    → create a ChecklistRun (snapshots specification + context)
     → mode = 'checklist'
 else:
     → evaluate policies as before
@@ -50,16 +53,16 @@ The OpenFeature flag `approvals.checklist-mode-enabled` (key:
 `FEATURE_FLAGS.CHECKLIST_MODE_ENABLED`, default `false`) lives **only in
 the admin-dashboard frontend**. It gates:
 
-- The "Checklist Templates" admin pages (list, new, edit, detail).
+- The "Checklist Specifications" admin pages (list, new, edit, detail).
 - The "Migrate to checklist" wizard.
 
-When `false`, the admin UI for templates is hidden; users do not see
+When `false`, the admin UI for specifications is hidden; users do not see
 checklist-mode workflows in the UI. However:
 
 - **The backend is agnostic to the flag.** Endpoints in this skill work
   regardless of the flag's state — useful for platform teams who want to
-  prepare templates ahead of a rollout, or for API consumers (BFFs, CLIs,
-  external tools) that bypass the UI.
+  prepare specifications ahead of a rollout, or for API consumers (BFFs,
+  CLIs, external tools) that bypass the UI.
 - **Existing checklist runs continue to evaluate** even if the flag is
   switched off after they were created. Turning the flag off does **not**
   fall existing requests back to policy mode (`mode` on the request is
@@ -85,3 +88,37 @@ Use **policy mode** when:
 
 For new gates, the team's direction is checklist mode. Policy mode stays
 fully supported for backward compatibility.
+
+## Fail path: `on_policy_fail` in checklist mode
+
+The action's `on_policy_fail` (surfaced on the run read as
+`action_config.on_checklist_fail`) decides what a resolved-`fail` run does
+to the approval request:
+
+| `on_policy_fail` | Effect of a failed run |
+|---|---|
+| `deny` | Request lands `auto_denied` — terminal. |
+| `manual` | Request stays `pending` in a **resumable fail**. No notification fires. The requester (human or agent) picks the next move: fix the failed gates and redeploy (cancel + retry — the cheap, intended path), cancel, or `POST …/checklist/ask-for-manual` to hand it to classic review — which relabels `outcome_reason` to `requested_manual_review`, flips the front to the classic boolean approval, and notifies reviewers. |
+
+The `manual` row above describes the DEFAULT (`checklist_fail_mode:
+"on_request"`, also the NULL value). Actions can opt into push-style review
+with `checklist_fail_mode: "auto"` (a checklist-only field on the approval
+action, set via `POST/PATCH /approval/action` body `checklist_fail_mode`):
+a failed run then goes STRAIGHT to classic review — `outcome_reason` is
+relabeled `requested_manual_review` and reviewers are notified immediately.
+Choose `auto` for gates where the requester can never self-serve the fix
+(e.g. "deploys only from the CI api key"); keep `on_request` for educational
+gates an agent can satisfy by fixing the code and redeploying. The run read
+surfaces the mode as `action_config.checklist_fail_mode`.
+
+Success is NOT symmetric: a clean pass always lands `auto_approved`
+regardless of `on_policy_success` (the human-in-the-loop is modeled as
+manual checklist items; there is no reply flow to lift a pending checklist
+approval). Deployments still require the explicit execute ("Start
+deployment") after approval.
+
+Design intent for the resumable fail: checklists are also *educational*
+gates. An agent that deployed can read each failed gate's `query` (the
+expected condition), compare it against `context_snapshot`, fix the code
+or metadata, and redeploy — auto-escalating to humans on every fail would
+turn a teaching gate into a tollbooth.
