@@ -18,6 +18,23 @@ lore and findings the KB pipeline writes into the nullplatform catalog for an or
 6. **After a write, read by deterministic id** (`get_*`), never through search or listings: the read index lags.
 7. **Pick the surface you have.** If the tools list shows `np_kb_read`, you are on the nullplatform MCP: use its ops (→ `docs/np-mcp.md`, which has each op's params) and read the next table through the "`np_kb_read`" column. Otherwise use the **`np-catalog` MCP server** (→ `docs/surfaces.md`). Never raw `curl` against the catalog API; for the control plane → Ver `/np-api`.
 
+8. **Go to the depth the question needs, and say the depth used.** "What breaks if X goes down" is
+   not answered at depth 1: follow consumers until the chain ends or the intermediaries stop it,
+   and state "depth N" in the answer.
+9. **Never fold listed items into "etc."** List every item, or page through them, and say
+   "N of TOTAL shown" if you stop.
+10. **Before answering "unresolved", read what the result points to.** Read the book and the
+    facets the component lists (`configuration`, `backing-services`, `documentation`) for the
+    host, value or instance. Unresolved means not in any of them.
+11. **For documentation, list every document the documentation facet names**: the repo's
+    own README and other docs, and the wiki pages.
+12. **When asked what configuration an app needs, separate the keys it needs to start**
+    (no default, read at boot) from the optional ones, and say which are defined on the
+    platform.
+13. **A list of consumers or dependents always carries its coverage**: how many applications
+    the catalog has analysed out of the platform's total. An app missing from the list may
+    simply not be analysed.
+
 ## Question → path matrix
 
 The `np_kb_read` column is the same path on the nullplatform MCP. A dash means the op does not exist there; use the listed alternative.
