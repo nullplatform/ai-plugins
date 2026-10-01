@@ -71,7 +71,7 @@ if [ -n "$STATE" ]; then
 fi
 
 # Pending signals (if any)
-PEND=$("$API" GET "/executions/$EID/pending-signals" 2>/dev/null) || true
+PEND=$("$API" GET "/executions/$EID/pending_signals" 2>/dev/null) || true
 PEND_LINES=$(echo "$PEND" | jq -r '.data[]? | "  awaiting signal in \(.stepId)  channel=\(.channel // "—")"' 2>/dev/null)
 if [ -n "$PEND_LINES" ]; then
     echo ""

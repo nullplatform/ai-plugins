@@ -1,0 +1,34 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./.claude/skills/np-api/scripts/check_auth.sh:*)",
+      "Bash(./.claude/skills/np-api/scripts/fetch_np_api_url.sh:*)",
+      "Bash(./.claude/skills/np-api/scripts/np-api.sh:*)",
+      "Bash(./.claude/skills/np-api/scripts/np-context.sh:*)",
+      "Bash(./.claude/skills/np-catalog/scripts/catalog-api.sh:*)",
+      "Bash(./.claude/skills/np-workflow/scripts/execution.sh:*)",
+      "Bash(./.claude/skills/np-workflow/scripts/ping.sh:*)",
+      "Bash(./.claude/skills/np-workflow/scripts/plugins.sh:*)",
+      "Bash(./.claude/skills/np-workflow/scripts/publish.sh:*)",
+      "Bash(./.claude/skills/np-workflow/scripts/run.sh:*)",
+      "Bash(./.claude/skills/np-workflow/scripts/scaffold.sh:*)",
+      "Bash(./.claude/skills/np-workflow/scripts/trigger.sh:*)",
+      "Bash(./.claude/skills/np-workflow/scripts/workflow-api.sh:*)",
+      "Bash(./.claude/skills/np-workflow/scripts/workflows.sh:*)",
+      "Skill(np-api)",
+      "Skill(np-api:*)",
+      "Skill(np-catalog)",
+      "Skill(np-catalog:*)",
+      "Skill(np-kb-curate)",
+      "Skill(np-kb-curate:*)",
+      "Skill(np-kb-extend)",
+      "Skill(np-kb-extend:*)",
+      "Skill(np-kb-lore)",
+      "Skill(np-kb-lore:*)",
+      "Skill(np-kb-navigate)",
+      "Skill(np-kb-navigate:*)",
+      "Skill(np-workflow)",
+      "Skill(np-workflow:*)"
+    ]
+  }
+}

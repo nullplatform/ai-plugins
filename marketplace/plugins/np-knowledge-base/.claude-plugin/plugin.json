@@ -1,0 +1,12 @@
+{
+  "name": "np-knowledge-base",
+  "version": "1.3.2",
+  "description": "Navigate, curate, extend and re-analyse the organizational knowledge base built on the nullplatform catalog: answer questions with provenance through the np-catalog MCP server, keep it healthy (merges, suggestions, tombstones), register cross-cutting lore (norms, knowledge, investigation instructions), plug external sources in (tools, contract, instruction) and run full / delta / focus analyses on the engine (catalog-ia-analysis, catalog-refocus)",
+  "author": {
+    "name": "Nullplatform",
+    "email": "support@nullplatform.com",
+    "url": "https://nullplatform.com"
+  },
+  "repository": "https://github.com/nullplatform/np-claude-skills",
+  "license": "Apache-2.0"
+}

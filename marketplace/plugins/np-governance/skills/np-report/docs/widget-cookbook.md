@@ -104,6 +104,50 @@ and `thresholds` reach the tile — so the unit silently never appears. The `ini
 {"schema":{"type":"object","properties":{"startDate":{"type":"string","format":"date-time","default":""},"endDate":{"type":"string","format":"date-time","default":""},"avgLeadTimeHours":{"type":"number","title":"Avg Lead Time"},"medianLeadTimeHours":{"type":"number","title":"Median Lead Time"},"leadTimeTrend":{"type":"array","items":{"type":"object","properties":{"day":{"type":"string"},"avgLeadTimeHours":{"type":"number"}}}}}},"ui_schema":{"type":"VerticalLayout","elements":[{"type":"HorizontalLayout","elements":[{"type":"Control","scope":"#/properties/startDate","label":"Period","options":{"format":"date-range","endDateScope":"#/properties/endDate","initialPreset":"last90Days","allowedRanges":["last7Days","last30Days"],"customRanges":[{"key":"last90Days","label":"Last 90 days","diffDays":90},{"key":"last6Months","label":"Last 6 months","diffDays":180}],"disableFuture":true}}]},{"type":"Label","text":"##### Summary","options":{"format":"markdown"}},{"type":"HorizontalLayout","elements":[{"type":"Control","scope":"#/properties/avgLeadTimeHours","options":{"widget":"kpi","unit":"hours"}},{"type":"Control","scope":"#/properties/medianLeadTimeHours","options":{"widget":"kpi","unit":"hours"}}]},{"type":"Control","scope":"#/properties/leadTimeTrend","label":"Lead Time Trend","options":{"widget":"line-chart","categoryKey":"day","series":[{"dataKey":"avgLeadTimeHours","name":"Lead Time (hrs)"}],"xAxisLabel":"Date","yAxisLabel":"Hours","height":300}}]},"queries":{"avg-lead-time":{"source":"SELECT round(avg(dateDiff('second',b.created_at,d.created_at))/3600,2) AS avgLeadTimeHours,round(median(dateDiff('second',b.created_at,d.created_at))/3600,2) AS medianLeadTimeHours FROM core_entities_deployment AS d FINAL JOIN core_entities_release AS r FINAL ON d.release_id=r.id AND r._deleted=0 JOIN core_entities_build AS b FINAL ON r.build_id=b.id AND b._deleted=0 WHERE d._deleted=0 AND d.status='finalized' AND d.created_at>=coalesce(parseDateTimeBestEffortOrNull({startDate:String}),now()-INTERVAL 90 DAY) AND (parseDateTimeBestEffortOrNull({endDate:String}) IS NULL OR d.created_at<=parseDateTimeBestEffortOrNull({endDate:String})) FORMAT JSON","target":"#/properties/avgLeadTimeHours"},"median-lead-time":{"source":"SELECT round(avg(dateDiff('second',b.created_at,d.created_at))/3600,2) AS avgLeadTimeHours,round(median(dateDiff('second',b.created_at,d.created_at))/3600,2) AS medianLeadTimeHours FROM core_entities_deployment AS d FINAL JOIN core_entities_release AS r FINAL ON d.release_id=r.id AND r._deleted=0 JOIN core_entities_build AS b FINAL ON r.build_id=b.id AND b._deleted=0 WHERE d._deleted=0 AND d.status='finalized' AND d.created_at>=coalesce(parseDateTimeBestEffortOrNull({startDate:String}),now()-INTERVAL 90 DAY) AND (parseDateTimeBestEffortOrNull({endDate:String}) IS NULL OR d.created_at<=parseDateTimeBestEffortOrNull({endDate:String})) FORMAT JSON","target":"#/properties/medianLeadTimeHours"},"lead-time-trend":{"source":"SELECT toDate(d.created_at) AS day,round(avg(dateDiff('second',b.created_at,d.created_at))/3600,2) AS avgLeadTimeHours FROM core_entities_deployment AS d FINAL JOIN core_entities_release AS r FINAL ON d.release_id=r.id AND r._deleted=0 JOIN core_entities_build AS b FINAL ON r.build_id=b.id AND b._deleted=0 WHERE d._deleted=0 AND d.status='finalized' AND d.created_at>=coalesce(parseDateTimeBestEffortOrNull({startDate:String}),now()-INTERVAL 90 DAY) AND (parseDateTimeBestEffortOrNull({endDate:String}) IS NULL OR d.created_at<=parseDateTimeBestEffortOrNull({endDate:String})) GROUP BY day ORDER BY day FORMAT JSON","target":"#/properties/leadTimeTrend"}}}
 ```
 
+## Pattern 12: Tabbed sections
+
+Split one dashboard into tabs with `Categorization` + `Category`. This is the platform's own tabs
+element — it lives in the closed UI vocabulary and ships a renderer, so it needs no workaround. Use it
+when a single dashboard covers several distinct views (overview / detail / per-team) that share the
+same filters. Tabs are the default rendering; `Categorization.options.variant: "stepper"` turns the
+same element into a step-by-step wizard instead.
+
+**Filters stay global — that is the point.** A filter is derived from the queries that reference it in
+`params`, not from where its Control sits in the layout, so ONE filter row declared above the
+`Categorization` drives every query in every tab. Never repeat a filter per tab.
+
+**Tabs do NOT defer queries.** Every entry in `queries` runs on load regardless of which tab is active
+— the orchestrator reads the flat `queries` map and never looks at the ui_schema. Tabs organise a
+dashboard; they do not make it cheaper. A 3-tab dashboard costs all 3 tabs on every open, so keep the
+total query count in view and do not reach for tabs to "lazy-load" anything.
+
+Four rules, each of which fails quietly when broken:
+
+- **The `Categorization` is a CHILD of the root `VerticalLayout`, never the root itself.** As the root
+  it renders, but the dashboard editor has no layout to anchor to and cannot add anything around it.
+- **Every `Category` needs a `label`** — it is the tab's text, and it is required. Omitting it fails
+  validation, but the message never names the missing label and changes with the tab's content:
+  `expected "Category"` for a bare Control, `expected "Control"` for an empty `Category`, and an
+  `Unsupported property … "widget"` on an option further down for the widget shape used below. Read
+  any of those on a `Categorization` as a missing `label` first.
+- **Wrap each `Category`'s content in a `VerticalLayout`.** Widgets placed directly under a `Category`
+  render fine but are not selectable or movable in the dashboard's drag-and-drop editor.
+- **Keep it single level.** A `Categorization` placed DIRECTLY inside another passes schema validation
+  but does NOT render: the tabs renderer requires every direct child to be a `Category`, so the whole
+  block falls through to `No applicable renderer found.`. One nested inside a `Category`'s own
+  `VerticalLayout` does render as sub-tabs — but it hides content behind two clicks that the single
+  filter row above cannot signpost, so split the dashboard instead.
+
+Optional extras: `Category.options.icon` (any Iconify name, drawn before the tab label — the platform's
+own dashboards use `material-symbols:*`), `Categorization.options.collapsable` to fold the entire tab
+block, and a `rule` on a `Category` to show or hide a tab conditionally. `collapsable` is an OBJECT —
+`{"collapsed": true}`, `{"label": "Deployments"}`, `{"i18n": "key"}` — and the bare `collapsable: true`
+a reader reaches for first fails validation with `must be object`.
+
+```json
+{"ui_schema":{"type":"VerticalLayout","elements":[{"type":"HorizontalLayout","elements":[{"type":"Control","scope":"#/properties/environment","label":"Environment"}]},{"type":"Categorization","elements":[{"type":"Category","label":"Overview","options":{"icon":"material-symbols:speed-outline"},"elements":[{"type":"VerticalLayout","elements":[{"type":"HorizontalLayout","options":{"columns":[6,6]},"elements":[{"type":"Control","scope":"#/properties/totalDeploys","options":{"widget":"kpi","showBackground":true}},{"type":"Control","scope":"#/properties/successRate","options":{"widget":"kpi","showBackground":true,"unit":"%"}}]},{"type":"Control","scope":"#/properties/dailyTrend","label":"Daily Trend","options":{"widget":"area-chart","categoryKey":"date","series":[{"dataKey":"count","name":"Deployments"}],"xAxisLabel":"Date","yAxisLabel":"Deployments","height":300}}]}]},{"type":"Category","label":"Detail","options":{"icon":"material-symbols:table-rows-outline"},"elements":[{"type":"VerticalLayout","elements":[{"type":"Control","scope":"#/properties/recentDeploys","label":"Recent Deployments","options":{"widget":"data-table","features":["sorting","pagination"],"pagination":{"pageSize":10,"pageSizeOptions":[10,25,50]},"emptyState":{"title":"No deployments","description":"Try adjusting the filters."}}}]}]}]}]}}
+```
+
 ## Pattern: Clickable links
 
 The FE `LinkFormatterCell` uses `config.targetUrl` / `config.displayText` when given, and **falls back
@@ -396,7 +440,7 @@ Use `columns` on `HorizontalLayout` to give more space to the primary visualizat
 
 ### Layout Structure
 
-Never wrap a single widget in a `VerticalLayout` — place it directly as an element of the parent layout. When there are 2 charts that complement each other (e.g. trend + distribution, by-time + by-category), place them side-by-side in a `HorizontalLayout` with appropriate `columns` proportions instead of stacking them vertically. Full-width charts can go directly as elements of the root `VerticalLayout`.
+Never wrap a single widget in a `VerticalLayout` — place it directly as an element of the parent layout. When there are 2 charts that complement each other (e.g. trend + distribution, by-time + by-category), place them side-by-side in a `HorizontalLayout` with appropriate `columns` proportions instead of stacking them vertically. Full-width charts can go directly as elements of the root `VerticalLayout`. When a dashboard grows past two or three sections that are read independently, split it into tabs instead of one long scroll — see **Pattern 12: Tabbed sections**.
 
 ### Sparkline Cells in Tables
 
@@ -446,6 +490,7 @@ When enabling `pagination` in features, always set explicit page size options:
 - **Chart pairs**: Put 2 charts in a `HorizontalLayout` for side-by-side comparison
 - **Data table**: Always at the bottom for detailed drill-down data
 - **Vertical stacking**: Wrap everything in a top-level `VerticalLayout`
+- **Tabs**: Use `Categorization` + `Category` for independently-read sections; declare the filters once above it (Pattern 12)
 - **Max 50 items** in chart arrays for readability — aggregate larger datasets
 - **Date range picker**: Only add a Control for the start date field — the end date is managed automatically via `endDateScope`. Do NOT add a separate Control for `endDate`.
 - **Global filters**: Reference the same `params` in all data queries for consistent filtering

@@ -89,27 +89,25 @@ Use **policy mode** when:
 For new gates, the team's direction is checklist mode. Policy mode stays
 fully supported for backward compatibility.
 
-## Fail path: `on_policy_fail` in checklist mode
+## Fail path: `on_checklist_fail` in checklist mode
 
-The action's `on_policy_fail` (surfaced on the run read as
-`action_config.on_checklist_fail`) decides what a resolved-`fail` run does
-to the approval request:
+The action's `on_checklist_fail` (surfaced on the run read as
+`action_config.on_checklist_fail`; default `pending`) decides what a
+resolved-`fail` run does to the approval request. It is the only field
+checklist mode reads for this — `on_policy_fail` / `on_policy_success` are
+policy-mode only and have no effect here:
 
-| `on_policy_fail` | Effect of a failed run |
+| `on_checklist_fail` | Effect of a failed run |
 |---|---|
-| `deny` | Request lands `auto_denied` — terminal. |
-| `manual` | Request stays `pending` in a **resumable fail**. No notification fires. The requester (human or agent) picks the next move: fix the failed gates and redeploy (cancel + retry — the cheap, intended path), cancel, or `POST …/checklist/ask-for-manual` to hand it to classic review — which relabels `outcome_reason` to `requested_manual_review`, flips the front to the classic boolean approval, and notifies reviewers. |
+| `deny` | Request lands `auto_denied` — terminal. `POST …/checklist/ask-for-manual` is rejected with `NO_MANUAL_FALLBACK`. |
+| `pending` (default) | Request stays `pending` in a **resumable fail**. No notification fires. The requester (human or agent) picks the next move: fix the failed gates and redeploy (cancel + retry — the cheap, intended path), cancel, or `POST …/checklist/ask-for-manual` to hand it to classic review — which relabels `outcome_reason` to `requested_manual_review`, flips the front to the classic boolean approval, and notifies reviewers. |
+| `manual` | A failed run skips the resumable step and goes STRAIGHT to classic review — `outcome_reason` is relabeled `requested_manual_review` and reviewers are notified immediately. |
 
-The `manual` row above describes the DEFAULT (`checklist_fail_mode:
-"on_request"`, also the NULL value). Actions can opt into push-style review
-with `checklist_fail_mode: "auto"` (a checklist-only field on the approval
-action, set via `POST/PATCH /approval/action` body `checklist_fail_mode`):
-a failed run then goes STRAIGHT to classic review — `outcome_reason` is
-relabeled `requested_manual_review` and reviewers are notified immediately.
-Choose `auto` for gates where the requester can never self-serve the fix
-(e.g. "deploys only from the CI api key"); keep `on_request` for educational
-gates an agent can satisfy by fixing the code and redeploying. The run read
-surfaces the mode as `action_config.checklist_fail_mode`.
+Set with `POST/PATCH /approval/action` body `{"on_checklist_fail": "deny"|"pending"|"manual"}`.
+Choose `manual` for gates where the requester can never self-serve the fix
+(e.g. "deploys only from the CI api key"); keep the `pending` default for
+educational gates an agent can satisfy by fixing the code and redeploying;
+reserve `deny` for checklists that should never involve a human at all.
 
 Success is NOT symmetric: a clean pass always lands `auto_approved`
 regardless of `on_policy_success` (the human-in-the-loop is modeled as

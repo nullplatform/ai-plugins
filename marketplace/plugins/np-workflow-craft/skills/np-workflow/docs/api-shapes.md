@@ -140,7 +140,7 @@ A `publish` is the orchestration of:
 | GET | `/workflows/executions/:id` | — | Lifecycle record |
 | GET | `/workflows/executions/:id/state` | — | Step state, storage-backed (works on BOTH runtimes; no executor round-trip) |
 | GET | `/workflows/executions/:id/steps` | — | Step records (live-reported by activities as they start/complete) |
-| GET | `/workflows/executions/:id/pending-signals` | — | Signal envelopes the run is waiting on |
+| GET | `/workflows/executions/:id/pending_signals` | — | Signal envelopes the run is waiting on (`pending-signals` with a hyphen is a deprecated alias) |
 | POST | `/workflows/signals` | `{ workflowId, executionId, channel, payload }` | Resume a signal-wait |
 | POST | `/workflows/executions/:id/cancel` | `{}` | Best-effort cancellation |
 

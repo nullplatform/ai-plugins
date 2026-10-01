@@ -1,0 +1,64 @@
+{
+  "facets": [
+    {
+      "name": "documentation",
+      "title": "Related documentation (docs.nullplatform.com)",
+      "key": "path",
+      "producers": [
+        "agent"
+      ],
+      "entry_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "url",
+          "describes"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "pattern": "\\.mdx?$",
+            "description": "repo path of the page in nullplatform/docsite, e.g. docs/notifications/channels.md"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "public URL of the page"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "describes": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            },
+            "description": "code anchors (file:LINE or file:START-END) this page documents"
+          },
+          "sections": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^docs:"
+            },
+            "description": "docs:<path>#<anchor> sections cited"
+          }
+        }
+      },
+      "node": {
+        "kind": "document",
+        "prefix": "doc:",
+        "edge": "documented-by",
+        "title_field": "title",
+        "url_field": "url",
+        "via_field": "sections"
+      }
+    }
+  ],
+  "finding_categories": [
+    "doc-drift"
+  ]
+}

@@ -11,7 +11,7 @@
       "name": "np-setup-organization",
       "source": "./marketplace/plugins/np-setup-organization",
       "description": "Setup a new nullplatform organization: create org, configure cloud provider, infrastructure, and troubleshooting",
-      "version": "1.3.0",
+      "version": "1.3.2",
       "author": {
         "name": "Nullplatform"
       }
@@ -20,7 +20,16 @@
       "name": "np-service-craft",
       "source": "./marketplace/plugins/np-service-craft",
       "description": "Tools for developing nullplatform services",
-      "version": "1.3.0",
+      "version": "1.3.2",
+      "author": {
+        "name": "Nullplatform"
+      }
+    },
+    {
+      "name": "np-package-craft",
+      "source": "./marketplace/plugins/np-package-craft",
+      "description": "Build, run, and publish nullplatform packages (scope / service / simple) with the np CLI: init, dev, test, build, run (local agent), publish, and artifact release metadata",
+      "version": "1.3.2",
       "author": {
         "name": "Nullplatform"
       }
@@ -29,7 +38,7 @@
       "name": "np-troubleshooting",
       "source": "./marketplace/plugins/np-troubleshooting",
       "description": "Investigation and diagnosis of nullplatform issues",
-      "version": "1.3.0",
+      "version": "1.3.2",
       "author": {
         "name": "Nullplatform"
       }
@@ -38,7 +47,7 @@
       "name": "np-workflow-craft",
       "source": "./marketplace/plugins/np-workflow-craft",
       "description": "Build, publish, run, and debug workflows on the Nullplatform workflow engine via REST",
-      "version": "1.3.0",
+      "version": "1.3.2",
       "author": {
         "name": "Nullplatform"
       }
@@ -47,7 +56,7 @@
       "name": "np-catalog",
       "source": "./marketplace/plugins/np-catalog",
       "description": "Manage the nullplatform catalog: entity specifications, entity instances, relations, search/facets, interceptors/events, custom actions and authorization",
-      "version": "1.3.0",
+      "version": "1.3.2",
       "author": {
         "name": "Nullplatform"
       }
@@ -56,7 +65,7 @@
       "name": "np-developer",
       "source": "./marketplace/plugins/np-developer",
       "description": "Day-to-day tools for developers using nullplatform: query, operate, and diagnose",
-      "version": "1.3.0",
+      "version": "1.3.2",
       "author": {
         "name": "Nullplatform"
       }
@@ -65,7 +74,16 @@
       "name": "np-governance",
       "source": "./marketplace/plugins/np-governance",
       "description": "Governance & workflow authoring on the Nullplatform engine: query and operate on action items, categories and suggestions; build detector/executor agents; manage approval checklists (templates, action associations, runs, manual approvals); and author, publish, validate and test workflows (YAML, signals, triggers, config-entry secrets) — including the local kit (npx @nullplatform/workflow-kit) and the nullplatform/workflows corpus. Workflows commonly read the lake and drive action items, so all live together here.",
-      "version": "1.3.0",
+      "version": "1.3.2",
+      "author": {
+        "name": "Nullplatform"
+      }
+    },
+    {
+      "name": "np-knowledge-base",
+      "source": "./marketplace/plugins/np-knowledge-base",
+      "description": "Navigate, curate, extend and re-analyse the organizational knowledge base built on the nullplatform catalog: answer questions with provenance through the np-catalog MCP server, keep it healthy (merges, suggestions, tombstones), register cross-cutting lore (norms, knowledge, investigation instructions), plug external sources in (tools, contract, instruction) and run full / delta / focus analyses on the engine (catalog-ia-analysis, catalog-refocus)",
+      "version": "1.3.2",
       "author": {
         "name": "Nullplatform"
       }

@@ -367,7 +367,7 @@ harvested file on a same-named key) and size caps:
 | Publish 422 | YAML failed validation | Fix `errors[]`; re-run `publish` |
 | Publish 403 | Token lacks `workflow:write` | Use an admin token or update RBAC |
 | `trigger` reports no webhook | Alias not activated, or trigger pluginType isn't `webhook` | `/np-workflow describe <id>` to inspect alias state |
-| Execution stuck `running` | Waiting on a signal | `execution <eid>` shows pending-signals |
+| Execution stuck `running` | Waiting on a signal | `execution <eid>` shows pending_signals |
 | Webhook returns `503 "trigger not started"` | Replica got a transient handler it didn't activate; or worker/api deployed from different commits | Trigger plugin must honor `handler.transient` in `start()`; deploy worker + api from the same commit |
 | `CONNECTION_SOURCE_PORT_UNKNOWN` at run time (passed create-time validation) | Edge routed off a module plugin's non-default output port (e.g. signal-wait `timeout`); in-sandbox graph validation doesn't know module ports | Don't route off module ports — use `onTimeout: error` + `error_handling.fallback_step`. See yaml-cheat "Error handling & joins" |
 | Execution failed, cause unclear | — | Read `execution.error` — it carries the real error type + message + graph-validation issues. A single resolve node joining success+failure edges deadlocks; use a dedicated resolve node per failure path (yaml-cheat) |

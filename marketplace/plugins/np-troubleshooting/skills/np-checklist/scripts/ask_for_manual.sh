@@ -15,7 +15,7 @@
 #      not already routed (`outcome_reason != requested_manual_review`) —
 #      the "resumable fail".
 #   2. The approval request is still `pending`.
-#   3. The action has `on_policy_fail: manual`.
+#   3. The action's `on_checklist_fail` is not `deny` (`pending` or `manual`).
 #
 # Effect: the run's outcome_reason becomes `requested_manual_review`, the
 # request moves to the CLASSIC manual-review flow (waiting room), and the

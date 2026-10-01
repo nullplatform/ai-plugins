@@ -123,7 +123,7 @@ human-driven transitions.
 
 `POST /approval/:id/checklist/ask-for-manual` (body `{reason?}`) hands the
 run to the CLASSIC boolean review. Requester-only (`ONLY_REQUESTER`) and
-only for actions with `on_policy_fail=manual` (`NO_MANUAL_FALLBACK`
+only for actions whose `on_checklist_fail` is not `deny` (`NO_MANUAL_FALLBACK`
 otherwise). It works in two windows:
 
 - **Mid-run**: the checklist is still evaluating (e.g. stuck external

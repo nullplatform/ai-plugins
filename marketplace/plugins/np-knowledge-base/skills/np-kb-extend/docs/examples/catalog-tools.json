@@ -1,0 +1,7 @@
+[
+  { "name": "docs_search", "workflowId": "wf_boIa7xK65TOI", "alias": "latest", "read_only": true, "timeoutMs": 120000,
+    "description": "Search nullplatform's public documentation (docs.nullplatform.com). Input: query (free text, English), limit (default 8). Returns pages with repo path, public URL, title, description and excerpt. Follow up with docs_page to read one." },
+  { "name": "docs_page", "workflowId": "wf_KgZo9tEKz_jy", "alias": "latest", "read_only": true, "timeoutMs": 120000,
+    "resolves": { "scheme": "docs", "ref_input": "path" },
+    "description": "Read one documentation page by repo path (from docs_search), split into sections with anchors. Cite evidence as docs:<path>#<anchor>." }
+]

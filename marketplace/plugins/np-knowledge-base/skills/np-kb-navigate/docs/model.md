@@ -1,0 +1,11 @@
+# The knowledge base model in 15 lines
+
+- Unit: **component** (OPEN kind: app, library, service, queue, infra, core, vendor, lore, document, idp, unknown…). Identity: `slug` is the access key (readable, NOT unique org-wide); the `nrn` (`organization=…:account=…:namespace=…:application=…`) is the unique identity. Hierarchy: organization → account → namespace → app.
+- Each component carries: **facets** (structured data, ≤32k chars), **docs** (markdown: `overview`, `book`, `runbook`, `recent-changes`, …), typed **edges** with evidence (`uses-service`, `consumes-api`, `documented-by`, …), **lore / norms / instructions** projected at query time, and **suggestions**.
+- Every fact carries **provenance**: `observed:code` > `observed:null` > `joined` (code ⋈ platform) > `IA:verified` > `IA:deep` > `IA`. `human:curated` is untouchable: the pipeline never overwrites it (a contradiction becomes a suggestion).
+- **The catalog never contains source code.** The pipeline READS code but writes derived facts with a `file:line` anchor. A hardcoded data table ends up summarized (counts, ranges, anomalies) plus the anchor to the repo; the literal is absent by design.
+- Long content is partitioned into `~pN` instances; `get_facet` / `get_doc` reassemble it. Ids with `/` are mangled to `~` (so `doc:docs/x.md` is stored as `doc:docs~x.md`; the tools accept the readable form).
+- **Everything entering the catalog is English** (books before 2026-09-14 may still carry Spanish headings; a section patch reuses whatever heading exists).
+- **The credential defines the organization**: same MCP server, another `NP_API_KEY` = another org. Check with `get_hierarchy` that you are where you think you are.
+- Three analysis modes feed it (→ Ver `/np-kb-extend`): **full** (deep-dive: book, runbook, facets, edges, findings, seal), **delta** (post-deploy: the diff judged against the catalog, partial bundle), **focus** (intent-driven re-analysis after a context change: a new tool, lore, facet or question; patches the book by section, partial bundle). Partial bundles merge facets by key and never retract.
+- Findings are governance action items with a `categoria` (`catalog-findings` by default, `doc-drift`, or a category the org declared in its contract); they are not in facets nor in the book.
