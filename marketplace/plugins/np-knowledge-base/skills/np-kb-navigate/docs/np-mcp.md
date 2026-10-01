@@ -5,6 +5,23 @@ only when the deployment turned the toolset on for your organization. Both run w
 session**: they read what your token can read, and `np_kb_propose` files under your identity.
 Neither can change a fact in the catalog.
 
+## Connecting
+
+The hosted server is `https://mcp.nullplatform.com/mcp`. **An API key goes in the
+`X-API-Key` header**; `Authorization: Bearer` is only for a nullplatform token (a JWT). The
+gateway in front of the hosted server rejects an API key sent as a Bearer token with
+`401 Invalid token` before it reaches the server.
+
+```bash
+claude mcp add --transport http nullplatform https://mcp.nullplatform.com/mcp \
+  --header "X-API-Key: <your nullplatform API key>"
+```
+
+The organization comes from the credential. If a tool reports an authentication problem,
+call `np_auth_status`: it says which session the server holds and how to present one.
+
+## Ops
+
 The schemas are kept short on purpose, so this page holds the details: which params each
 op needs and what it returns. If a call misses a param, the tool says which one
 (`"graph needs ref"`). Params the op does not read come back under `ignored`, and the call
