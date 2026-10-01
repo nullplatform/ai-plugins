@@ -1,0 +1,58 @@
+{
+  "skill_name": "np-catalog",
+  "notes": "Baseline for these runs is the skill at da53ede (before the method-selection work). Every eval hits the live catalog and needs NP_TOKEN or NP_API_KEY. Eval 2 is the overcorrection guard: a skill that always reaches for semantic ranking is a different wrong skill, so it must NOT rank there. Assertions below are the ones the grader actually decides, from an instrumented log of every catalog-api.sh call \u2014 not from the agent's self-report. Keep this list in step with the grader; a stale assertion here is worse than none, because it reads as tested when it is not.",
+  "evals": [
+    {
+      "id": 0,
+      "name": "deployment-analysis-verbatim",
+      "prompt": "can you tell me the deployment analysis for nullplatform",
+      "expected_output": "Triggers np-catalog without being told to, finds the deployment-analysis specification, and answers with BOTH distributions (from facets) and what actually shipped (from relevance ranking over the summary prose). Should not be a pure paginate-and-aggregate answer.",
+      "files": [],
+      "assertions": [
+        "discovered the specification via GET /specifications",
+        "read the specification schema before querying",
+        "used ?facets= for at least one distribution",
+        "used relevance ranking for the qualitative half",
+        "combined at least two distinct read methods"
+      ]
+    },
+    {
+      "id": 1,
+      "name": "qualitative-must-rank",
+      "prompt": "did any breaking API changes ship across our services in the last month? which services were affected?",
+      "expected_output": "Uses semantic ranking over the summary prose to find the change, confirms each hit from matches[] rather than trusting rank, and names the affected services. Paging every record and skimming rows is the failure mode this eval exists to catch.",
+      "files": [],
+      "assertions": [
+        "used relevance ranking to find the change",
+        "probed with more than one ranking query rather than trusting one",
+        "did NOT make full pagination the primary method",
+        "hydrated or filtered beyond the ranked hits"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "quantitative-must-not-rank",
+      "prompt": "what's the risk distribution of our deployments broken down by namespace?",
+      "expected_output": "Answers from facets in as few requests as possible. This is the overcorrection guard: relevance ranking here would be wrong and wasteful.",
+      "files": [],
+      "assertions": [
+        "used ?facets= to get the distribution",
+        "did NOT reach for relevance ranking on a counting question",
+        "did not page full record documents to re-derive a facet count"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "composite-needs-the-join",
+      "prompt": "is the breaking flag on our deployment records actually trustworthy?",
+      "expected_output": "Builds a candidate set by ranking the prose, then joins those ids against the records to compare the prose against the stored flag, and reports how often they disagree. Neither method alone can answer this.",
+      "files": [],
+      "assertions": [
+        "used relevance ranking to build a candidate set",
+        "read records back to compare against the stored flag",
+        "used a filter or facet on the flag itself",
+        "combined ranking with record reads (the join)"
+      ]
+    }
+  ]
+}

@@ -22,7 +22,7 @@ Create and manage approvals, approval actions, and approval policies.
 |---------|-------------|
 | `np approval action create --body <json>` | Create a new approval action |
 | `np approval action delete --id <id>` | Delete an approval action (permanent) |
-| `np approval action patch --id <id> --body <json>` | Update on_policy_success and on_policy_fail fields |
+| `np approval action patch --id <id> --body <json>` | Update on_policy_success, on_policy_fail, and on_checklist_fail fields |
 | `np approval action policy create --id <id> --body <json>` | Associate a policy with an approval action |
 | `np approval action policy delete --id <id> --policy_id <id>` | Disassociate a policy from an approval action |
 | `np approval policy create --body <json>` | Create a new policy |

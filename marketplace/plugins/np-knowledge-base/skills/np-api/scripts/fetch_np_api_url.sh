@@ -1,0 +1,425 @@
+#!/bin/bash
+#
+# fetch_np_api_url.sh - Fetch Nullplatform API endpoints with authentication
+#
+# Usage:
+#   ./fetch_np_api_url.sh <endpoint> [output_file]
+#
+# Examples:
+#   ./fetch_np_api_url.sh "/application/441069822"
+#   ./fetch_np_api_url.sh "/application/441069822?include_messages=true" app.json
+#   ./fetch_np_api_url.sh "/deployment/123456?include_messages=true"
+#
+# Authentication precedence:
+#   1. NP_API_KEY environment variable (exchanges for token, caches in ~/.claude/)
+#   2. NP_TOKEN environment variable (direct bearer token, no cache)
+#   3. `np login` session, via `np token get` (uses the stored refresh token;
+#      only tried when neither env var is set, so env/.env always win)
+#
+# Environment overrides (for use by other skills that share the same auth):
+#   NP_API_BASE_URL    Target API base URL (default: https://api.nullplatform.com).
+#                      Token exchange always uses https://api.nullplatform.com
+#                      regardless — only the destination of the actual call changes.
+#   NP_API_BASE_PATH   Path prefix prepended to the endpoint (default: "" — none).
+#                      Used by skills whose target API is served under a REST
+#                      prefix like /api. The ALLOWED_MODIFY allowlist still
+#                      matches on the bare resource path (e.g. "workflows/*"),
+#                      so the prefix never leaks into the policy.
+
+set -e
+
+# Configuration
+# TOKEN_EXCHANGE_URL always points at the NP control plane — that's where the
+# /token endpoint lives. BASE_URL is the destination of the *actual* API call,
+# overridable so other skills can reuse this script against their own host.
+TOKEN_EXCHANGE_URL="https://api.nullplatform.com"
+BASE_URL="${NP_API_BASE_URL:-https://api.nullplatform.com}"
+TOKEN_CACHE_DIR="$HOME/.claude"
+
+# Endpoints (after stripping leading "/" and query string) where modifying
+# methods (POST/PUT/PATCH/DELETE) are allowed. Each entry is a bash case glob.
+# Add new entries here when exposing new mutable endpoints to skills.
+ALLOWED_MODIFY=(
+    # NP control plane (api.nullplatform.com)
+    "controlplane/agent_command"
+    "notification/*/resend"
+    "governance/action_item"
+    "governance/action_item/*"
+    "governance/action_item_category"
+    "governance/action_item_category/*"
+    "data/lake/query"
+
+    # Checklist approvals (np-checklist skill). The canonical entity name is
+    # "specification"; the template paths are the API's deprecated aliases,
+    # kept here so older installed copies of np-checklist keep working.
+    "approval/checklist/specification"
+    "approval/checklist/specification/*"
+    "approval/action/*/checklist_specification"
+    "approval/checklist/template"
+    "approval/checklist/template/*"
+    "approval/action/*/checklist_template"
+    # Checklist pre-evaluation (dry_run_specification.sh): POST /approval/dry-run
+    "approval/dry-run"
+    # Manual item resolve: PATCH .../items/:itemId {status,message,inputs}.
+    # (The old .../items/*/approve endpoint never shipped - kept out on purpose.)
+    "approval/*/checklist/items/*"
+    "approval/*/checklist/ask-for-manual"
+    # Cancel a pending approval request (withdraw a failed deploy to fix the
+    # cause and redeploy - the resumable-fail loop in deployments.md 10a-CHK).
+    "approval/*/cancel"
+    "approval/checklist/migrate_from_policy/preview"
+    "approval/checklist/migrate_from_policy/apply"
+    "approval/checklist/migrate_from_policy/rollback"
+    # Hyphenated migrate-from-policy paths are the API's deprecated aliases,
+    # kept here so older installed copies of np-checklist keep working.
+    "approval/checklist/migrate-from-policy/preview"
+    "approval/checklist/migrate-from-policy/apply"
+    "approval/checklist/migrate-from-policy/rollback"
+
+    # Workflow engine (NP_API_BASE_URL = NP_WORKFLOW_URL, paths here are bare
+    # resource paths — the NP_API_BASE_PATH prefix like /workflows is stripped
+    # before the allowlist check). The bash case glob's `*` spans '/' so a
+    # single `resource/*` pattern covers every depth under it.
+    "definitions"
+    "definitions/*"
+    "executions/*"
+    "signals"
+    "config"
+    "config/*"
+
+    # Reports API
+    "report"
+    "report/*"
+
+    # Nullplatform catalog (np-catalog skill), addressed by its public
+    # /catalog path. Covers specification CRUD + nested handler CRUD
+    # (catalog/specifications/*), instance + relation CRUD
+    # (catalog/instances/*), action execution/updates (catalog/actions/*),
+    # and retrieval/graph POSTs (catalog/search, catalog/traverse — POST
+    # /search takes the same query object as the GET form, since large id
+    # sets do not fit in a URL; POST is the only form of /traverse).
+    "catalog/specifications"
+    "catalog/specifications/*"
+    "catalog/instances/*"
+    "catalog/actions/*"
+    "catalog/search"
+    "catalog/traverse"
+)
+
+is_modify_allowed() {
+    local path="$1"
+    for allowed in "${ALLOWED_MODIFY[@]}"; do
+        # shellcheck disable=SC2254
+        case "$path" in
+            $allowed) return 0 ;;
+        esac
+    done
+    return 1
+}
+
+# Parse arguments
+METHOD="GET"
+DATA=""
+ENDPOINT=""
+OUTPUT_FILE=""
+CONTENT_TYPE=""
+DATA_BINARY=false
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --method)
+            METHOD="$2"
+            shift 2
+            ;;
+        --data)
+            DATA="$2"
+            shift 2
+            ;;
+        --content-type)
+            CONTENT_TYPE="$2"
+            shift 2
+            ;;
+        --data-binary)
+            DATA_BINARY=true
+            shift
+            ;;
+        *)
+            if [ -z "$ENDPOINT" ]; then
+                ENDPOINT="$1"
+            else
+                OUTPUT_FILE="$1"
+            fi
+            shift
+            ;;
+    esac
+done
+
+# Check if endpoint is provided
+if [ -z "$ENDPOINT" ]; then
+    echo "Error: endpoint required"
+    echo "Usage: $0 [--method GET|POST|PUT|PATCH|DELETE] [--data <json>] <endpoint> [output_file]"
+    echo "Example: $0 /application/441069822"
+    echo "Example: $0 --method PATCH --data '{\"status\":\"resolved\"}' /governance/action_item/abc123"
+    exit 1
+fi
+
+# Validate method + endpoint
+case "$METHOD" in
+    GET|HEAD)
+        ;; # always allowed
+    POST|PUT|PATCH|DELETE)
+        ENDPOINT_PATH="${ENDPOINT#/}"
+        ENDPOINT_PATH="${ENDPOINT_PATH%%\?*}"  # Remove query string
+        if ! is_modify_allowed "$ENDPOINT_PATH"; then
+            echo "Error: $METHOD method is only allowed for endpoints matching:" >&2
+            for allowed in "${ALLOWED_MODIFY[@]}"; do
+                echo "  /${allowed}" >&2
+            done
+            exit 1
+        fi
+        if [ "$METHOD" != "DELETE" ] && [ -z "$DATA" ]; then
+            echo "Error: --data is required for $METHOD requests" >&2
+            exit 1
+        fi
+        if [ "$DATA_BINARY" = true ] && [ -z "$DATA" ]; then
+            echo "Error: --data-binary requires --data" >&2
+            exit 1
+        fi
+        ;;
+    *)
+        echo "Error: unsupported method: $METHOD" >&2
+        exit 1
+        ;;
+esac
+
+# If npcurl doesn't exist, use curl as fallback
+if ! command -v npcurl &> /dev/null; then
+    npcurl() { curl "$@"; }
+fi
+
+# Function to decode base64 (handles URL-safe base64)
+decode_base64() {
+    local input="$1"
+    # Add padding if needed
+    local pad=$((4 - ${#input} % 4))
+    if [ $pad -ne 4 ]; then
+        input="${input}$(printf '=%.0s' $(seq 1 $pad))"
+    fi
+    # Replace URL-safe characters
+    echo "$input" | tr '_-' '/+' | base64 -d 2>/dev/null
+}
+
+# Function to check if JWT token is expired
+# Returns 0 if valid, 1 if expired or invalid
+is_jwt_valid() {
+    local token="$1"
+
+    # Check if it's a JWT (has 3 parts separated by dots)
+    if [[ "$token" != *"."*"."* ]]; then
+        return 1
+    fi
+
+    # Extract payload (second part)
+    local payload=$(echo "$token" | cut -d'.' -f2)
+    local decoded=$(decode_base64 "$payload")
+
+    if [ -z "$decoded" ]; then
+        return 1
+    fi
+
+    # Extract exp
+    local exp=$(echo "$decoded" | grep -o '"exp":[0-9]*' | cut -d':' -f2)
+
+    if [ -z "$exp" ]; then
+        return 1
+    fi
+
+    local now=$(date +%s)
+
+    if [ "$now" -gt "$exp" ]; then
+        return 1
+    fi
+
+    return 0
+}
+
+# Function to exchange API Key for Access Token
+exchange_api_key_for_token() {
+    local api_key="$1"
+    local response
+
+    # The /token endpoint always lives on the NP control plane — even when the
+    # caller is targeting a different API host (overridden via NP_API_BASE_URL).
+    response=$(npcurl -s -X POST "${TOKEN_EXCHANGE_URL}/token" \
+        -H 'Content-Type: application/json' \
+        -H 'Accept: application/json' \
+        -d "{\"api_key\": \"$api_key\"}")
+
+    # Extract access_token from response
+    local token=$(echo "$response" | grep -o '"access_token":"[^"]*"' | cut -d'"' -f4)
+
+    if [ -z "$token" ]; then
+        echo "Error: Failed to exchange API key for token" >&2
+        echo "Response: $response" >&2
+        return 1
+    fi
+
+    echo "$token"
+}
+
+# Print guidance for the `np login` auth tier, tailored to the np CLI state:
+# missing (install), too old to have `np login` (upgrade), or present (log in).
+# `np token get --help` exits 0 only on CLIs new enough to have np login.
+np_login_guidance() {
+    if ! command -v np >/dev/null 2>&1; then
+        echo "  np login (interactive browser SSO) — the np CLI is not installed:"
+        echo "    curl https://cli.nullplatform.com/install.sh | bash"
+        echo "    np login --np-url https://<your-org>.app.nullplatform.io   # or set NP_LOGIN_URL"
+    elif np token get --help >/dev/null 2>&1; then
+        echo "  np login (interactive browser SSO — stores an auto-renewed refresh token):"
+        echo "    np login --np-url https://<your-org>.app.nullplatform.io   # or set NP_LOGIN_URL"
+        echo "    Once logged in, this skill picks up the session automatically."
+    else
+        echo "  np login — your np CLI is outdated and has no 'np login'; update it first:"
+        echo "    np upgrade   # or: curl https://cli.nullplatform.com/install.sh | bash"
+        echo "    np login --np-url https://<your-org>.app.nullplatform.io   # or set NP_LOGIN_URL"
+    fi
+}
+
+# Function to get a valid Bearer token
+# Handles precedence and caching
+get_token_cache_file() {
+    local api_key="$1"
+    local key_hash
+    if command -v md5 &>/dev/null; then
+        key_hash=$(echo -n "$api_key" | md5 | cut -c1-8)
+    elif command -v md5sum &>/dev/null; then
+        key_hash=$(echo -n "$api_key" | md5sum | cut -c1-8)
+    else
+        echo "[auth] ERROR: Neither 'md5' nor 'md5sum' found. Install coreutils." >&2
+        return 1
+    fi
+    echo "${TOKEN_CACHE_DIR}/.np-token-${key_hash}.cache"
+}
+
+get_valid_token() {
+    # 1. Try NP_API_KEY environment variable (with token cache)
+    if [ -n "${NP_API_KEY:-}" ]; then
+        local cache_file=$(get_token_cache_file "$NP_API_KEY")
+        if [ -f "$cache_file" ]; then
+            local cached_token=$(cat "$cache_file")
+            if is_jwt_valid "$cached_token"; then
+                echo "$cached_token"
+                return 0
+            fi
+            echo "[auth] Cached token expired, renewing from NP_API_KEY..." >&2
+        else
+            echo "[auth] No cached token found, exchanging NP_API_KEY for token..." >&2
+        fi
+        local new_token=$(exchange_api_key_for_token "$NP_API_KEY")
+        if [ -n "$new_token" ]; then
+            mkdir -p "$TOKEN_CACHE_DIR"
+            echo "$new_token" > "$cache_file"
+            echo "[auth] Token renewed and cached in $cache_file" >&2
+            echo "$new_token"
+            return 0
+        fi
+        echo "[auth] ERROR: Failed to exchange NP_API_KEY for token. Check that your API key is valid." >&2
+        return 1
+    fi
+
+    # 2. Try NP_TOKEN environment variable (direct token, no cache)
+    if [ -n "${NP_TOKEN:-}" ]; then
+        if is_jwt_valid "$NP_TOKEN"; then
+            echo "$NP_TOKEN"
+            return 0
+        fi
+        echo "[auth] ERROR: NP_TOKEN is expired. Get a new token from Nullplatform UI > Profile > Copy personal access token." >&2
+        return 1
+    fi
+
+    # 3. Fall back to the `np login` session (only reached when neither
+    #    NP_API_KEY nor NP_TOKEN is set — env vars always take precedence).
+    #    `np token get` renews the access token from the stored refresh token
+    #    and prints it; it exits non-zero / prints no token when not logged in.
+    if command -v np >/dev/null 2>&1; then
+        local np_token
+        np_token=$(np token get --format bash 2>/dev/null | sed -n 's/^export ACCESS_TOKEN="\(.*\)"$/\1/p')
+        if [ -n "$np_token" ] && is_jwt_valid "$np_token"; then
+            echo "[auth] Using the 'np login' session (np token get)." >&2
+            echo "$np_token"
+            return 0
+        fi
+    fi
+
+    echo "[auth] ERROR: No authentication configured. Use ONE of these:" >&2
+    echo "" >&2
+    echo "  NP_API_KEY (recommended for CI/agents - never expires, token cached in ~/.claude/)" >&2
+    echo "    export NP_API_KEY='your-api-key'" >&2
+    echo "" >&2
+    echo "  NP_TOKEN (bearer token - expires in ~24h)" >&2
+    echo "    export NP_TOKEN='eyJ...'" >&2
+    echo "" >&2
+    np_login_guidance >&2
+    return 1
+}
+
+# Get valid token
+BEARER_TOKEN=$(get_valid_token)
+if [ $? -ne 0 ]; then
+    exit 1
+fi
+
+# Build URL.
+# - When NP_API_BASE_PATH is set (e.g. "/api"), it is interposed between BASE_URL
+#   and the endpoint. The allowlist already matched on the bare endpoint above,
+#   so prefixing here doesn't affect policy.
+# - Normalise: NP_API_BASE_PATH gets a leading "/" and no trailing "/".
+if [[ "$ENDPOINT" == http* ]]; then
+    URL="$ENDPOINT"
+else
+    # Remove leading slash if present
+    ENDPOINT="${ENDPOINT#/}"
+
+    PATH_PREFIX="${NP_API_BASE_PATH:-}"
+    if [ -n "$PATH_PREFIX" ]; then
+        case "$PATH_PREFIX" in
+            /*) ;;
+            *)  PATH_PREFIX="/$PATH_PREFIX" ;;
+        esac
+        PATH_PREFIX="${PATH_PREFIX%/}"
+    fi
+
+    URL="${BASE_URL%/}${PATH_PREFIX}/${ENDPOINT}"
+fi
+
+# Make request
+CURL_ARGS=(-s -X "$METHOD" -H "Authorization: Bearer $BEARER_TOKEN")
+
+# Resolve Content-Type: explicit override wins, else JSON default for bodies
+EFFECTIVE_CT="${CONTENT_TYPE:-application/json}"
+
+if [ "$DATA_BINARY" = true ]; then
+    DATA_FLAG="--data-binary"
+else
+    DATA_FLAG="-d"
+fi
+
+case "$METHOD" in
+    POST|PUT|PATCH)
+        CURL_ARGS+=(-H "Content-Type: $EFFECTIVE_CT" "$DATA_FLAG" "$DATA")
+        ;;
+    DELETE)
+        # DELETE may or may not carry a body; forward if provided
+        if [ -n "$DATA" ]; then
+            CURL_ARGS+=(-H "Content-Type: $EFFECTIVE_CT" "$DATA_FLAG" "$DATA")
+        fi
+        ;;
+esac
+
+if [ -n "$OUTPUT_FILE" ]; then
+    npcurl "${CURL_ARGS[@]}" "$URL" > "$OUTPUT_FILE"
+    echo "Response saved to: $OUTPUT_FILE"
+else
+    npcurl "${CURL_ARGS[@]}" "$URL"
+fi

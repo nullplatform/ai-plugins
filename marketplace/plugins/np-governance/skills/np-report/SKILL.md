@@ -120,7 +120,9 @@ of the first row and the widget renders blank. See `docs/json-schema-reference.m
 contract", which also covers matching SQL aliases to the keys each widget reads.
 
 Use `docs/widget-cookbook.md` for widget shapes and enrichment rules, `docs/filters-reference.md` for
-filters, `docs/lake-query-recipes.md` for SQL. Apply the enrichment rules (backgrounds, thresholds,
+filters, `docs/lake-query-recipes.md` for SQL. A dashboard that covers several independently-read
+views belongs in tabs (`Categorization` + `Category`) rather than one long scroll — see
+`docs/widget-cookbook.md` § "Pattern 12: Tabbed sections" for the shape and its four silent traps. Apply the enrichment rules (backgrounds, thresholds,
 axis labels, chip formatters, section headers). To assign a category, run
 `${CLAUDE_PLUGIN_ROOT}/skills/np-api/scripts/fetch_np_api_url.sh "/report_category"` and pick a
 matching `id`.

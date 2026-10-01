@@ -1,0 +1,12 @@
+{
+  "name": "np-package-craft",
+  "version": "1.3.2",
+  "description": "Build, run, and publish nullplatform packages (scope / service / simple) with the np CLI: init, dev, test, build, run (local agent), publish, and artifact release metadata",
+  "author": {
+    "name": "Nullplatform",
+    "email": "support@nullplatform.com",
+    "url": "https://nullplatform.com"
+  },
+  "repository": "https://github.com/nullplatform/np-claude-skills",
+  "license": "Apache-2.0"
+}

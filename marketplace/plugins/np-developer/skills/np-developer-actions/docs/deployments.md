@@ -340,10 +340,11 @@ Del resultado importan:
 - `context_snapshot`: el contexto contra el que se evaluo (mismo addressing que las queries:
   `build.metadata.coverage` en la query se lee de `.build.metadata.coverage` aca). Comparar
   query vs snapshot dice EXACTAMENTE que valor no cumplio.
-- `action_config.on_checklist_fail`: `manual` | `deny` — decide que pasa al fallar.
-- `action_config.checklist_fail_mode`: `on_request` (default) | `auto` — con `auto` un fail va
-  DERECHO a review clasica (no hay fail retomable: ya esta en la waiting room, solo queda
-  esperar aprobacion o cancelar); con `on_request` aplica el loop de agente de abajo.
+- `action_config.on_checklist_fail`: `deny` | `pending` (default) | `manual` — decide que pasa
+  al fallar. Con `deny` el approval queda `auto_denied` (terminal, sin `ask_for_manual`); con
+  `pending` aplica el loop de agente de abajo (fail retomable, nadie notificado); con `manual`
+  un fail va DERECHO a review clasica (no hay fail retomable: ya esta en la waiting room, solo
+  queda esperar aprobacion o cancelar).
 - `available_actions`: verbos disponibles (`ask_for_manual`, `cancel`, `override`).
 
 **Monitorear el RUN (no el deployment) hasta que resuelva:**
@@ -380,7 +381,7 @@ y se sigue con la tabla de abajo. Señales tipicas de que ya no hay que esperar 
 |---|---|---|---|
 | `auto_approved` | `approve` | Gates pasaron | `POST /approval/{id}/execute` para iniciar |
 | `pending` | `null` (aggregate `pending_items`) | Items manuales/external pendientes | Ver `items_summary.first_pending_actionable_by_me`; un reviewer resuelve items via el skill np-checklist |
-| `pending` | `fail` + `on_checklist_fail: manual` | **Fail retomable** — nadie fue notificado | Loop de agente (abajo) |
+| `pending` | `fail` + `on_checklist_fail: pending` | **Fail retomable** — nadie fue notificado | Loop de agente (abajo) |
 | `pending` | `fail` + `outcome_reason: requested_manual_review` | Ya escalado a review clasica | Esperar aprobacion humana; luego execute |
 | `auto_denied` | `fail` (action con `deny`) | Gates fallaron, denegado | Corregir la causa y recrear deployment |
 
@@ -498,7 +499,7 @@ np-api fetch-api "/service/<instance_id>/action/<action_id>?include_messages=tru
 |---------|---------------|-------------|
 | Queda en `creating_approval` y luego `cancelled` | Policies rechazan (coverage, vulns) | Revisar build quality, desplegar desde UI |
 | Queda en `creating_approval` con `auto_denied` | Policies rechazaron automaticamente | Revisar `policy_context.policies[]` del approval para ver que fallo |
-| Approval `pending` con `checklist.final_outcome: fail` | Fail retomable de checklist (modo checklist, `on_checklist_fail: manual`) | Leer los gates fallidos del run, arreglar la causa, cancelar y redeployar (paso 10a-CHK) |
+| Approval `pending` con `checklist.final_outcome: fail` | Fail retomable de checklist (modo checklist, `on_checklist_fail: pending`) | Leer los gates fallidos del run, arreglar la causa, cancelar y redeployar (paso 10a-CHK) |
 | Approval `expired` | Ventana de aprobacion expiro sin respuesta | Recrear deployment si es necesario |
 | Status `failed` sin messages | El agent no proceso la notificacion | Verificar notification channels y agent |
 | BackOff events en messages | Container crashea al iniciar | Revisar logs: health check path, puerto, variables de entorno |
