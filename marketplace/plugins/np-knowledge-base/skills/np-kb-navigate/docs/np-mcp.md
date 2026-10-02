@@ -32,8 +32,8 @@ still runs.
 | `op` | Needs | Optional | Returns |
 |---|---|---|---|
 | `search` | `query` | `limit` 1–30 (default 10), `offset` | hits with `owner`, `kind` (component/facet/doc/edge), `ref`, `score`, snippets. Read a hit with `get` |
-| `list` | — | `view`: `components` (default), `hierarchy`, `lore`, `apis`, `libs`; `kind`; `namespace` (a namespace or account name); `application_id`; `query`; `limit` 1–500 (default 50), `offset` | `components`: slug, name, kind, namespace, account, nrn. `hierarchy`: account → namespace → apps, the kind counts, the lore titles. `lore`: norms/knowledge/instructions (`kind` = `norm`/`knowledge`/`instruction`). `apis`/`libs`: each API or library with its consumers |
-| `get` | `ref`: a slug, a name, an NRN, `application:<id>` or `lore:<key>` | `include`: `facet:<name>` (up to 5), `doc:<name>` (up to 3), `norms`, `deploy_checklist`, `retired`, `lore`; `limit` (edges per page, default 50, max 500), `offset` | `component`: identity, NRN, platform app, facets and docs index, **live** `edges_out` / `edges_in` with evidence, `via` and provenance, `edges_retired_omitted` (how many retired edges were left out; `edges_retired` with `include: ["retired"]`), applicable knowledge and instructions as `{key, title, summary, page}` (full bodies with `include: ["lore"]`, or one at a time with `get {ref: "lore:<key>"}`). Then `facets.<name>`, `docs.<name>`, `norms` and `deploy_checklist` for whatever you included. When nothing matches, `found: false` |
+| `list` | — | `view`: `components` (default), `hierarchy`, `lore`, `apis`, `libs`, `facet` (with `facet`, `where`, optional `fields`; see below); `kind`; `namespace` (a namespace or account name); `application_id`; `query`; `limit` 1–500 (default 50), `offset` | `components`: slug, name, kind, namespace, account, nrn. `hierarchy`: account → namespace → apps, the kind counts, the lore titles. `lore`: norms/knowledge/instructions (`kind` = `norm`/`knowledge`/`instruction`). `apis`/`libs`: each API or library with its consumers |
+| `get` | `ref`: a slug, a name, an NRN, `application:<id>` or `lore:<key>` | `include`: `facet:<name>` (up to 5), `doc:<name>` (up to 3), `norms`, `deploy_checklist`, `retired`, `lore`; `limit` (edges per page, default 50, max 500), `offset` | `component`: identity, NRN, platform app, facets and docs index, **live** `edges_out` / `edges_in` with evidence, `via` and provenance, `edges_retired_omitted` (how many retired edges were left out; `edges_retired` with `include: ["retired"]`), applicable knowledge and instructions as `{key, title, summary, page}` (full bodies with `include: ["lore"]`, or one at a time with `get {ref: "lore:<key>"}`). Then `facets.<name>`, `docs.<name>`, `norms` and `deploy_checklist` for whatever you included. Every answer carries `state` (see below); when there is no node, `found: false` |
 | `graph` | `ref`: a node, e.g. a slug, `queue:<name>`, `lib:<name>` or `doc:<path>` | `direction`: `consumers` (default) or `dependencies`; `depth` 1–4 (default 1); `through_intermediaries` (default false); `include: ["retired"]`; `limit`, `offset` | **live edges only**. Depth 1 consumers: `consumers`. Deeper, or dependencies: `affected` (the node list) and `detail`. Both carry `intermediaries`, always `[{node, depth, behind, behind_truncated}]`. Every row, in both directions and at every depth, is `{depth, from, to, edge, via, evidence, provenance}`: `from` calls or depends on `to`. A consumer that is a gateway, proxy or bus carries `intermediary: true`. `retired_omitted` counts the retired edges left out |
 | `items` | `type`: `findings`, `questions` or `suggestions` | `ref` (one component), `status`, `limit` (default 50), `offset` | `findings`: governance items with `category`, `severity`, `evidence` (anchors), `kind`, and `complete` (every application NRN read to its total). `questions`: open questions with options, evidence and priority. `suggestions`: filed proposals |
 
@@ -83,6 +83,42 @@ everything it fronts, not on the node you asked about.
   the backend, so they are in the result.
 - Pass `through_intermediaries: true` only when the question really is "everything behind
   that gateway", and say the result is then over-inclusive.
+
+### Filtering by a facet field: `list` with `view: "facet"`
+
+To find the nodes, or the entries inside a facet, whose facet field has a value, do not `get`
+node after node: one call reads every instance of that facet and matches for you.
+- `{op: "list", view: "facet", facet: "<name>", where: [{path, op, value}], fields?, kind?, namespace?, query?}`.
+  Example: `{op: "list", view: "facet", facet: "inventory", where: [{path: "items[].state", op: "eq", value: "open"}], fields: ["name", "owner"]}`.
+- `path` is dotted keys. `key[]` steps into an array: the elements of the array at the first `[]`
+  are what is matched and returned, as `{node, at: "items[3]", element}`. Every clause must start
+  at the same array, and clauses are ANDed on the same element. A path with no `[]` matches the
+  facet as a whole and returns `values`.
+- `op`: `eq`, `ne` (no value equals it), `exists`, `gt`, `gte`, `lt`, `lte` (numbers with numbers,
+  strings with strings), `contains` (substring or array member). Every op except `exists` needs a `value`.
+- `fields` returns only those paths of each match instead of the whole element.
+- `kind`, `namespace` or `query` narrow the nodes first. They pay off on large facets; on a
+  facet with few instances the unscoped call is cheaper.
+- Read `result.scanned` before answering. It has `facet_rows` against `facet_rows_indexed` and
+  `complete`. If `complete` is false, say the answer may be partial and quote the `note`.
+  `parse_failures` names the nodes whose facet is not JSON, which were not matched. The read
+  comes from the catalog index, so facets written moments ago may be missing.
+- `limit` and `offset` page the matches, never the scan, so a page is never a partial truth.
+- To see the field names and the shape of a facet before filtering on it, `get` one node with
+  `include: ["facet:<name>"]`.
+
+### `state` on `get`: absent is not the same as never analysed
+
+Every `get` answer carries `state`:
+- `analysed`: a node with facets or docs.
+- `bare`: a node with no facets or docs, only named by edges.
+- `not_analysed`: the platform has this application in the organization, but the catalog has
+  no node, or only a bare one. `platform` carries its id, name, slug and status. Say "exists,
+  not analysed yet", never "does not exist".
+- `not_in_platform`: no node, and the platform has no application with that id in this organization.
+- `not_in_catalog`: no node, and the platform was not asked. Either the ref was a name rather
+  than an application id or NRN, or `platform_lookup: "unavailable"` says the platform could not
+  answer. Ask with `application:<id>` to tell absent from not analysed.
 
 ### Coverage: say how partial the answer can be
 
