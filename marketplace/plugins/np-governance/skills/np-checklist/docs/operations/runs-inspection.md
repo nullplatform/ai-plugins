@@ -87,9 +87,27 @@ Returns:
   "specification_snapshot": { /* full specification as of run creation */ },
   "context_snapshot": { /* full evaluated context */ },
   "started_at": "...",
-  "resolved_at": null
+  "resolved_at": null,
+  "execution": {
+    "trigger": "explicit",
+    "automatic_run": false,
+    "on_approval": "wait"
+  }
 }
 ```
+
+`execution` says what an approval of this run does with the action behind
+it: `trigger` is the snapshot's `definition.execution_trigger` (`explicit`
+when the specification does not set it), `automatic_run` whether no person
+or external system took part (always `false` while the run is
+`pending_override`, as here), and `on_approval` is `execute` (the approval
+starts the action on its own) or `wait` (someone has to start it with
+`POST /approval/{id}/execute`).
+Before the run resolves it tells what will happen; after, read it next to
+the approval's `execution_status` (`GET /approval/{id}`) to tell what did:
+`execute` goes with `executing` / `success` / `failed`, `wait` with
+`pending` until someone starts it. The rule behind the three fields is in
+`docs/concepts/modes.md` ("Success path").
 
 (During the rename transition the read also mirrors the legacy
 `template_id` / `template_snapshot` keys — same values.)
@@ -103,7 +121,8 @@ ${CLAUDE_PLUGIN_ROOT}/skills/np-checklist/scripts/get_run.sh --approval-id 99421
       aggregate_status,
       final_outcome,
       outcome_reason,
-      items: (.item_states | to_entries | map({id: .key, status: .value.status, message: .value.message}))
+      execution,
+      items: [.items[] | {id, status, message}]
     }'
 ```
 

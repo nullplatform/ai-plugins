@@ -349,11 +349,13 @@ np-api fetch-api "/approval/<approval_id>"
 |----------|-------------------|-------------|-----------|
 | `pending` | `pending` | Esperando aprobación humana | Informar dónde aprobar, mencionar expiración si hay `time_to_reply` |
 | `approved` | `pending` | Aprobado, sin ejecutar | Ofrecer `POST /approval/{id}/execute` |
-| `approved` | `executing` | Ejecutándose | Esperar |
+| `approved` | `executing` | Ejecutándose | Esperar. Si sigue `executing`, `GET /approval/{id}/can_execute`: con `can_execute: true`, lo que lo ejecutaba se cayó (lleva más de 60 s): reintentar con `POST /approval/{id}/execute` o cancelar con `POST /approval/{id}/cancel`; con `false` + `Approval is already executed`, sigue en curso |
 | `approved` | `success` | Completado | Continuar flujo |
-| `approved` | `failed` | Ejecución falló | Diagnosticar |
+| `approved` | `failed` | Ejecución falló | Diagnosticar; se reintenta con `POST /approval/{id}/execute` |
 | `approved` | `expired` | Ventana de ejecución expiró | Informar, puede necesitar recrear |
-| `auto_approved` | `*` | Policies pasaron, auto-aprobado | Continuar flujo |
+| `auto_approved` | `pending` | Aprobado automáticamente, sin ejecutar (modo checklist con `execution.on_approval: wait`) | Ofrecer `POST /approval/{id}/execute` |
+| `auto_approved` | `executing` / `success` | Aprobado automáticamente y ya arrancó (modo policy, o modo checklist con `execution.on_approval: execute`) | Continuar flujo (con `executing` de más de 60 s, como la fila de `approved`) |
+| `auto_approved` | `failed` | Aprobado automáticamente, la ejecución falló | Diagnosticar; se reintenta con `POST /approval/{id}/execute` |
 | `auto_denied` | - | Policies rechazaron automáticamente | Mostrar policies que fallaron, sugerir fixes |
 | `denied` | - | Rechazado manualmente | Informar |
 | `cancelled` | - | Cancelado | Informar |
@@ -363,16 +365,22 @@ Analizar `policy_context.policies[]` para identificar qué policies fallaron (`p
 y qué condiciones no se cumplieron (`evaluations[].result: "not_met"`).
 Las conditions usan operadores MongoDB: `$gte`, `$lte`, `$eq`, `$or`, `$nor`, `$and`.
 
+En modo checklist (`mode: "checklist"`, sin `policy_context`), si el scope arranca solo al
+aprobarse lo dice el run: `GET /approval/{id}/checklist` → `execution.on_approval` (`execute`
+arranca solo; `wait` espera `POST /approval/{id}/execute`). Lo decide el
+`definition.execution_trigger` de la spec; la migración desde policies siembra `any_approval` en
+`scope:create` y `scope:write`, así que un `scope:create` o `scope:write` migrado arranca con
+cualquier aprobación. → Ver /np-checklist
+
 **Opciones según el estado:**
 
 1. **`auto_denied` o `denied`**: Corregir y recrear con valores que cumplan las policies,
    o escalar a un administrador
 2. **`pending`**: Indicar que debe solicitar aprobación por el canal correspondiente
-   (Slack, UI de Nullplatform). Si tiene permisos, puede aprobar via:
-
-```bash
-action-api.sh exec-api --method POST --data '{}' "/approval/<approval_id>/execute"
-```
+   (Slack, UI de Nullplatform; en modo checklist, los items del run o la review manual).
+   `POST /approval/{id}/execute` **no aprueba**: sobre un `pending` responde `400 CANNOT_EXECUTE`:
+   el cuerpo dice `The approval request cannot be executed`; el motivo lo da
+   `GET /approval/{id}/can_execute` → `message` (`Approval is not approved`).
 
 3. **`approved` + `execution_status: pending`**: Ejecutar el approval:
 

@@ -295,11 +295,11 @@ Del resultado extraer:
 |----------|--------------------|--------------| ------|
 | `pending` | `pending` | Esperando aprobacion humana | Solicitar aprobacion por canal correspondiente |
 | `approved` | `pending` | Aprobado, esperando inicio | Ejecutar `POST /approval/{id}/execute` |
-| `approved` | `executing` | Ejecutandose | Esperar |
+| `approved` | `executing` | Ejecutandose | Esperar. Si sigue `executing`, `GET /approval/{id}/can_execute`: con `can_execute: true`, lo que lo ejecutaba se cayo (lleva mas de 60 s): reintentar con `POST /approval/{id}/execute` o cancelar con `POST /approval/{id}/cancel`; con `false` + `Approval is already executed`, sigue en curso |
 | `approved` | `success` | Completado | Continuar flujo |
-| `approved` | `failed` | Ejecucion fallo | Diagnosticar |
+| `approved` | `failed` | Ejecucion fallo | Diagnosticar; se reintenta con `POST /approval/{id}/execute` |
 | `approved` | `expired` | Ventana de ejecucion expiro | Informar, puede necesitar recrear |
-| `auto_approved` | `*` | Policies pasaron, auto-aprobado | Continuar flujo |
+| `auto_approved` | `*` | Policies pasaron, auto-aprobado (el engine lo arranca) | Continuar flujo; con `failed` o `executing` de mas de 60 s, como las filas de `approved` |
 | `auto_denied` | - | Policies rechazaron automaticamente | Mostrar policies que fallaron, sugerir fixes |
 | `denied` | - | Rechazado manualmente | Informar |
 | `cancelled` | - | Cancelado | Informar |
@@ -346,6 +346,12 @@ Del resultado importan:
   un fail va DERECHO a review clasica (no hay fail retomable: ya esta en la waiting room, solo
   queda esperar aprobacion o cancelar).
 - `available_actions`: verbos disponibles (`ask_for_manual`, `cancel`, `override`).
+- `execution`: `{ trigger, automatic_run, on_approval }` — que hace el approval con el deployment
+  al aprobarse. `on_approval: execute` → arranca solo; `wait` → espera `POST /approval/{id}/execute`.
+  `trigger` es el `definition.execution_trigger` de la spec (`explicit` si no lo declara) y
+  `automatic_run` dice si ninguna persona ni sistema externo intervino en el run. Lo calcula la
+  API con la misma regla con que ejecuta: leerlo, no re-derivarlo (la regla completa:
+  → Ver /np-checklist).
 
 **Monitorear el RUN (no el deployment) hasta que resuelva:**
 
@@ -366,7 +372,9 @@ np-api fetch-api "/approval/<approval_id>/checklist" | jq '{
 y se sigue con la tabla de abajo. Señales tipicas de que ya no hay que esperar mas:
 
 - `aggregate_status: resolved` + `final_outcome: approve` → el approval pasa a
-  `auto_approved` y el deployment ARRANCA solo (volver al paso 10 a monitorear el deployment).
+  `auto_approved`. Si el deployment arranca solo lo dice `execution.on_approval`: `execute` → ya
+  arranco (`execution_status` `executing` → `success`; volver al paso 10 a monitorear el
+  deployment); `wait` → espera `POST /approval/{id}/execute` (tabla de abajo).
 - `aggregate_status: resolved` + `final_outcome: fail` → NADA mas va a cambiar solo:
   el deployment se queda en `creating_approval` para siempre. Pasar YA al loop de agente
   o a `ask-for-manual` segun la tabla — seguir esperando es un error.
@@ -379,10 +387,12 @@ y se sigue con la tabla de abajo. Señales tipicas de que ya no hay que esperar 
 
 | `status` approval | `checklist.final_outcome` | Significado | Accion |
 |---|---|---|---|
-| `auto_approved` | `approve` | Gates pasaron | `POST /approval/{id}/execute` para iniciar |
+| `auto_approved` | `approve` + `execution.on_approval: execute` | Gates pasaron y el deployment arranco solo | Monitorear el deployment (paso 10); con `execution_status: failed`, reintentar con `POST /approval/{id}/execute` |
+| `auto_approved` | `approve` + `execution.on_approval: wait` | Gates pasaron, falta el inicio | `POST /approval/{id}/execute` para iniciar |
+| `approved` | `approve_with_override` | Un gate fallo y un override lo destrabo | Segun `execution.on_approval`, como las dos filas de arriba (solo `any_approval` lo arranca solo) |
 | `pending` | `null` (aggregate `pending_items`) | Items manuales/external pendientes | Ver `items_summary.first_pending_actionable_by_me`; un reviewer resuelve items via el skill np-checklist |
 | `pending` | `fail` + `on_checklist_fail: pending` | **Fail retomable** — nadie fue notificado | Loop de agente (abajo) |
-| `pending` | `fail` + `outcome_reason: requested_manual_review` | Ya escalado a review clasica | Esperar aprobacion humana; luego execute |
+| `pending` | `fail` + `outcome_reason: requested_manual_review` | Ya escalado a review clasica | Esperar aprobacion humana; luego execute, salvo `execution.on_approval: execute` (`any_approval`): ahi lo arranca el approve del reviewer |
 | `auto_denied` | `fail` (action con `deny`) | Gates fallaron, denegado | Corregir la causa y recrear deployment |
 
 **Loop de agente para el fail retomable** (el caso de diseño: la checklist es una gate
@@ -408,7 +418,8 @@ np-api fetch-api --method POST --data '{}' "/approval/<approval_id>/cancel"
 np-api fetch-api --method POST --data '{"reason": "<por que no puedo cumplirlo>"}'   "/approval/<approval_id>/checklist/ask-for-manual"
 #    Esto convierte el approval en la review CLASICA (waiting room), notifica a los
 #    reviewers (recien aca — el fail retomable no notifica a nadie), y al aprobarse
-#    se inicia con POST /approval/{id}/execute como siempre.
+#    se inicia con POST /approval/{id}/execute, salvo execution.on_approval: execute
+#    (any_approval): ahi lo arranca el approve del reviewer.
 ```
 
 Reglas para el agente:
@@ -468,7 +479,8 @@ np-api fetch-api "/approval?nrn=<deployment_nrn_encoded>"
 
 Cuando el approval pase a `status: approved`:
 - Si `execution_status: pending`: Preguntar al usuario si quiere iniciar el deployment. Si confirma, ejecutar `POST /approval/{id}/execute` (ver seccion correspondiente mas abajo)
-- Si `execution_status: executed`: Continuar al paso 10b/10c (monitoreo del deployment)
+- Si `execution_status: executing` o `success`: ya arranco. Continuar al paso 10b/10c (monitoreo del deployment)
+- Si `execution_status: failed`: el callback fallo; se reintenta con `POST /approval/{id}/execute`
 
 **Resultado esperado del paso 10a**: El usuario sabe el estado del approval, que policies fallaron,
 DONDE ir a aprobar, y puede iniciar el deployment via API una vez aprobado.
@@ -762,18 +774,52 @@ action-api.sh exec-api --method POST --data '{"build_id": 123, "application_id":
 
 ## @action POST /approval/{id}/execute
 
-Inicia un deployment que ya fue aprobado. Despues de que un approval pasa a `status: approved`,
-el deployment NO arranca automaticamente — queda en `execution_status: pending` esperando
-que alguien lo inicie explicitamente.
+Inicia un deployment que ya fue aprobado. Si el deployment arranca solo al aprobarse o espera
+este endpoint depende del modo:
+
+- **Modo policy**: un `auto_approved` (las policies pasaron) arranca solo; un `approved` (aprobo
+  una persona) queda en `execution_status: pending` esperando el execute.
+- **Modo checklist**: lo decide `definition.execution_trigger` de la spec, y el run read
+  (`GET /approval/{id}/checklist`) lo dice en `execution.on_approval`: `execute` → arranca solo;
+  `wait` → queda `pending` esperando el execute. Sin el campo en la spec, espera el execute.
+
+Un deployment que pertenece a un `deployment_group` no arranca por su propio approval: lo arranca
+el approval del grupo.
 
 ### Cuando usar
 
 Cuando un approval tiene:
-- `status`: `approved`
-- `execution_status`: `pending`
+- `status`: `approved` o `auto_approved`, y
+- `execution_status`: `pending` (aprobado, sin iniciar), `failed` (el callback fallo: se
+  reintenta con el mismo execute, en los dos modos) o `executing` que `can_execute` da como `true`
+  (lleva mas de 60 s: lo que lo ejecutaba se cayo a mitad del callback; tambien se puede cancelar
+  con `POST /approval/{id}/cancel`).
 
-Esto significa que las policies fueron satisfechas (manual o automaticamente) pero el deployment
-aun no comenzo. Se necesita este endpoint para iniciar la ejecucion.
+`GET /approval/{id}/can_execute` lo resuelve en una llamada: responde `{ can_execute, message }`,
+y con `false` + `"Approval is already executed"` el deployment ya arranco (`success`, o
+`executing` de menos de 60 s).
+
+```bash
+np-api fetch-api "/approval/<approval_id>/can_execute"
+```
+
+### Que hace
+
+- **No aprueba**: sobre un approval que no esta aprobado (`pending`) responde
+  `400 CANNOT_EXECUTE`: el cuerpo dice `The approval request cannot be executed`; el motivo lo da
+  `GET /approval/{id}/can_execute` → `message` (`Approval is not approved`).
+- **Un solo callback por approval**: toma la fila con compare-and-set (`pending` | `failed` |
+  `executing` vencido → `executing`) antes de mandar el callback. Si otro la tomo antes (otro
+  Start, un pipeline, el approve del reviewer), no manda nada y responde `200` con la fila como
+  esta.
+- **Idempotente**: con `success`, o `executing` de menos de 60 s, responde `200` con la fila como
+  esta, sin segundo callback. Repetir el execute no hace nada.
+- **Presupuesto de 10 s** para el callback entero. Termina `success` o `failed`; despues de un
+  timeout no reintenta (el PATCH pudo haber entrado) y queda `failed`, reintentable con otro
+  execute.
+- **`deployment_group`**: el approval del grupo se guarda apenas contesta el callback y los
+  hijos se actualizan despues, best-effort. Puede quedar el grupo `success` con los hijos
+  `approved` + `pending`: lo que arranca es el grupo, y su callback ya entro.
 
 ### Flujo obligatorio
 
@@ -783,8 +829,8 @@ aun no comenzo. Se necesita este endpoint para iniciar la ejecucion.
 np-api fetch-api "/approval?nrn=organization%3D<org_id>%3Aaccount%3D<acc_id>%3Anamespace%3D<ns_id>%3Aapplication%3D<app_id>%3Ascope%3D<scope_id>%3Adeployment%3D<deployment_id>"
 ```
 
-2. Verificar que `status` sea `approved` y `execution_status` sea `pending`
-3. Obtener el `id` del approval de la respuesta
+2. Obtener el `id` del approval de la respuesta
+3. Verificar con `GET /approval/{id}/can_execute` que `can_execute` sea `true` (ver "Cuando usar")
 4. Confirmar con el usuario que quiere iniciar el deployment
 5. Ejecutar POST /approval/{id}/execute
 
@@ -806,7 +852,8 @@ Despues de ejecutar, consultar el approval nuevamente:
 np-api fetch-api "/approval/<approval_id>"
 ```
 
-Verificar que `execution_status` cambio a `executed` o `success`.
+Verificar `execution_status`: `executing` → `success` (arranco) o `failed` (el callback fallo o
+se paso de los 10 s; se reintenta con el mismo execute).
 Luego monitorear el deployment normalmente (Paso 10b/10c del flujo de deployment).
 
 ---

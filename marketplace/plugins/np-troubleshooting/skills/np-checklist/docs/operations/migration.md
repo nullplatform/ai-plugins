@@ -5,7 +5,9 @@ one. This is a transactional operation that:
 
 1. Generates a derived `ChecklistSpecification` from the action's current
    policies (one `condition` item per policy predicate — the policy's
-   mongo condition is copied 1:1 into the item's `query`).
+   mongo condition is copied 1:1 into the item's `query`) and from its
+   `on_policy_success` (a `human_sign_off` manual item and the
+   `execution_trigger`, see "What the converter carries over" below).
    **The copy is verbatim: no path rewriting.** Checklist conditions
    address the context catalog exactly the way policies do, so the
    predicate that worked as a policy works unchanged as a condition. (This
@@ -46,6 +48,7 @@ body `{"approval_action_id": 1842}`. Response:
     "name": "Auto-migrated: scope:deploy",
     "description": "...",
     "definition": {
+      "execution_trigger": "automatic_approval",  // always the first key; seeded from the action (table below)
       "items": [
         {
           "id": "build_metadata_coverage",
@@ -73,19 +76,46 @@ at apply time, when the specification row is created. During the rename
 transition the preview also mirrors the legacy `generated_template` key —
 same value.)
 
-**Read `diff.warnings` carefully, and know what the converter does NOT
-do.** Every generated item is a `condition` with `behavior: gate` — the
-converter only carries mongo predicates; it never emits `manual` or
-`external` items. A policy that encoded human review or a webhook does
-not survive as an equivalent step: re-author it as a `manual` /
-`external` item via `update_specification.sh` after applying, or that
-step silently disappears from the gate.
+### What the converter carries over
 
-Warnings flag: an action with no policies (the specification would
-vacuously approve — review before applying), policies with empty
-conditions (no item generated), item ids truncated at 40 characters,
-nested `$or`/`$and`/`$nor` operators translated as-is, and multiple
-policies declaring the same key (each gets its own suffixed item).
+**Read `diff.warnings` carefully, and know what the converter carries.**
+Every item generated from a policy is a `condition` with `behavior: gate`:
+the converter carries mongo predicates, and the action's
+`on_policy_success` (anything but `approve`, `null` included, reads as
+`manual`, the API default).
+
+- **The person who approved.** When `on_policy_success` is `manual`, or
+  the action has no policies, the converter appends one `manual` gate item
+  for the reviewer who signed after the conditions passed:
+  `{ "id": "human_sign_off", "type": "manual", "behavior": "gate", "title": "A reviewer signs off" }`.
+  Its id follows the same collision rule as the generated ids
+  (`human_sign_off_2` if taken) and it comes last in `diff.items_added`.
+  With no policies it is the whole specification.
+- **Who started the action.** `definition.execution_trigger` is seeded so
+  the migrated action starts the way it did in policy mode:
+
+  | Action and configuration | `execution_trigger` | Why |
+  |---|---|---|
+  | `scope:create` / `scope:write`, any `on_policy_success` | `any_approval` | Policy mode ran them on the engine's approval and on a reviewer's reply |
+  | any other action, `on_policy_success: approve` with at least one policy | `automatic_approval` | The engine ran it when the policies passed; nobody pressed Start |
+  | anything else (`manual`, `null`, or no policies) | `explicit` | A person approved and someone started it |
+
+- **Never `external` items.** A policy that encoded a webhook does not
+  survive as an equivalent step: re-author it as an `external` item via
+  `update_specification.sh` after applying, or that step silently
+  disappears from the gate.
+
+Edge case: the sign-off counts policies, not items. A policy with empty
+`conditions` under `approve` still yields a specification with no items,
+and `apply` rejects it with `422`.
+
+Warnings flag: an action with no policies (the specification is the
+single `human_sign_off` item — review before applying), an
+`on_policy_success` of `manual` with policies (the `human_sign_off` item
+was added so a person still approves after the conditions pass), policies
+with empty conditions (no item generated), item ids truncated at 40
+characters, nested `$or`/`$and`/`$nor` operators translated as-is, and
+multiple policies declaring the same key (each gets its own suffixed item).
 
 **Generated item ids** are slugified from the policy's top-level condition
 key. Keys the aggregation grammar reserves (`and`, `or`, `not`, `true`,
@@ -124,9 +154,12 @@ Post-conditions:
 - The previous policies are still in the DB with `deleted_at` set —
   recoverable.
 - The new specification is `active` and `version: 1` — bump via
-  `update_specification.sh` once you add the `manual` / `external` items
-  the policies couldn't express (the converter emits condition gates
-  only).
+  `update_specification.sh` once you add the `external` items (or any
+  other step) the policies couldn't express (the converter emits condition
+  gates, plus the `human_sign_off` item when a person approved in policy
+  mode).
+- Its `execution_trigger` is the seeded one (table above): the first run's
+  `execution` (`get_run.sh`) shows what an approval does with it.
 
 ## What happens to in-flight requests
 
@@ -197,8 +230,8 @@ then expand.
   different audit shape). Communicate with the team that consumes the
   action.
 - **Review the preview's `diff.warnings`** — and remember the converter
-  emits condition gates only: policies that encoded human review or
-  webhooks must be re-authored as `manual`/`external` items after
+  emits condition gates plus the `human_sign_off` item: policies that
+  encoded webhooks must be re-authored as `external` items after
   applying, or those steps are silently lost.
 - **Schedule rollback windows narrow**. Once the team starts using the
   checklist features (manual approvals, overrides, history), rolling

@@ -91,8 +91,31 @@ Condition items take a mongo-like `query` object (non-empty, required).
 The legacy `evaluator` / `mode` / `expression` fields are rejected by the
 validator with `condition.*.removed` errors.
 
-Two things the validator will bounce a definition for, both of which used
-to fail silently at run time instead:
+### Choosing what starts the approved action
+
+`execution_trigger` is a key of the `definition`, next to `items` (not an
+item field):
+
+```yaml
+execution_trigger: automatic_approval   # explicit (default) | automatic_approval | any_approval
+items:
+  - id: my_check
+    type: condition
+    behavior: gate
+    query:
+      "build.metadata.tests_status": { "$eq": "passed" }
+```
+
+Without it the definition reads `explicit`: an approved request waits for
+someone to start it (Start deployment, or `POST /approval/{id}/execute`).
+`automatic_approval` starts it on its own when no person or external system
+took part in the run; `any_approval`, on any approval. The full rule is in
+`docs/concepts/modes.md` ("Success path").
+
+### What the validator rejects
+
+Three things the validator will bounce a definition for, each of which
+would otherwise fail silently at run time:
 
 - **`context.`-rooted field paths** in `query` or `applies_when`
   (`condition.query.context_rooted_path` /
@@ -102,6 +125,12 @@ to fail silently at run time instead:
   `context.build.metadata.tests_status`.
 - **An item id equal to `and`, `or`, `not`, `true` or `false`**
   (`item.id.reserved`) — the aggregation grammar reserves those words.
+- **An `execution_trigger` outside `explicit`, `automatic_approval` and
+  `any_approval`** (`execution_trigger.invalid`, path
+  `definition.execution_trigger`) — a typo would otherwise never start
+  anything. Absent and `null` pass and read `explicit`.
+
+All three come back as `422 VALIDATION_FAILED`, on create and on update.
 
 See `docs/concepts/item-types.md` for the full addressing rules (including
 how to rewrite an old `context.`-rooted definition) and the reserved-id

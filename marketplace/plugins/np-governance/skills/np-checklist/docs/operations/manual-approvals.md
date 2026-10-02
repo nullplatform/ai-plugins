@@ -29,7 +29,16 @@ What happens server-side:
 4. Updates `item_states[itemId]` to:
    - `status: passed`
    - `details: { approver, decided_at, decision_message }`
-5. Triggers a re-aggregation pass (which may resolve the run).
+5. Triggers a re-aggregation pass (which may resolve the run). When that
+   approve resolves the run to `approve`, the request lands
+   `auto_approved`, and the specification's `execution_trigger` decides
+   whether the action starts: with `any_approval` this approve starts it
+   (the deploy goes out on this checkbox); with `automatic_approval` or
+   `explicit` it waits for `POST /approval/{id}/execute` — a checked manual
+   item means a person took part. The run read's `execution.on_approval`
+   says which, and covers the exceptions (a deployment inside a deployment
+   group, an approval with nothing to run): `docs/concepts/modes.md`,
+   "Success path".
 6. Writes a `checklist_event` row (`event_type: item.status_changed`,
    `actor: alice@acme.com`, payload with `from/to/message`).
 
@@ -59,7 +68,10 @@ override`. Approving it has special semantics:
   `gate` items have resolved otherwise). The server validates this.
 - **Effect**: the run resolves with `final_outcome = approve_with_override`,
   and `override_metadata` is set to `{ approver, decided_at, message,
-  failed_gates: [...] }`.
+  failed_gates: [...] }`. The request lands `approved`; with
+  `execution_trigger: any_approval` the override starts the action, and
+  with `automatic_approval` or `explicit` it waits for an explicit execute
+  (a used override is always a person's call).
 
 The script call is identical:
 
