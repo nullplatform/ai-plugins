@@ -1,6 +1,6 @@
 {
   "name": "np-workflow-craft",
-  "version": "1.3.4",
+  "version": "1.3.5",
   "description": "Build, publish, run, and debug workflows on the Nullplatform workflow engine via REST",
   "author": {
     "name": "Nullplatform",

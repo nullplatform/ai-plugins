@@ -33,8 +33,8 @@ still runs.
 |---|---|---|---|
 | `search` | `query` | `limit` 1–30 (default 10), `offset` | hits with `owner`, `kind` (component/facet/doc/edge), `ref`, `score`, snippets. Read a hit with `get` |
 | `list` | — | `view`: `components` (default), `hierarchy`, `lore`, `apis`, `libs`; `kind`; `namespace` (a namespace or account name); `application_id`; `query`; `limit` 1–500 (default 50), `offset` | `components`: slug, name, kind, namespace, account, nrn. `hierarchy`: account → namespace → apps, the kind counts, the lore titles. `lore`: norms/knowledge/instructions (`kind` = `norm`/`knowledge`/`instruction`). `apis`/`libs`: each API or library with its consumers |
-| `get` | `ref`: a slug, a name, an NRN, `application:<id>` or `lore:<key>` | `include`: `facet:<name>` (up to 5), `doc:<name>` (up to 3), `norms`, `deploy_checklist`, `retired`; `limit` (edges per page, default 50, max 500), `offset` | `component`: identity, NRN, platform app, facets and docs index, **live** `edges_out` / `edges_in` with evidence, `via` and provenance, `edges_retired_omitted` (how many retired edges were left out; `edges_retired` with `include: ["retired"]`), applicable knowledge and instructions. Then `facets.<name>`, `docs.<name>`, `norms` and `deploy_checklist` for whatever you included. When nothing matches, `found: false` |
-| `graph` | `ref`: a node, e.g. a slug, `queue:<name>`, `lib:<name>` or `doc:<path>` | `direction`: `consumers` (default) or `dependencies`; `depth` 1–4 (default 1); `through_intermediaries` (default false); `include: ["retired"]`; `limit`, `offset` | **live edges only**. Depth 1 consumers: `consumers`. Deeper, or dependencies: `affected` (the node list), `detail`, and `intermediaries`. Every row, in both directions and at every depth, is `{depth, from, to, edge, via, evidence, provenance}`: `from` calls or depends on `to`. A consumer that is a gateway, proxy or bus carries `intermediary: true`. `retired_omitted` counts the retired edges left out |
+| `get` | `ref`: a slug, a name, an NRN, `application:<id>` or `lore:<key>` | `include`: `facet:<name>` (up to 5), `doc:<name>` (up to 3), `norms`, `deploy_checklist`, `retired`, `lore`; `limit` (edges per page, default 50, max 500), `offset` | `component`: identity, NRN, platform app, facets and docs index, **live** `edges_out` / `edges_in` with evidence, `via` and provenance, `edges_retired_omitted` (how many retired edges were left out; `edges_retired` with `include: ["retired"]`), applicable knowledge and instructions as `{key, title, summary, page}` (full bodies with `include: ["lore"]`, or one at a time with `get {ref: "lore:<key>"}`). Then `facets.<name>`, `docs.<name>`, `norms` and `deploy_checklist` for whatever you included. When nothing matches, `found: false` |
+| `graph` | `ref`: a node, e.g. a slug, `queue:<name>`, `lib:<name>` or `doc:<path>` | `direction`: `consumers` (default) or `dependencies`; `depth` 1–4 (default 1); `through_intermediaries` (default false); `include: ["retired"]`; `limit`, `offset` | **live edges only**. Depth 1 consumers: `consumers`. Deeper, or dependencies: `affected` (the node list) and `detail`. Both carry `intermediaries`, always `[{node, depth, behind, behind_truncated}]`. Every row, in both directions and at every depth, is `{depth, from, to, edge, via, evidence, provenance}`: `from` calls or depends on `to`. A consumer that is a gateway, proxy or bus carries `intermediary: true`. `retired_omitted` counts the retired edges left out |
 | `items` | `type`: `findings`, `questions` or `suggestions` | `ref` (one component), `status`, `limit` (default 50), `offset` | `findings`: governance items with `category`, `severity`, `evidence` (anchors), `kind`, and `complete` (every application NRN read to its total). `questions`: open questions with options, evidence and priority. `suggestions`: filed proposals |
 
 ### Reading a response
@@ -50,6 +50,11 @@ pipeline's own definition. Retraction, curator refutation and tombstones all set
 and append the reason to the evidence, as `RETRACTED (<code>): <why>` or `REFUTED: <why>`.
 - `graph` and `get` return live edges only and count the rest (`retired_omitted`,
   `edges_retired_omitted`).
+- The count is **per call**, over the edges that call read: `get` counts retired edges in
+  and out of the node; depth-1 `graph` counts the retired edges into it; a deeper `graph`
+  sums the retired edges met at every hop, so it grows with `depth` and can exceed the
+  node's own. Never compare counts across calls, and never read one as "how many edges
+  this node lost".
 - Pass `include: ["retired"]` to see the retired ones, in their own list, each with
   `status`, `reason` and the original `evidence`. Use it for "was X ever a dependency" or
   "why is this edge gone", never to answer "who depends on X".
@@ -72,8 +77,8 @@ A gateway, proxy or bus in front of backends is an **intermediary**. The catalog
 with outgoing `proxies-to` edges, or with an org rule. Its callers depend on it for
 everything it fronts, not on the node you asked about.
 - `graph` lists it in `affected` but does not walk past it. It reports it in
-  `intermediaries: [{node, depth, behind}]`, where `behind` is how many callers (or routes)
-  sit behind it.
+  `intermediaries: [{node, depth, behind, behind_truncated}]`, where `behind` is how many
+  live callers (or routes) sit behind it. The shape is the same at every depth.
 - Calls through a gateway that the pipeline resolved by path are already direct edges to
   the backend, so they are in the result.
 - Pass `through_intermediaries: true` only when the question really is "everything behind

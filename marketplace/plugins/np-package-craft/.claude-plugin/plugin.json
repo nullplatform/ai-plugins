@@ -1,6 +1,6 @@
 {
   "name": "np-package-craft",
-  "version": "1.3.4",
+  "version": "1.3.5",
   "description": "Build, run, and publish nullplatform packages (scope / service / simple) with the np CLI: init, dev, test, build, run (local agent), publish, and artifact release metadata",
   "author": {
     "name": "Nullplatform",
