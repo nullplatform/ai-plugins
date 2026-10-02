@@ -33,9 +33,26 @@ still runs.
 |---|---|---|---|
 | `search` | `query` | `limit` 1–30 (default 10), `offset` | hits with `owner`, `kind` (component/facet/doc/edge), `ref`, `score`, snippets. Read a hit with `get` |
 | `list` | — | `view`: `components` (default), `hierarchy`, `lore`, `apis`, `libs`; `kind`; `namespace` (a namespace or account name); `application_id`; `query`; `limit` 1–500 (default 50), `offset` | `components`: slug, name, kind, namespace, account, nrn. `hierarchy`: account → namespace → apps, the kind counts, the lore titles. `lore`: norms/knowledge/instructions (`kind` = `norm`/`knowledge`/`instruction`). `apis`/`libs`: each API or library with its consumers |
-| `get` | `ref`: a slug, a name, an NRN, `application:<id>` or `lore:<key>` | `include`: `facet:<name>` (up to 5), `doc:<name>` (up to 3), `norms`, `deploy_checklist`; `limit` (edges per page, default 50, max 500), `offset` | `component`: identity, NRN, platform app, facets and docs index, `edges_out` / `edges_in` with evidence, `via` and provenance, `edges_refuted`, applicable knowledge and instructions. Then `facets.<name>`, `docs.<name>`, `norms` and `deploy_checklist` for whatever you included. When nothing matches, `found: false` |
-| `graph` | `ref`: a node, e.g. a slug, `queue:<name>`, `lib:<name>` or `doc:<path>` | `direction`: `consumers` (default) or `dependencies`; `depth` 1–4 (default 1); `through_intermediaries` (default false); `limit`, `offset` | depth 1 consumers: each edge with `edge_type`, `evidence`, `via`, `provenance`; a consumer that is a gateway, proxy or bus carries `intermediary: true`. Deeper, or dependencies: `affected` (the node list), `detail` hop by hop (each with `via` and `evidence`), and `intermediaries` |
+| `get` | `ref`: a slug, a name, an NRN, `application:<id>` or `lore:<key>` | `include`: `facet:<name>` (up to 5), `doc:<name>` (up to 3), `norms`, `deploy_checklist`, `retired`; `limit` (edges per page, default 50, max 500), `offset` | `component`: identity, NRN, platform app, facets and docs index, **live** `edges_out` / `edges_in` with evidence, `via` and provenance, `edges_retired_omitted` (how many retired edges were left out; `edges_retired` with `include: ["retired"]`), applicable knowledge and instructions. Then `facets.<name>`, `docs.<name>`, `norms` and `deploy_checklist` for whatever you included. When nothing matches, `found: false` |
+| `graph` | `ref`: a node, e.g. a slug, `queue:<name>`, `lib:<name>` or `doc:<path>` | `direction`: `consumers` (default) or `dependencies`; `depth` 1–4 (default 1); `through_intermediaries` (default false); `include: ["retired"]`; `limit`, `offset` | **live edges only**. Depth 1 consumers: `consumers`. Deeper, or dependencies: `affected` (the node list), `detail`, and `intermediaries`. Every row, in both directions and at every depth, is `{depth, from, to, edge, via, evidence, provenance}`: `from` calls or depends on `to`. A consumer that is a gateway, proxy or bus carries `intermediary: true`. `retired_omitted` counts the retired edges left out |
 | `items` | `type`: `findings`, `questions` or `suggestions` | `ref` (one component), `status`, `limit` (default 50), `offset` | `findings`: governance items with `category`, `severity`, `evidence` (anchors), `kind`, and `complete` (every application NRN read to its total). `questions`: open questions with options, evidence and priority. `suggestions`: filed proposals |
+
+### Reading a response
+
+`np_kb_read` answers `{op, coverage?, truncated?, ignored?, result}`, with the metadata **before** the result.
+A long answer can be cut by the client, and what is partial must still show. On a paged op,
+`truncated` is always there: `{}` means every list is complete.
+
+### Retired edges: never mixed with live ones
+
+An edge is live when it has a type and its `config_status` is not `refuted`. That is the
+pipeline's own definition. Retraction, curator refutation and tombstones all set `refuted`
+and append the reason to the evidence, as `RETRACTED (<code>): <why>` or `REFUTED: <why>`.
+- `graph` and `get` return live edges only and count the rest (`retired_omitted`,
+  `edges_retired_omitted`).
+- Pass `include: ["retired"]` to see the retired ones, in their own list, each with
+  `status`, `reason` and the original `evidence`. Use it for "was X ever a dependency" or
+  "why is this edge gone", never to answer "who depends on X".
 
 ### Pages: never reason over a cut list
 

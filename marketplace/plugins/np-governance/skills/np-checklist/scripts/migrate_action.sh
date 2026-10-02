@@ -10,9 +10,12 @@
 #   POST /approval/checklist/migrate_from_policy/apply    {approval_action_id, expected_specification}
 #
 # What it does:
-#   1. Reads the action's existing policies (must have at least one).
-#   2. Generates a derived checklist specification (one condition item per
-#      policy predicate, plus a top-level aggregation expression).
+#   1. Reads the action's existing policies and its on_policy_success.
+#   2. Generates a derived checklist specification: one condition item per
+#      policy predicate, a manual human_sign_off item when on_policy_success
+#      is not `approve` or there are no policies (with no policies it is the
+#      only item), and a seeded definition.execution_trigger. No aggregation
+#      block: the server derives the expression from the items' behaviors.
 #   3. In a single transaction:
 #        - soft-deletes the existing action_policy associations
 #          (deleted_at = NOW())

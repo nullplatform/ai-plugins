@@ -48,7 +48,6 @@ Gets details of an approval.
   - `build`: Build associated with the release
   - `application`: Application
   - `namespace`, `account`, `organization`: Organizational hierarchy
-- `updated_at`: Last update timestamp
 
 ### Navigation
 - **→ deployment**: `entity_id` → `/deployment/{entity_id}` (when `entity_name` is `deployment`)
@@ -79,7 +78,7 @@ np-api fetch-api "/approval/541210877"
 |--------|-------------|
 | `pending` | Waiting for human decision |
 | `approved` | Manually approved |
-| `auto_approved` | Automatically approved (all policies passed) |
+| `auto_approved` | Automatically approved: all policies passed (policy mode), or the checklist run resolved `approve` (checklist mode) |
 | `denied` | Manually rejected |
 | `auto_denied` | Automatically rejected (policies failed + auto-deny config) |
 | `cancelled` | Cancelled by user or system |
@@ -90,9 +89,9 @@ np-api fetch-api "/approval/541210877"
 | Status | Description |
 |--------|-------------|
 | `pending` | Approved but not started yet |
-| `executing` | Execution in progress |
+| `executing` | Execution in progress. An `executing` for more than 60 s (the API measures it from the row's last write, which the approval JSON does not carry: `/can_execute` answers `true` for a stale one) has no live executor left: `POST /approval/{id}/execute` starts it again, or `POST /approval/{id}/cancel` cancels it |
 | `success` | Successfully executed |
-| `failed` | Execution failed |
+| `failed` | Execution failed. `POST /approval/{id}/execute` retries it, in both modes |
 | `expired` | Expired without executing (exceeded `allowed_time_to_execute`) |
 
 ### Secret visibility (parameter:read-secrets)
@@ -106,7 +105,8 @@ to secret parameter values. Flow:
 
 ### Notes
 - `status: approved` + `execution_status: pending` = approved but waiting for deployment to start ("Start deployment" in the UI)
-- `status: approved` + `execution_status: executed` = approved and deployment already started
+- `status: auto_approved` + `execution_status: pending` = a checklist approval whose specification does not start the action on its own (`definition.execution_trigger: explicit`, the default): it also waits for the Start. `GET /approval/{id}/checklist` → `execution.on_approval` says whether a checklist approval starts on its own (`execute`) or waits (`wait`)
+- `status: approved` / `auto_approved` + `execution_status: executing` or `success` = approved and deployment already started
 - `policy_context.action: manual` indicates policies didn't pass and human approval was required
 - `policy_context.action: auto` indicates policies passed and it was auto-approved
 - The `context` is an immutable snapshot from the approval moment - useful for auditing
@@ -156,8 +156,9 @@ np-api fetch-api "/approval?nrn=organization%3D<org_id>%3Aaccount%3D<acc_id>%3An
 
 ## @endpoint /approval/{id}/execute
 
-Executes an approved approval. This is the endpoint used by the "Start deployment" button in the UI.
-Approves the approval and executes the associated action in one step.
+Starts the action of an approved approval by sending the callback the entity registered with it
+(for a deployment, the call that moves it to `creating`). This is the endpoint behind the
+"Start deployment", "Create scope" and "Apply changes" buttons in the UI. It does not approve.
 
 ### Parameters
 - `id` (path, required): Approval ID
@@ -168,16 +169,36 @@ Approves the approval and executes the associated action in one step.
 
 ### Behavior
 
-When executed, the approval:
-1. Changes `status` to `approved` (if it was `pending`)
-2. Changes `execution_status` to `executed`
-3. Internally executes the associated action (e.g., PATCH to deployment with `{"status": "creating"}`)
-4. Populates the `context` field with the snapshot of all related entities
+First rule that applies (the same rules `/approval/{id}/can_execute` answers with):
+
+1. **Already executed** — `execution_status: success`, or `executing` for less than 60 s (the API
+   measures it from the row's last write, which the approval JSON does not carry: `/can_execute`
+   answers `true` for a stale one), on an approval with a registered callback, with or without an
+   execution window →
+   `200` with the approval as it is: no save, no second callback, no propagation to a group's
+   children.
+2. **Cannot execute** for any other reason → `400 CANNOT_EXECUTE`: the body reads
+   `"The approval request cannot be executed"` (`detail: null`); the reason is not in it:
+   `GET /approval/{id}/can_execute` → `message` gives it (`Approval is not approved` on a
+   `pending`: approve it through its channel first).
+3. **Claim.** The row is taken with a compare-and-set (`pending` | `failed` | `executing` older
+   than 60 s → `executing`). Exactly one caller wins, so the callback is sent once per approval
+   even when two Starts, a pipeline, a reviewer's reply or the policy engine race for it. A caller
+   that loses the claim answers `200` with the approval as it is now, without a callback.
+4. **Callback**, with a total budget of 10 s: each attempt gets what is left of it, fast errors
+   are retried while budget remains, and a timeout is not retried (the call may have landed). The
+   approval ends `success` or `failed`; a `failed` is retried with another execute, in both modes.
+5. **`deployment_group`**: the group's approval is saved as soon as its callback answers, and its
+   children's approvals are updated afterwards, best effort (logged). If that update fails, the
+   group keeps its own status (e.g. `success`) and its children stay `approved` + `pending`.
+
+An approval with no registered callback (e.g. `parameter:read-secrets`) has nothing to send: an
+execute marks it `success`.
 
 ### Response
 
-Returns the complete updated approval (same structure as GET `/approval/{id}`),
-including `policy_context` with evaluated policies and `context` with the snapshot.
+Returns the approval (same structure as GET `/approval/{id}`), with `execution_status` as it
+ended: `success` or `failed` after the callback, or unchanged when the call was a no-op.
 
 ### Example
 ```bash
@@ -187,9 +208,44 @@ action-api.sh exec-api --method POST --data '{}' "/approval/<approval_id>/execut
 
 ### Notes
 - Empty body (`{}`) - no additional parameters required
-- Only works with approvals in `status: pending` or `status: approved` + `execution_status: pending`
-- If the approval was already executed or the deployment was started by other means, returns `execution_status: failed`
+- Repeating an execute is safe: once the approval is `success`, or `executing` within the last
+  60 s, it answers `200` and sends nothing
+- An `executing` older than 60 s means whatever was executing it died mid-callback: an execute
+  takes it again and sends the callback again, even if the previous one had landed
+- In checklist mode the approval may have started on its own (`definition.execution_trigger`):
+  read `execution.on_approval` on `GET /approval/{id}/checklist`, or ask `/can_execute`, before
+  offering a Start
 - **This is the correct path to start an approved deployment** (instead of direct PATCH to deployment)
+
+---
+
+## @endpoint /approval/{id}/can_execute
+
+Tells whether `POST /approval/{id}/execute` would start the approval's action now.
+
+### Parameters
+- `id` (path, required): Approval ID
+
+### Response
+- `can_execute`: boolean
+- `message`: the reason, first rule that applies:
+
+| `can_execute` | `message` | When |
+|---|---|---|
+| `false` | `Approval is not approved` / `Approval is expired` | `status` is not `approved` / `auto_approved` |
+| `false` | `Approval is already executed` | `execution_status: success`, or `executing` for less than 60 s (the API measures it from the row's last write, which the approval JSON does not carry), on an approval with a registered callback — with or without an execution window |
+| `false` | `Approval is expired to execute` | `execution_status: expired` |
+| `true` | `Approval is approved and not expired to execute` | `failed`, or `executing` more than 60 s old, on an approval with a registered callback: retryable in both modes |
+| `false` | `Approval is not pending to execute` | No execution window and not `pending` (nor retryable, as above) |
+| `true` | `Approval is approved and not expired to execute` | Anything else |
+
+An approval with no registered callback (`parameter:read-secrets`) skips the "already executed"
+and the retryable rows: its execution window is the access to the secret.
+
+### Example
+```bash
+np-api fetch-api "/approval/<approval_id>/can_execute"
+```
 
 ---
 
