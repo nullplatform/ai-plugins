@@ -30,7 +30,11 @@ description: This skill should be used when the user asks to "manage services", 
 
 ### np-service-creator
 
-description: This skill should be used when the user asks to "register a service in terraform", "create service_definition module", "create agent binding", "configure terraform for services", or needs to work with terraform modules for nullplatform service registration and agent association.
+description: This skill should be used when the user asks to "register a service in terraform", "publish a service package", "wire a service worker", "create service_definition module", "create agent binding", or needs to work with terraform modules for nullplatform service registration.
+
+### np-package-builder
+
+description: Use when the user works with nullplatform PACKAGES or the control-plane runtime around them — "np package init/build/run/publish", "create a scope/service/simple package", "scaffold a plugin", "run a local agent", "publish a package", "register an artifact with a changelog", "np artifact login/create", "how does the agent run workers", "worker bridge image", "migrate a scope to packages", "pin a worker image", "allowedRegistries", "publish a package with terraform/tofu modules", "artifact lookup by tag". Covers the CLI workflow, the agent+workers architecture and its validations, the plugin SDK, the worker-bridge image contract, old-model migration, and the tofu modules.
 
 ### np-agent-local-setup
 
@@ -90,6 +94,8 @@ This plugin requires the following permissions:
   "Skill(np-api:*)",
   "Skill(np-notification-manager)",
   "Skill(np-notification-manager:*)",
+  "Skill(np-package-builder)",
+  "Skill(np-package-builder:*)",
   "Skill(np-rules)",
   "Skill(np-rules:*)",
   "Skill(np-service-craft)",

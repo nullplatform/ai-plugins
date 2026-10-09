@@ -1,0 +1,10 @@
+{
+  "id": "source_branch",
+  "type": "condition",
+  "behavior": "gate",
+  "severity": "major",
+  "title": "Allowed source branch",
+  "description": "Production deploys only from the allowed branches. A build from any other branch fails this item.\n",
+  "applies_when": { "scope.dimensions.environment": "production" },
+  "query": { "build.branch": { "$in": ["main", "master"] } }
+}

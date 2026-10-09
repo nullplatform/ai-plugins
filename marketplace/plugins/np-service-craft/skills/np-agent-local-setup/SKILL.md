@@ -17,6 +17,33 @@ The result of this skill is **an agent running locally and verified** — connec
 - When an iterative testing environment is needed (edit script -> trigger -> see logs -> fix -> retry)
 - As a prerequisite for `/np-service-craft test`, `/np-scope-craft`, or any flow that needs local agent execution
 
+## Two execution models — know which one you are testing
+
+The agent can reach a service's code two ways, and this skill's workflow serves the first:
+
+| | Legacy: command-executor | Current: worker-orchestrator |
+|---|---|---|
+| How code arrives | agent clones git repos into a basepath | agent starts a worker pod from the package's OCI image |
+| Configured by | `-command-executor-git-command-repos` / `agent_repo` | `worker_orchestrated_packages` + `worker.allowedRegistries` |
+| Code location | `~/.np/<org>/<repo>/services/<svc>/` | a fixed path inside the image |
+| Local testing | **the flow below** — symlink the repo into `~/.np/` | build and run the image |
+
+The `~/.np/` symlink workflow below applies to **legacy services and scopes**, which still
+work and are still the fastest local iteration loop: edit a script, trigger, read logs, fix,
+retry — with no image rebuild in between.
+
+For a service already published as a package, that loop does not apply: the worker runs what
+is baked into the image, so an edit on disk changes nothing until you rebuild. Iterate on the
+scripts locally with this flow first, then package once the behaviour is right.
+
+> **Gap worth naming**: the `worker.backend` value (`kubernetes` by default) passes straight
+> through to the nullplatform-agent chart, and the tofu module does not enumerate which
+> backends exist. Whether a host-local worker backend is available is a chart question this
+> skill cannot answer from the module source — confirm with the agent team rather than
+> assuming one exists.
+
+→ Package model: `@${CLAUDE_PLUGIN_ROOT}/skills/np-service-creator/docs/packaged-service.md`
+
 ## Critical Rules
 
 1. **NEVER run the agent in Docker for local testing** — run it directly on the host
@@ -222,6 +249,9 @@ To find the notification ID:
 
 ## Flags Reference
 
+Every `-command-executor-*` flag below belongs to the legacy model. They have no effect on
+worker-orchestrated packages.
+
 | Flag | Default | Usage |
 |------|---------|-------|
 | `-api-key` | `$NP_API_KEY` | Authentication (mandatory) |
@@ -231,7 +261,7 @@ To find the notification ID:
 | `-command-executor-command-folders` | - | Additional search folders |
 | `-command-executor-debug` | `false` | Prints stdout of executed scripts |
 | `-command-executor-env` | - | Env vars injected into scripts (`K=V,K2=V2`) |
-| `-command-executor-git-command-repos` | - | Repos to clone into basepath |
+| `-command-executor-git-command-repos` | - | **Legacy.** Repos to clone into basepath. The TF equivalent is the agent module's `agent_repo`, which its own docs describe as "empty when every scope uses worker_orchestrator instead" |
 | `-command-executor-disable-known-commands-validate` | `false` | Disables path validation (security bypass) |
 | `-log-level` | `ERROR` | `DEBUG`, `INFO`, `WARNING`, `ERROR` |
 | `-log-pretty-print` | `false` | Colored logs |

@@ -1,0 +1,24 @@
+{
+  "behavior": "override",
+  "description": "Only for a production hotfix with explicit approval. The justification is required and stored together with who approved.\n",
+  "id": "hotfix_override",
+  "inputs": {
+    "schema": {
+      "type": "object",
+      "required": [
+        "justification"
+      ],
+      "properties": {
+        "justification": {
+          "type": "string",
+          "title": "Hotfix justification",
+          "description": "Why this release goes to production without the lower environments (incident, ticket, ...).",
+          "minLength": 10
+        }
+      }
+    }
+  },
+  "severity": "major",
+  "title": "Hotfix approved without the lower environments",
+  "type": "manual"
+}

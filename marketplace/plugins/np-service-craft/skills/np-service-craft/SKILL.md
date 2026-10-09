@@ -13,7 +13,16 @@ Orchestrator to create, list, register, and test Nullplatform services.
 1. **Never use `curl` directly** against `api.nullplatform.com`. Always use `/np-api fetch-api`.
 2. **Confirm before any mutating operation**. Explain WHAT and WHY, then ask to proceed.
 3. **Use `AskUserQuestion`** for all user-facing questions.
-4. **Reference specialized skills** for detailed conventions:
+4. **Services ship as an OCI image, packaged.** `service_definition` publishes a package
+   revision pinning the specs and the image; the agent association emits a package-exec
+   channel with `worker_orchestrator = true`. Packaging is a **mode of those modules**, not a
+   replacement — both layers still apply, in order. The legacy git-clone flow still works for
+   services that have not moved.
+5. **The package model itself lives in `/np-package-builder`** — worker-bridge image
+   contract, agent/worker architecture, `allowedRegistries`, artifact forms, the
+   `np package` CLI, the SDK, legacy migration. Reference it; never restate it here.
+6. **Reference specialized skills** for detailed conventions:
+   - `np-package-builder` — the package model, worker-bridge image, agent workers
    - `np-service-specs` — spec file authoring (service-spec.json.tpl, link specs, values.yaml)
    - `np-service-workflows` — workflow YAML structure, build_context, entrypoints
    - `np-service-creator` — terraform registration patterns
@@ -30,6 +39,12 @@ Orchestrator to create, list, register, and test Nullplatform services.
 @.claude/skills/np-service-craft/docs/test-environment.md
 @.claude/skills/np-service-craft/docs/execution-flow.md
 @.claude/skills/np-service-craft/docs/troubleshooting.md
+
+### Registering a service as a package
+
+Service-specific; the model behind it is `/np-package-builder`.
+
+@${CLAUDE_PLUGIN_ROOT}/skills/np-service-creator/docs/packaged-service.md
 
 ### Lazy-loaded docs (read only when needed)
 
@@ -52,8 +67,13 @@ Orchestrator to create, list, register, and test Nullplatform services.
 ## Command: List Services (no args)
 
 1. Scan `services/` for `specs/service-spec.json.tpl`
-2. For each: read spec, check registration in `nullplatform/main.tf`, check binding in `nullplatform-bindings/main.tf`
-3. Show table: Service | Slug | Category | Provider | Registered | Binding
+2. For each: read the spec, find its `service_definition` module in `nullplatform/main.tf`
+   and whether it carries a `package` block, check its association in
+   `nullplatform-bindings/main.tf` for `worker_orchestrator = true`, and check whether its
+   slug appears in the agent's `worker_orchestrated_packages`
+3. Show table: Service | Slug | Category | Package version | Worker channel | Worker wired
+4. A service whose `service_definition` has no `package` block is on the legacy git-clone
+   flow — mark it as legacy in the table
 
 ## Command: create
 
@@ -70,7 +90,8 @@ See `docs/create-service.md`. Two paths:
 
 ## Command: register <name>
 
-See `docs/register-service.md`. Generates terraform modules for service_definition + agent_association.
+See `docs/register-service.md`. Tags, builds and pushes the image, adds the `package` block
+to `service_definition`, sets `worker_orchestrator` on the association, and wires the worker.
 
 ## Command: test <name>
 

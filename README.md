@@ -76,6 +76,7 @@ Tools for developing nullplatform services: design specs, write workflows, regis
 - **np-service-creator** - Register services in Terraform with service_definition modules and agent bindings
 - **np-agent-local-setup** - Set up a local nullplatform controlplane agent for development and testing
 - **np-notification-manager** - Manage notification channels, debug delivery, and resend notifications
+- **np-package-builder** - Build, run, and publish nullplatform packages (scope / service / simple) with the np CLI
 
 ### np-setup-organization
 

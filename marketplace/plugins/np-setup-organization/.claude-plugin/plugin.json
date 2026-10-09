@@ -1,6 +1,6 @@
 {
   "name": "np-setup-organization",
-  "version": "1.3.6",
+  "version": "1.4.0",
   "description": "Setup a new nullplatform organization: create org, configure cloud provider, infrastructure, and troubleshooting",
   "author": {
     "name": "Nullplatform",

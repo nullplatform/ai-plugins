@@ -26,7 +26,7 @@ description: This skill should be used when the user asks "why did my scope fail
 
 ### np-nullplatform-wizard
 
-description: This skill should be used when the user asks to "configure nullplatform resources", "setup dimensions", "create service definitions", "configure scope types", or needs to configure core nullplatform resources including scopes, dimensions, and service definitions via Terraform.
+description: This skill should be used when the user asks to "configure nullplatform resources", "setup dimensions", "create service definitions", "configure scope types", or needs to configure core nullplatform resources including scopes, dimensions, service definitions and governance checklists/workflows via Terraform.
 
 ### np-nullplatform-bindings-wizard
 

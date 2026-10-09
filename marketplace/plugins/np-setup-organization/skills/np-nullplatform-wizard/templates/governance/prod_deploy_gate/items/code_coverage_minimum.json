@@ -1,0 +1,10 @@
+{
+  "id": "code_coverage_minimum",
+  "type": "condition",
+  "behavior": "gate",
+  "severity": "critical",
+  "title": "Minimum code coverage (80%)",
+  "description": "The build's code coverage, reported by CI as the `coverage` build metadata, has to be at least 80%. A build with no coverage reported fails this item.\n",
+  "applies_when": { "scope.dimensions.environment": "production" },
+  "query": { "build.metadata.coverage.code.coverage": { "$gte": 80 } }
+}

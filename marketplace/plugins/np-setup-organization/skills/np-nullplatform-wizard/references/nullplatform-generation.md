@@ -32,7 +32,11 @@ nullplatform/
 ├── provider.tf
 ├── backend.tf
 ├── outputs.tf
-└── terraform.tfvars
+├── terraform.tfvars
+├── metadata.tf             # only if metadata was selected
+├── metadata.json           # the selected specifications (read by metadata.tf with file())
+├── workflow_checklist.tf   # only if governance cases were selected
+└── governance/<slug>/      # one per selected case (apply.sh, destroy.sh, *.json)
 ```
 
 ---
@@ -179,6 +183,10 @@ Containers has no toggle — it is always generated.
 - **Dimensions**: names, order and values (`environment`, `region`, …). Not derived from the catalog.
 - **Version pins**, only if the user wants to override a catalog ref for this environment
   (`var.scope_definitions[<slug>].version`).
+- **Metadata**: whether to add it, and which specifications (application: Owner, Business Unit,
+  SLA, Environment; build: Coverage, Security). Question and generation in [metadata.md](metadata.md).
+- **Governance cases** (workflows + checklists): which ones, or none. Question, options and
+  generation in [governance-cases.md](governance-cases.md).
 
 ### Show summary before generating
 
@@ -189,6 +197,8 @@ Containers has no toggle — it is always generated.
 | **Services** (from `common.tfvars`) | aws_s3_bucket, rds_postgres_server |
 | **Dimensions** | environment (development, staging, production) |
 | **Version overrides** | none |
+| **Metadata** | owner, business_unit, sla, environment, coverage, security (or "none") |
+| **Governance cases** | prod_deploy_gate (checks: lower envs, branch, coverage, vulnerabilities), nonprod_sizing (or "none") |
 ```
 
 ---

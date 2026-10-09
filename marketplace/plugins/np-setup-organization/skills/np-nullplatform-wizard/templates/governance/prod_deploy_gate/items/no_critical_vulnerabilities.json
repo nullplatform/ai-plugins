@@ -1,0 +1,10 @@
+{
+  "id": "no_critical_vulnerabilities",
+  "type": "condition",
+  "behavior": "gate",
+  "severity": "critical",
+  "title": "No critical vulnerabilities",
+  "description": "The build's security scan, reported by CI as the `security` build metadata, has to show zero critical vulnerabilities. A build with no scan reported fails this item.\n",
+  "applies_when": { "scope.dimensions.environment": "production" },
+  "query": { "build.metadata.security.security.vulnerabilities.critical": { "$eq": 0 } }
+}

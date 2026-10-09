@@ -1,0 +1,269 @@
+{
+  "owner": {
+    "entity": "application",
+    "name": "Owner",
+    "description": "Who is accountable for the application.",
+    "schema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "required": ["application_owner"],
+      "properties": {
+        "application_owner": {
+          "type": "string",
+          "title": "Application owner",
+          "description": "Person or team accountable for the application.",
+          "visibleOn": ["create", "read", "update", "list"],
+          "tag": true
+        },
+        "contact_email": {
+          "type": "string",
+          "title": "Contact email",
+          "format": "email",
+          "description": "Where to reach the owner when the application misbehaves.",
+          "visibleOn": ["create", "read", "update"]
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "business_unit": {
+    "entity": "application",
+    "name": "Business unit",
+    "description": "Business unit that owns the application budget.",
+    "schema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "title": "Business unit",
+          "description": "Business unit that owns the application budget.",
+          "enum": ["Digital Services", "Finance", "Marketing", "People and Culture"],
+          "visibleOn": ["create", "read", "update", "list"],
+          "tag": true
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "sla": {
+    "entity": "application",
+    "name": "SLA",
+    "description": "Availability, latency and error budget committed for the application.",
+    "schema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "service_tier": {
+          "type": "string",
+          "title": "Service tier",
+          "description": "Criticality tier that the objectives below are committed against.",
+          "enum": ["tier-1", "tier-2", "tier-3"],
+          "default": "tier-3",
+          "visibleOn": ["create", "read", "update", "list"],
+          "tag": true
+        },
+        "availability_target": {
+          "type": "number",
+          "title": "Availability target (%)",
+          "description": "Monthly successful-request ratio the application commits to.",
+          "minimum": 90,
+          "maximum": 100,
+          "default": 99.9,
+          "visibleOn": ["create", "read", "update", "list"],
+          "tag": true
+        },
+        "latency_p95_ms": {
+          "type": "number",
+          "title": "Latency objective p95 (ms)",
+          "description": "95th percentile response time the application commits to.",
+          "minimum": 1,
+          "default": 500,
+          "visibleOn": ["create", "read", "update"]
+        },
+        "error_budget_policy": {
+          "type": "string",
+          "title": "Error budget policy",
+          "description": "What happens when the error budget for the period is exhausted.",
+          "enum": ["Freeze feature deploys", "Require manual approval", "Notify only"],
+          "default": "Notify only",
+          "visibleOn": ["create", "read", "update"]
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "environment": {
+    "entity": "application",
+    "name": "Environment",
+    "description": "Environment the application belongs to.",
+    "schema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "title": "Environment",
+          "description": "Environment where the application exists.",
+          "enum": ["development", "staging", "production"],
+          "default": "development",
+          "visibleOn": ["create", "read", "update", "list"],
+          "tag": true
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "coverage": {
+    "entity": "build",
+    "name": "Coverage",
+    "description": "Code coverage of the build, reported by CI.",
+    "schema": {
+      "additionalProperties": false,
+      "description": "Code coverage of the build, reported by CI.",
+      "properties": {
+        "code": {
+          "additionalProperties": false,
+          "properties": {
+            "coverage": {
+              "description": "Percentage of code coverage",
+              "maximum": 100,
+              "minimum": 0,
+              "type": "number"
+            },
+            "lines": {
+              "description": "Total amount of code lines",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "coverage"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "code"
+      ],
+      "title": "Code Coverage Results",
+      "type": "object",
+      "uiSchema": {
+        "elements": [
+          {
+            "elements": [
+              {
+                "label": "Coverage",
+                "options": {
+                  "icon": "lsicon:coverage-filled",
+                  "style": {
+                    "&::after": {
+                      "content": "\"%\""
+                    },
+                    "color": "success.main",
+                    "fontSize": "1.5rem"
+                  }
+                },
+                "scope": "#/properties/code/properties/coverage",
+                "type": "Control"
+              },
+              {
+                "label": "Lines of Code",
+                "options": {
+                  "icon": "mdi:code-braces",
+                  "style": {
+                    "fontSize": "1.5rem"
+                  }
+                },
+                "scope": "#/properties/code/properties/lines",
+                "type": "Control"
+              }
+            ],
+            "type": "HorizontalLayout"
+          }
+        ],
+        "type": "VerticalLayout"
+      }
+    }
+  },
+  "security": {
+    "entity": "build",
+    "name": "Security",
+    "description": "Vulnerabilities found in the build, reported by CI.",
+    "schema": {
+      "additionalProperties": false,
+      "description": "Vulnerabilities found in the build, reported by CI.",
+      "properties": {
+        "security": {
+          "additionalProperties": false,
+          "properties": {
+            "vulnerabilities": {
+              "additionalProperties": false,
+              "properties": {
+                "critical": {
+                  "description": "Number of critical severity vulnerabilities",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "high": {
+                  "description": "Number of high severity vulnerabilities",
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "high",
+                "critical"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "vulnerabilities"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "security"
+      ],
+      "title": "Security Vulnerability Results",
+      "type": "object",
+      "uiSchema": {
+        "elements": [
+          {
+            "elements": [
+              {
+                "label": "Critical",
+                "options": {
+                  "icon": "mdi:alert-octagon",
+                  "style": {
+                    "color": "error.main",
+                    "fontSize": "1.5rem"
+                  }
+                },
+                "scope": "#/properties/security/properties/vulnerabilities/properties/critical",
+                "type": "Control"
+              },
+              {
+                "label": "High",
+                "options": {
+                  "icon": "mdi:alert",
+                  "style": {
+                    "color": "warning.main",
+                    "fontSize": "1.5rem"
+                  }
+                },
+                "scope": "#/properties/security/properties/vulnerabilities/properties/high",
+                "type": "Control"
+              }
+            ],
+            "type": "HorizontalLayout"
+          }
+        ],
+        "type": "VerticalLayout"
+      }
+    }
+  }
+}
