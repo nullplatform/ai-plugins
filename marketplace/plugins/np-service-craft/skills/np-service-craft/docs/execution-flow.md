@@ -4,14 +4,23 @@ Chain from notification to tofu apply.
 
 ## Diagram
 
+The chain has two halves. The **outer** half — how the action reaches the service's code —
+changed with the package model. The **inner** half — entrypoint through tofu — did not.
+
 ```
 User creates service in UI
   -> Service API -> SNS/SQS -> infrastructure-service-provisioner (Lambda)
   -> Notification API: creates notification, finds channels by NRN
-  -> For agent channel: agents-api finds agent by tags + org + capability
-  -> agents-api dispatches via WebSocket to agent
-  -> np-agent receives exec command
-  -> entrypoint
+  -> the service's channel is a PACKAGE-EXEC channel (emitted by the agent
+     association with worker_orchestrator = true), not a git-clone exec one
+  -> agents-api finds the agent by tags + org + capability
+  -> np-agent starts a WORKER POD for the service's package
+     |-- pulls the package's OCI image (must match worker.allowedRegistries)
+     |-- runs under the agent's ServiceAccount if the package slug is in
+     |   worker_orchestrated_packages, else the namespace default
+     |-- memory limit = worker_memory_limit (2Gi default; the chart's own
+     |   default OOMs mid-tofu-apply)
+  -> entrypoint (inside the image)
      |-- Bridge: NP_API_KEY -> NULLPLATFORM_API_KEY
      |-- Clean NP_ACTION_CONTEXT (remove quotes)
      |-- Parse CONTEXT, SERVICE_ACTION, SERVICE_ACTION_TYPE
@@ -63,9 +72,29 @@ Steps declare `output` variables that become env vars for subsequent steps.
 
 YAML files use `$SERVICE_PATH` in `file:` paths. The workflow executor expands it before running each step.
 
-### CWD Gotcha
+### CWD Gotcha (legacy command-executor only)
 
-Agent child process inherits CWD from where np-agent was started, NOT `~/.np/`. The entrypoint must resolve SERVICE_PATH with fallback to `~/.np/`.
+Under the legacy flow the agent child process inherited CWD from where np-agent was
+started, not `~/.np/`, so the entrypoint had to resolve `SERVICE_PATH` with a fallback.
+
+Under worker orchestration the code lives at a fixed path inside the image and there is no
+basepath to resolve against. If you see `SERVICE_PATH` resolution failures on a packaged
+service, the cause is the image layout, not the CWD.
+
+### Worker never starts
+
+The package published fine but its first action hangs or fails. In order of likelihood:
+
+1. The image's registry is not in `worker.allowedRegistries` (defaults to
+   `public.ecr.aws/nullplatform/*` and nothing else).
+2. The package slug is not in `worker_orchestrated_packages`.
+3. The channel's entrypoint path does not exist in the image — the association defaults to
+   `/app/packages/<slug>/entrypoint` while the reference Dockerfiles bake
+   `/app/pkg/<slug>/entrypoint/entrypoint`.
+4. `tags_selectors` on the association do not match the agent's tags. Packaging does not
+   remove this — the channel still routes by tags.
+
+None of the four is validated at `tofu apply`.
 
 ## Variables by Stage
 

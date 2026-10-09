@@ -1,6 +1,6 @@
 {
   "name": "np-catalog",
-  "version": "1.3.6",
+  "version": "1.4.0",
   "description": "Manage the nullplatform catalog: entity specifications, entity instances, relations, search/facets, interceptors/events, custom actions and authorization",
   "author": {
     "name": "Nullplatform",

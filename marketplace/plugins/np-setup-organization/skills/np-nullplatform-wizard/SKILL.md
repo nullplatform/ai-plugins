@@ -1,11 +1,11 @@
 ---
 name: np-nullplatform-wizard
-description: This skill should be used when the user asks to "configure nullplatform resources", "setup dimensions", "create service definitions", "configure scope types", or needs to configure core nullplatform resources including scopes, dimensions, and service definitions via Terraform.
+description: This skill should be used when the user asks to "configure nullplatform resources", "setup dimensions", "create service definitions", "configure scope types", or needs to configure core nullplatform resources including scopes, dimensions, service definitions and governance checklists/workflows via Terraform.
 ---
 
 # Nullplatform Config Wizard
 
-Configures Nullplatform resources: scopes, dimensions, and service definitions.
+Configures Nullplatform resources: scopes, dimensions, service definitions and, optionally, governance cases (approval checklists + workflows).
 
 ## Critical Rules
 
@@ -24,6 +24,7 @@ Each scope and service lives in its own repo, so every catalog entry in this lay
 - Creating environment dimensions (dev/staging/prod)
 - Registering service definitions
 - Configuring metadata schemas and policies
+- Adding governance cases (approval checklists + workflows)
 
 ## Prerequisites
 
@@ -73,14 +74,21 @@ Templates for creating cloud services:
 | Endpoint Exposer | dependency | Exposes application endpoints |
 | (Custom services) | dependency | Can be added in second iteration |
 
+### Governance cases (Optional)
+
+Approval checklists (and the workflow that resolves them, when needed), applied by `tofu apply`
+through `workflow_checklist.tf`. The user picks which ones in step 5:
+
+| Case | Rule |
+| ---- | ---- |
+| `prod_deploy_gate` | Checks before a production deploy, each one gate or informational: release running in lower environments, allowed source branch, minimum code coverage, no critical vulnerabilities |
+| `nonprod_sizing` | Non-prod scopes: autoscaling off, max 128 MB, max 1 instance |
+
 ### Metadata Schemas (Optional)
 
-Schemas for tracking application attributes:
-
-- Code coverage
-- Security vulnerabilities
-- FinOps costs
-- Custom metadata
+Metadata specifications picked by the user in step 4: application fields shown when creating and
+editing an application (Owner, Business Unit, SLA, Environment) and build results reported by CI
+(Coverage, Security). Generated as `metadata.tf` + `metadata.json`.
 
 ## Wizard Workflow
 
@@ -90,24 +98,19 @@ Schemas for tracking application attributes:
 ls nullplatform/*.tf 2>/dev/null || echo "No configuration exists - proceed"
 ```
 
-### 2. Copy templates (except main.tf)
+### 2. Copy templates (except main.tf and metadata.tf)
 
 ```bash
-# Copy all templates EXCEPT main.tf (generated dynamically)
+# Copy all templates EXCEPT main.tf (generated dynamically) and metadata.tf (generated in step 4)
 for f in nullplatform/example/*.tf; do
-  [ "$(basename "$f")" = "main.tf" ] && continue
+  case "$(basename "$f")" in main.tf|metadata.tf) continue ;; esac
   cp "$f" nullplatform/
 done
 ```
 
-> **Note**: Templates include optional files:
-> - `metadata.tf` - Metadata schemas (requires `nrn_namespace`)
-> - `policies.tf` - Approval policies (requires `nrn_namespace`)
->
-> These files are **optional** and require a namespace NRN (not account).
-> If you don't need them or they cause errors, rename them to `.tf.disabled`:
+> **Note**: Templates include the optional file `policies.tf` - Approval policies (requires
+> `nrn_namespace`, not account). If you don't need it or it causes errors, rename it:
 > ```bash
-> mv nullplatform/metadata.tf nullplatform/metadata.tf.disabled
 > mv nullplatform/policies.tf nullplatform/policies.tf.disabled
 > ```
 
@@ -137,7 +140,19 @@ The nullplatform `main.tf` is generated dynamically following [references/nullpl
 
 3. If `tofu validate` fails, fix BEFORE continuing with step 4.
 
-### 4. Customize variables
+### 4. Metadata
+
+Ask whether to add metadata and which specifications, and generate `metadata.tf` +
+`metadata.json` following [references/metadata.md](references/metadata.md). If the user picks
+"No metadata", skip this step: no file is copied.
+
+### 5. Governance cases (workflows + checklists)
+
+Ask which governance cases to add and generate them following
+[references/governance-cases.md](references/governance-cases.md). If the user picks "None",
+skip this step: no file is copied.
+
+### 6. Customize variables
 
 The wizard helps you configure:
 
@@ -145,7 +160,7 @@ The wizard helps you configure:
 - `environments` (list of dimensions)
 - `tags_selectors` (for matching)
 
-### 5. Apply
+### 7. Apply
 
 ```bash
 cd nullplatform
@@ -161,6 +176,8 @@ tofu apply
 | `np_api_key` | Nullplatform API key | NP_API_KEY/np-api-skill.key (recommended) |
 | `environments` | List of dimensions | terraform.tfvars |
 | `tags_selectors` | Tags for matching | terraform.tfvars |
+| `governance_cases` | Governance cases to apply (optional, default none) | terraform.tfvars |
+| `governance_nrn` | Where governance cases are created (optional, default `nrn`) | terraform.tfvars |
 
 ## Outputs
 

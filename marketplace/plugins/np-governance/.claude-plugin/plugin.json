@@ -1,6 +1,6 @@
 {
   "name": "np-governance",
-  "version": "1.3.6",
+  "version": "1.4.0",
   "description": "Governance & workflow authoring on the Nullplatform engine: query and operate on action items, categories and suggestions; build detector/executor agents; manage approval checklists (templates, action associations, runs, manual approvals); and author, publish, validate and test workflows (YAML, signals, triggers, config-entry secrets) — including the local kit (npx @nullplatform/workflow-kit) and the nullplatform/workflows corpus. Workflows commonly read the lake and drive action items, so all live together here.",
   "author": {
     "name": "Nullplatform",

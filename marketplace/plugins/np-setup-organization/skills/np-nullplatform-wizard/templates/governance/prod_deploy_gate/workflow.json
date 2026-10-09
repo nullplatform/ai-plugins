@@ -1,0 +1,99 @@
+{
+  "id": "poc-release-in-lower-env",
+  "name": "PoC - Release in lower environments",
+  "description": "Resolves the checklist item kind=poc-release-in-lower-env: passes when the release being deployed to production (or another release of the same build) is running in every lower environment of the application.",
+  "path": "/poc/governance",
+  "steps": {
+    "trigger": {
+      "id": "trigger",
+      "name": "Checklist dispatch (kind=poc-release-in-lower-env)",
+      "type": "trigger",
+      "pluginType": "np-checklist-trigger",
+      "config": {
+        "nrn": "(apply.sh)",
+        "kind": "poc-release-in-lower-env",
+        "mode": "start",
+        "pathPrefix": "(apply.sh)"
+      }
+    },
+    "check": {
+      "id": "check",
+      "name": "Release running in lower environments?",
+      "type": "module",
+      "pluginType": "code-exec",
+      "inputs": {
+        "params": "${{ steps.trigger.outputs.inputs }}",
+        "np_api_key": "${{ secrets.NP_API_KEY }}"
+      },
+      "config": {
+        "code": "// Gate: the release being deployed (or another release of the same build) is the one running in\n// every lower environment of the application. Runs in the code-exec sandbox: `inputs` are this\n// step's inputs, and the only reachable host is api.nullplatform.com.\nconst EXPLAIN = \"**What it checks:** the release you are deploying (or another release of the same build) is the one currently running in every lower environment of this application.\\n\\n**Why:** every change goes through the lower environments before production, so it is tested with the real integrations before it reaches users.\\n\\n**How to fix:** deploy the same release to the environments listed as missing (and finish their traffic switch), then deploy to production again.\";\n\nconst p = inputs.params || {};\nconst dimension = String(p.dimension || 'environment');\nconst required = String(p.required_values || '').split(',').map((s) => s.trim()).filter(Boolean);\nconst releaseId = String(p.release_id || '');\nconst buildId = p.build_id ? String(p.build_id) : '';\nconst appId = String(p.application_id || '');\n\nconst out = (status, message, extra) => ({\n  status,\n  message,\n  details: Object.assign({ markdown: EXPLAIN, dimension, required_values: required, release_id: releaseId, build_id: buildId || null }, extra || {}),\n});\n\nif (required.length === 0) return out('failed', 'Checklist misconfigured: required_values is empty.');\nif (!releaseId || !appId) return out('failed', 'The dispatch did not include application_id / release_id.');\n\nconst tok = await fetch('https://api.nullplatform.com/token', {\n  method: 'POST',\n  headers: { 'content-type': 'application/json' },\n  body: JSON.stringify({ api_key: inputs.np_api_key }),\n});\nif (!tok.ok) throw new Error('NP token exchange failed: ' + tok.status);\nconst token = (await tok.json()).access_token;\nconst np = async (path) => {\n  const r = await fetch('https://api.nullplatform.com' + path, { headers: { authorization: 'Bearer ' + token } });\n  if (!r.ok) throw new Error('NP GET ' + path + ' -> ' + r.status);\n  return r.json();\n};\n\n// Active scopes of the application (paginated).\nconst scopes = [];\nfor (let offset = 0; ; offset += 100) {\n  const page = await np(`/scope?application_id=${appId}&status=active&limit=100&offset=${offset}`);\n  scopes.push(...(page.results || []));\n  if (offset + 100 >= ((page.paging && page.paging.total) || 0)) break;\n}\n\n// The scope LIST does not fill active_deployment: read each scope by id.\nconst releases = {};\nconst release = async (id) => {\n  if (!(id in releases)) releases[id] = await np('/release/' + id).catch(() => null);\n  return releases[id];\n};\n\nconst evidence = {};\nconst missing = [];\nfor (const value of required) {\n  const envScopes = scopes.filter((s) => (s.dimensions || {})[dimension] === value);\n  const rows = [];\n  let match = null;\n  for (const s of envScopes) {\n    const full = await np('/scope/' + s.id);\n    const activeId = full.active_deployment || full.current_active_deployment;\n    if (!activeId) { rows.push({ scope_id: s.id, scope: s.name, deployment_id: null }); continue; }\n    const dep = await np('/deployment/' + activeId);\n    const rel = await release(String(dep.release_id));\n    const row = {\n      scope_id: s.id,\n      scope: s.name,\n      deployment_id: activeId,\n      release_id: String(dep.release_id),\n      semver: rel && rel.semver,\n      build_id: rel && rel.build_id != null ? String(rel.build_id) : null,\n    };\n    rows.push(row);\n    if (row.release_id === releaseId || (buildId && row.build_id === buildId)) { match = row; break; }\n  }\n  if (match) { evidence[value] = { ok: true, matched: match }; continue; }\n\n  let reason;\n  if (envScopes.length === 0) reason = 'no active scopes';\n  else if (rows.every((r) => !r.deployment_id)) reason = 'no scope has a running deployment';\n  else reason = 'runs ' + [...new Set(rows.filter((r) => r.deployment_id).map((r) => r.semver || 'release ' + r.release_id))].join(', ');\n  missing.push(value + ': ' + reason);\n  evidence[value] = { ok: false, reason, scopes: rows };\n}\n\nconst candidate = await release(releaseId);\nconst label = (candidate && candidate.semver) || releaseId;\nif (missing.length === 0) return out('passed', `Release ${label} is running in ${required.join(', ')}.`, { evidence });\nreturn out('failed', `Release ${label} is not running in every lower environment (${missing.join('; ')}). Deploy it there first.`, {\n  evidence,\n  missing: missing.map((m) => m.split(':')[0]),\n});\n",
+        "network": {
+          "allowedHosts": [
+            "api.nullplatform.com"
+          ]
+        }
+      },
+      "errorHandling": {
+        "fallbackStep": "resolve_error"
+      }
+    },
+    "resolve": {
+      "id": "resolve",
+      "name": "Resolve checklist item",
+      "type": "module",
+      "pluginType": "np-checklist-item-resolve",
+      "inputs": {
+        "callbackUrl": "${{ steps.trigger.outputs.callbackUrl }}",
+        "callbackToken": "${{ steps.trigger.outputs.callbackToken }}",
+        "status": "${{ steps.check.outputs.status }}",
+        "message": "${{ steps.check.outputs.message }}",
+        "details": "${{ steps.check.outputs.details }}"
+      }
+    },
+    "resolve_error": {
+      "id": "resolve_error",
+      "name": "Resolve checklist item (check failed)",
+      "type": "module",
+      "pluginType": "np-checklist-item-resolve",
+      "inputs": {
+        "callbackUrl": "${{ steps.trigger.outputs.callbackUrl }}",
+        "callbackToken": "${{ steps.trigger.outputs.callbackToken }}",
+        "status": "failed",
+        "message": "Could not verify the lower environments: ${{ steps.check.error.message }}",
+        "details": {
+          "application_id": "${{ steps.trigger.outputs.inputs.application_id }}",
+          "error_code": "${{ steps.check.error.code }}"
+        }
+      }
+    }
+  },
+  "connections": [
+    {
+      "id": "c1",
+      "from": "trigger",
+      "to": "check",
+      "sourcePort": "default",
+      "targetPort": "default"
+    },
+    {
+      "id": "c2",
+      "from": "check",
+      "to": "resolve",
+      "sourcePort": "default",
+      "targetPort": "default"
+    },
+    {
+      "id": "e1",
+      "from": "check",
+      "to": "resolve_error",
+      "condition": "false",
+      "sourcePort": "default",
+      "targetPort": "default"
+    }
+  ],
+  "outputs": {
+    "resolved_status": "${{ steps.check.outputs.status }}",
+    "resolved_message": "${{ steps.check.outputs.message }}",
+    "callback_ok": "${{ steps.resolve.outputs.ok }}"
+  }
+}

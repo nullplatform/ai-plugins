@@ -39,7 +39,16 @@ specification definition and are snapshotted into the run like everything else.
 - Submit-time: posted `inputs` values validated with ajv; failures come back
   as `422` with `errors[]` entries `input.<field>.required` /
   `input.<field>.invalid`.
-- Values persist on the item state (`input_values` on reads) — audit trail.
+- Values persist whole on the item state (`input_values` on reads). In the
+  audit trail — the `item.answer_recorded` event and its
+  `checklist:item:answer_recorded` audit notification — a property the
+  schema marks `writeOnly: true` or `format: "password"` goes as
+  `"[REDACTED]"`. Only marks reached through `properties` or `items` count:
+  under `$ref`, `allOf`, `anyOf`, `oneOf`, `patternProperties`,
+  `additionalProperties` or a tuple `items`, the value passes as is. Above
+  8 KB serialized, the (redacted) `inputs` go as `inputs_digest`: the sha256
+  hex of their canonical JSON (compact, the keys of every object sorted,
+  recursively; arrays keep their order) — recompute it that way to match.
 - `require_comment: true` still works and is independent of inputs.
 
 ## `validations` — same query language as policies

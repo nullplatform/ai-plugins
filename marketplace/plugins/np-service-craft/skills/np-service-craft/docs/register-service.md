@@ -1,133 +1,179 @@
-# Register Service in Terraform
+# Register a service as a package
+
+A service ships as an **OCI image**; `service_definition` publishes a **package revision**
+pinning its specs and that image; the agent association emits a **package-exec channel** so
+the agent spawns a **worker** from it.
+
+→ The worker-bridge image, the agent/worker architecture and the artifact forms:
+`/np-package-builder`. The service-specific parts (two layers, links, the channel's
+entrypoint, operational behaviour):
+@${CLAUDE_PLUGIN_ROOT}/skills/np-service-creator/docs/packaged-service.md
 
 ## Prerequisites
 
-- `services/<name>/specs/service-spec.json.tpl` must exist and be valid JSON
-- The `nullplatform/` and `nullplatform-bindings/` directories must exist with terraform configured
+- `<slug>/specs/service-spec.json.tpl` exists and is valid JSON
+- A `Dockerfile` at the repo root, built on `public.ecr.aws/nullplatform/scopes/worker-bridge`
+- A container registry the agent is allowed to pull from
+- `nullplatform/` and `nullplatform-bindings/` terraform directories
 
-## Terraform Base Structure
+## Terraform layout
 
-Registration uses two separate terraform directories at the repo root:
-
-- **`nullplatform/`** — Service definitions. Contains the `service_definition` modules (one per service), outputs, variables (`nrn`, `np_api_key`), nullplatform provider, and `common.tfvars` with values.
-- **`nullplatform-bindings/`** — Agent associations. Contains the `service_definition_agent_association` modules (one per service), variables (`nrn`, `np_api_key`, `tags_selectors`), nullplatform provider, and a `data.tf` that reads the state from `nullplatform/` via `terraform_remote_state` to access outputs (slug, id).
-
-These are two separate directories because the binding needs the `service_specification_slug` as output from the service_definition. They are applied in order: first `nullplatform/`, then `nullplatform-bindings/`.
-
-If the directories don't exist, create them with the base files (providers.tf, variables.tf, common.tfvars, data.tf). Ask the user for the `nrn` and `np_api_key` if they don't have them.
-
-## Module Source of Truth
-
-The modules live in `https://github.com/nullplatform/tofu-modules`:
-- `nullplatform/service_definition` — creates service_specification + link_specification
-- `nullplatform/service_definition_agent_association` — creates notification_channel
-
-**BEFORE generating terraform**, clone the repo and read each module's `variables.tf` to determine mandatory and optional variables:
-
-```bash
-git clone https://github.com/nullplatform/tofu-modules /tmp/tofu-modules-ref 2>/dev/null \
-  || (cd /tmp/tofu-modules-ref && git pull)
-```
-
-Also read `main.tf` and `locals.tf` to understand how resources are built internally.
+Two directories, applied in order — packaging does not change this. `nullplatform-bindings/`
+reads the spec slug out of `nullplatform/` through `terraform_remote_state`.
 
 ## Flow
 
-### 1. Read service spec
+### 1. Read the service spec
 
 ```bash
-jq '{name, slug, selectors}' services/<name>/specs/service-spec.json.tpl
+jq '{name, slug, selectors}' <slug>/specs/service-spec.json.tpl
 ```
 
-### 2. Check for duplicates and collisions
-
-**2a. Check not already registered in terraform:**
+### 2. Check for collisions
 
 ```bash
 grep -c "service_definition_<slug>" nullplatform/main.tf
-```
-
-**2b. Check for name/slug collisions in the remote repository** (Remote mode only):
-
-Before pushing or registering, verify that no existing service in the remote repo uses the same slug or directory path. This prevents accidental overwrites and confusing slug collisions in nullplatform.
-
-```bash
-# Check if the service path already exists in the remote repo
-git ls-remote --exit-code origin HEAD -- "services/<slug>/" 2>/dev/null
-# Or if repo is already cloned:
-git fetch origin main && git ls-tree -r --name-only origin/main | grep "^services/<slug>/"
-```
-
-If a collision is found:
-- **Same slug exists in remote**: Inform the user that `services/<slug>/` already exists in the remote repository. Ask with AskUserQuestion whether they want to:
-  - **Overwrite**: Replace the existing service (confirm this is intentional — the previous version will be lost)
-  - **Rename**: Choose a different slug (suggest alternatives like `<slug>-v2`, `<provider>-<slug>`, etc.)
-  - **Cancel**: Abort the registration
-
-- **Same service name but different slug**: Warn the user that another service with the same `name` field already exists under a different slug. This can cause confusion in the UI. Ask the user to disambiguate by either renaming the new service or confirming the duplicate name is intentional.
-
-**2c. Check for slug collisions in nullplatform** (both modes):
-
-```bash
-# Query existing service specifications to check for slug conflicts
 /np-api fetch-api "/service_specification?nrn=<nrn>&show_descendants=true" | jq '[.[] | {slug, name}]'
+/np-api fetch-api "/packages?nrn=<nrn>" | jq '.results[] | {slug, name}'
 ```
 
-If a service specification with the same slug already exists in nullplatform, inform the user and ask them to disambiguate before proceeding.
+If a specification or package with the same slug exists, ask the user to disambiguate. Do
+not overwrite silently.
 
-### 3. Ask user: local or remote
-
-**BEFORE generating terraform**, ask the user with AskUserQuestion:
-
-> How do you want to register the service?
->
-> **Local (recommended for testing)**: Reads specs directly from the filesystem. You don't need to push anything to GitHub, you can iterate quickly.
->
-> **Remote (for production)**: Reads specs from a GitHub/GitLab repository. Requires the repo to exist and specs to be pushed.
-
-This decision determines the module's `git_provider`:
-- **Local** → `git_provider = "local"` + `local_specs_path` pointing to the service directory
-- **Remote** → `git_provider = "github"` (default) + `repository_org`, `repository_name`, `repository_branch`. If the repo is private, also `repository_token`.
-
-### 3b. If Remote: Repository visibility (default: Private)
-
-When the user selects **Remote**, the repository **MUST be private by default**. Present the AskUserQuestion with **Private as the first option and marked as Recommended**:
-
-> The repository will be created/used as **private** (recommended). Do you want to change this?
->
-> **Private (Recommended)**: Service specs are only accessible with a token. You will need to provide a GitHub/GitLab access token with read permissions. The module passes this token to fetch spec files securely. This is the safe default.
->
-> **Public**: Service specs are publicly accessible on the internet. **Warning**: anyone can read your service definitions, attribute schemas, and link configurations. Only use this for open-source services or non-sensitive specs.
-
-**Default behavior**: If the user does not explicitly choose Public, always proceed with Private. Never create or assume a public repository.
-
-Based on the answer:
-- **Private (default)** → `repository_token` is **required**. Ask the user for a GitHub Personal Access Token (or GitLab PAT with `read_api` scope). Warn that without the token, tofu apply will fail with a 404 error. If the agent needs to create the repo on behalf of the user (e.g., via GitHub API), always set `"private": true`.
-- **Public** → `repository_token` can be omitted (set to `null`). Explicitly confirm with the user: _"Your service specs will be publicly readable by anyone on the internet. Are you sure?"_. Require explicit confirmation before proceeding.
-
-**Important**: If the user needs to push specs to a new repository, remind them to set the repository visibility to **private before pushing**. If the repo was accidentally created as public, immediately help them change it to private via the GitHub/GitLab API or UI before continuing.
-
-For the binding (`service_definition_agent_association`):
-- **Local** → `base_clone_path = pathexpand("~/.np")` (points to the local symlink)
-- **Remote** → omit `base_clone_path` (uses the default `/root/.np` of the agent in k8s)
-
-### 4. Generate terraform
-
-Read the module variables from `/tmp/tofu-modules-ref/` and generate:
-
-1. **nullplatform/main.tf**: module `service_definition_<slug>` with mandatory module variables + `git_provider = "local"` and `local_specs_path` if in local mode.
-2. **nullplatform/outputs.tf**: outputs for `service_specification_slug` and `service_specification_id`.
-3. **nullplatform-bindings/main.tf**: module `service_definition_agent_association` with mandatory variables. For local dev, set `base_clone_path = pathexpand("~/.np")`.
-
-For the binding, the module builds the cmdline internally — read the module's `main.tf` to understand the pattern.
-
-### 5. Apply
+In a repository that already holds services, check the remote too — the API says nothing
+about a directory that exists but was never registered:
 
 ```bash
-cd nullplatform && tofu init && tofu apply -var-file=common.tfvars
-cd ../nullplatform-bindings && tofu init && tofu apply -var-file=../nullplatform/common.tfvars
+git ls-tree -r --name-only origin/<branch> | grep "^<slug>/"
 ```
 
-Verify: `/np-api fetch-api "/service_specification?nrn=<nrn>&show_descendants=true"`
+On a hit, ask with `AskUserQuestion`: **Overwrite** (confirming the previous version is
+lost), **Rename** (suggest `<slug>-v2` or `<provider>-<slug>`), or **Cancel**. With the
+one-repo-per-service layout this document describes, the check is usually a no-op — run it
+anyway when the repo is shared.
 
-For the pre-registration checklist, see `np-service-creator` skill.
+### 2b. The specs repository is private by default
+
+The module fetches the spec files over HTTPS on every `apply`, packaged or not, so the
+repository is part of the runtime. Ask with `AskUserQuestion`, **Private first and marked
+`(Recommended)`**:
+
+- **Private (Recommended)** — needs a fine-grained token with `Contents: Read-only`, passed
+  through `repository_token`. Without it the apply fails with a 404.
+- **Public** — service definitions, attribute schemas and link configurations become readable
+  by anyone on the internet. Require an explicit confirmation before proceeding.
+
+**Never create or assume a public repository.** If one was created public by mistake, switch
+it to private *before* continuing — the specs are already exposed until you do.
+
+### 3. Tag the repo
+
+`repository_branch` must be a **tag** — the module rejects `main`. Tag before building so
+the image and the spec ref describe the same commit.
+
+### 4. Build and push the image, capture the digest
+
+Ask the user which cloud and which registry — the rest of the flow is identical on all three.
+
+```bash
+# AWS — ECR
+aws ecr get-login-password --region <region> | docker login --username AWS --password-stdin <registry>
+docker buildx build --platform linux/amd64 -t <registry>/<repo>:<tag> . --push
+
+# Azure — ACR (builds server-side, no local login needed)
+az acr build -r <acr> --platform linux/amd64 -t <repo>:<tag> .
+
+# GCP — Artifact Registry
+gcloud auth configure-docker <region>-docker.pkg.dev
+docker buildx build --platform linux/amd64 -t <region>-docker.pkg.dev/<project>/<repo>:<tag> . --push
+```
+
+Then capture the digest:
+
+```bash
+docker buildx imagetools inspect <ref> --format '{{.Manifest.Digest}}'   # AWS / GCP
+az acr manifest list-metadata -r <acr> -n <repo> --query "[0].digest" -o tsv   # Azure
+```
+
+Confirm the registry is covered by the agent's `worker.allowedRegistries` (step 7), and that
+the cluster can pull from it: on Azure that is `az acr update --attach-acr`, on AWS the node
+role or IRSA, on GCP `artifactregistry.reader` on the node service account.
+
+To verify the image locally before pushing, build **natively** (`docker build -t x .`) —
+`--platform linux/amd64` under the legacy builder fails at `COPY` on an arm64 machine.
+
+### 5. Generate the `nullplatform/` module
+
+Read the module variables at the ref you are pinning — never from memory. Generate a
+`service_definition` module with its `package` block carrying `version` and an `oci_image`
+artifact with `registry`, `repository` and the digest from step 4, plus an output exporting
+`service_specification_slug`.
+
+**State `type = "oci_image"` explicitly.** It defaults to `git_repository`, and an
+`oci_image` that omits `repository` falls back to the containers scope image without failing.
+
+**Set `available_links` explicitly when the service has no links.** It defaults to
+`["connect"]`, so a link-less service fails the apply reading a spec file that was never
+written: `Invalid value for "path" parameter: no file exists at .../specs/links/connect.json.tpl`.
+Pass `available_links = []`.
+
+### 6. Generate the `nullplatform-bindings/` module
+
+A `service_definition_agent_association` with `worker_orchestrator = true` and
+`package_slug`. Check the baked entrypoint against the module's default
+(`/app/packages/<slug>/entrypoint`) — the reference Dockerfiles bake `/app/pkg/<slug>/entrypoint/entrypoint`,
+which does **not** match, so pass `entrypoint` explicitly unless you baked the module's path.
+
+### 7. Wire the worker on the agent
+
+```hcl
+worker_orchestrated_packages = ["containers", "<slug>"]
+worker = { allowedRegistries = ["<registry>/*"] }
+extra_envs = { … }   # the worker does NOT inherit the agent's environment
+```
+
+### 8. Apply, in order
+
+```bash
+cd nullplatform          && tofu init && tofu apply -var-file=../common.tfvars
+cd ../nullplatform-bindings && tofu init && tofu apply -var-file=../common.tfvars
+# then the agent layer, for the worker wiring
+```
+
+Verify:
+
+```bash
+/np-api fetch-api "/packages?nrn=<nrn>"
+/np-api fetch-api "/packages/<package_id>/revisions/<revision_id>"
+/np-api fetch-api "/service_specification?nrn=<nrn>&show_descendants=true"
+```
+
+### 9. Release a new version
+
+Five steps, and skipping any one leaves the previous version running:
+
+```
+tag → build and push → new digest + new package.version → tofu apply → create the service
+```
+
+The `apply` is what publishes the revision — the package is a terraform resource
+(`nullplatform_artifact` + `nullplatform_package`). Edit the `.tf` and create the instance
+without applying and the instance is born on the **previous** revision, which the next
+paragraph then makes permanent for it.
+
+A service instance is bound for life to the revision it was born with; promoting a new
+revision does not move existing instances.
+
+**Expect `1 to add, 1 to change, 1 to destroy` on a version bump.** A changed `meta.digest`
+forces replacement of the `nullplatform_artifact` resource while the package updates
+in-place. That is benign here. Do not confuse it with the same signature on the **agent**
+module, where it means the Helm release is being destroyed and recreated — read which
+resource the plan names before reacting.
+
+## Legacy services
+
+A service still on the git-clone flow keeps `agent_repo` and an association without
+`worker_orchestrator`. Do not run both models against the same service. Migration steps are
+in `np-service-creator`.
+
+For the pre-registration checklist, see the `np-service-creator` skill.

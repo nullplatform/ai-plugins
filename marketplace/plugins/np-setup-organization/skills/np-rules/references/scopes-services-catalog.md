@@ -15,15 +15,21 @@ successfully in nullplatform, then fails on the first deploy inside the agent.
 | Scheduled Tasks | scope | `nullplatform/scopes` | `main` | `scheduled_task` | — none | — | `false` |
 | Static Files | scope | `nullplatform/scopes-static-files` | `1.0.0` (branch) | `static-files` | `static-files/specs/requirements/aws` | `static-files` | `true` |
 | AWS Lambda | scope | `nullplatform/scopes-lambda` | `1.0.1` | `lambda` | `lambda/specs/requirements` | `lambda` | `true` |
-| AWS S3 Bucket | service | `nullplatform/services-s-3` | `1.0.0` | `aws-s3-bucket` | `aws-s3-bucket/specs/requirements/aws` | `s3` | n/a |
-| RDS Postgres Server | service | `nullplatform/services-rds` | `1.0.0` | `rds-postgres-server` | `rds-postgres-server/specs/requirements/aws` | `rds-postgres-server` | n/a |
-| RDS Postgres DB | service | `nullplatform/services-rds` | `1.0.0` | `rds-postgres-db` | `rds-postgres-db/specs/requirements/aws` | `rds-postgres-db` | n/a |
+| AWS S3 Bucket | service | `nullplatform/services-s-3` | `v0.4.0` | `aws-s3-bucket` | `aws-s3-bucket/specs/requirements/aws` | `s3` | n/a |
+| RDS Postgres Server | service | `nullplatform/services-rds` | `v0.1.0` | `rds-postgres-server` | `rds-postgres-server/specs/requirements/aws` | `rds-postgres-server` | n/a |
+| RDS Postgres DB | service | `nullplatform/services-rds` | `v0.1.0` | `rds-postgres-db` | `rds-postgres-db/specs/requirements/aws` | `rds-postgres-db` | n/a |
 | PostgreSQL (K8s) | service | `nullplatform/services-postgresql-k-8-s` | `main` | `postgres/k8s` (ref-dependent — see note 8) | — none | — | n/a |
 | Azure Cosmos DB | service | `nullplatform/services-azure-cosmos-db` | `main` | `azure-cosmos-db` | — none (Azure) | — | n/a |
 | Endpoint Exposer | service | `nullplatform/services-endpoint-exposer` | `v0.2.1` | `.` (repo root — see note 9) | `specs/requirements/aws` | ⚠️ verify | n/a |
 | Networking overrides | override | `nullplatform/scopes-networking` | `main` | `lambda` | — none | — | n/a |
 | Parameter Store | provider | `nullplatform/parameters-provider` | `main` | `parameters/providers/aws-parameter-store` | `parameters/providers/aws-parameter-store/specs/requirements` | `parameter_store` | n/a |
 | Secrets Manager | provider | `nullplatform/parameters-provider` | `main` | `parameters/providers/aws-secrets-manager` | `parameters/providers/aws-secrets-manager/specs/requirements` | `secret_manager` | n/a |
+
+**The `Ref` column is a starting point with a shelf life, not an authority.** These repos
+release often and the column drifts within weeks. Consumers that must pin a version — the
+infrastructure and nullplatform wizards — can use it as the default, but anything cloning a
+reference to craft from resolves the ref at the moment of use (see note 3a). Do not treat a
+value here as current without checking.
 
 ⚠️ marks a value that could **not** be verified against an applied reference setup. Ask the
 user or verify against the repo — never fill one in with a plausible guess.
@@ -50,6 +56,35 @@ RDS Server and RDS Database share `services-rds`. Containers and Scheduled Tasks
 Confirm the ref with the user before generating. Note that `1.0.0` in `scopes-static-files`
 is a **branch** (`refs/heads/1.0.0`), not a tag — the repos are mid-migration from release
 branches to tags, so do not assume `?ref=` values are tags.
+
+#### 3a. Resolve the latest release, then verify it is packaged
+
+The refs in this table are **defaults that go stale**, and two failure modes follow from
+that: a ref that no longer exists (the `1.0.0` this table carried for AWS S3 Bucket never
+existed in the repo — `git clone --branch` simply fails), and a ref that predates the package
+model, handing you a legacy implementation with no `Dockerfile` and terraform without a
+`package` block.
+
+So resolve the latest release at the moment of use rather than trusting the table:
+
+```bash
+REF=$(git ls-remote --tags https://github.com/nullplatform/$REPO \
+      | awk '{print $2}' | sed 's|refs/tags/||' | grep -v '\^{}' | sort -V | tail -1)
+```
+
+Then confirm that ref carries the packaged structure, because a release can be older than the
+model and a tag can point at a scaffold:
+
+```bash
+curl -sf "https://raw.githubusercontent.com/nullplatform/$REPO/$REF/Dockerfile" \
+  | grep -q "worker-bridge" && echo packaged || echo "NOT packaged — use the default branch"
+```
+
+Known at the time of writing: `services-s-3` is packaged from `v0.3.0` on;
+`services-postgresql-k-8-s` from `v1.0.2` on; `services-blob-storage` from `v0.1.0` on — its
+`0.0.1` tag still points at a pre-service scaffold.
+
+**The GitHub organization is always `nullplatform`.**
 
 #### 4. Requirements module paths are NOT derivable
 

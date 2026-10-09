@@ -231,13 +231,14 @@ organization_slug   = ""
 domain_name         = ""
 private_domain_name = ""
 tags_selectors = {
-  "environment" = "development"
+  "owner"       = "nullplatform",
+  "environment" = "poc"
 }
 ```
 
-3. Ask the user for the empty ones with AskUserQuestion. **Ask — do not fill any of them in from
-   the environment or from the account slug.** For the two domains, offer the convention as a
-   default the user confirms or replaces:
+3. Ask the user for the empty strings with AskUserQuestion (`tags_selectors` goes in step 4).
+   **Ask — do not fill any of them in from the environment or from the account slug.** For the
+   two domains, offer the convention as a default the user confirms or replaces:
 
 > `nrn` — Resource NRN, e.g. `organization=123:account=456`
 >
@@ -253,7 +254,39 @@ tags_selectors = {
 > as `domain_name` (split horizon), and on Azure it has to sit inside the public zone. If the setup
 > has no internal gateway, say so and leave it empty rather than inventing a value.
 
-4. Update the file with the values the user provides
+4. Ask for `tags_selectors` with AskUserQuestion, in this order:
+
+   - **Question:** "Use the default tags selectors?"
+   - **Option 1 — `New tags (Recommended)`:** description "Write your own tags as `key = value`
+     pairs separated by commas, e.g. `environment = dev, owner = my-client, my-tag = value`"
+   - **Option 2 — `Default tags`:** description "`owner = nullplatform, environment = poc`"
+
+   On **Default tags**, keep the generated map. On **New tags**, ask for the list as a free-text
+   question in the chat and wait for the answer:
+
+> Write the tags as `key = value` pairs, separated by commas. For example:
+>
+> `environment = dev, owner = my-client, my-tag = value`
+
+   If the user already typed the pairs in the "Other" field of the question, use that answer and
+   do not ask again. Parse the answer:
+   - Split on commas, then each pair on its first `=`. Trim the spaces around keys and values.
+   - Every pair needs a key and a value, and no key can repeat. A value cannot contain a comma
+     (it is the separator). If a pair fails, say which one and why, and ask again.
+   - At least one tag. An empty answer is not "no tags": ask again.
+
+   The new tags **replace** the defaults; they are not added to them. Show the resulting map and
+   confirm it before writing. The example answer becomes:
+
+```hcl
+tags_selectors = {
+  "environment" = "dev"
+  "owner"       = "my-client"
+  "my-tag"      = "value"
+}
+```
+
+5. Update the file with the values the user provides
 
 | Variable | Default | Notes |
 |----------|---------|-------|
@@ -262,7 +295,7 @@ tags_selectors = {
 | `organization_slug` | Empty | **Ask.** Never infer it from the only org the caller can see |
 | `domain_name` | Empty | **Ask**, offering `{account_slug}.nullapps.io` as a default to confirm |
 | `private_domain_name` | Empty | **Ask.** Cloud-dependent — check the cloud's reference first |
-| `tags_selectors` | `{ "environment" = "development" }` | Reasonable default, user can change it |
+| `tags_selectors` | `{ "owner" = "nullplatform", "environment" = "poc" }` | **Ask** with AskUserQuestion: new tags (recommended, free text) or the defaults |
 
 > **Both domains are read by all three layers**, which is why they live here. And the values must
 > exist before `/np-infrastructure-wizard` runs: its DNS step and its `cert_manager` wiring both

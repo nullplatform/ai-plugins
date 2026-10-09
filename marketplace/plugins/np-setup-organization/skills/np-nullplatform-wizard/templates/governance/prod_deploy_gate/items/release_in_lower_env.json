@@ -1,0 +1,22 @@
+{
+  "id": "release_in_lower_env",
+  "type": "external",
+  "behavior": "gate",
+  "severity": "critical",
+  "title": "Release running in lower environments",
+  "description": "The release being deployed to production (or another release of the same build) has to be the one running in every lower environment of the application. Deploy it there first, then retry.\n",
+  "applies_when": { "scope.dimensions.environment": "production" },
+  "external": {
+    "kind": "poc-release-in-lower-env",
+    "trigger": "auto",
+    "timeout_seconds": 300,
+    "inputs": {
+      "dimension": "environment",
+      "required_values": "development,staging",
+      "application_id": "{{ context.application.id }}",
+      "release_id": "{{ context.release.id }}",
+      "build_id": "{{ context.build.id }}",
+      "scope_id": "{{ context.scope.id }}"
+    }
+  }
+}

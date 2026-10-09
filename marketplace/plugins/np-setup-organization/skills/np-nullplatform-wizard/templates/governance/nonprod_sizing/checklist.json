@@ -1,0 +1,56 @@
+{
+  "items": [
+    {
+      "id": "autoscaling_disabled",
+      "type": "condition",
+      "behavior": "gate",
+      "severity": "major",
+      "title": "Autoscaling deshabilitado",
+      "description": "En ambientes no productivos el scope tiene que usar instancias fijas (scaling_type = fixed).\nEn scope:create se evalua el scope pedido; en scope:write, el valor pedido (requested) y si no viene, el actual (scope).\n",
+      "query": {
+        "$or": [
+          { "requested.capabilities.scaling_type": "fixed" },
+          { "requested.capabilities.scaling_type": { "$exists": false }, "scope.capabilities.scaling_type": "fixed" }
+        ]
+      }
+    },
+    {
+      "id": "memory_max_128",
+      "type": "condition",
+      "behavior": "gate",
+      "severity": "major",
+      "title": "Memoria de 128 MB como maximo",
+      "description": "La memoria pedida (ram_memory) y el limite (ram_memory_limit, si esta seteado) no pueden superar 128 MB.\n",
+      "query": {
+        "$and": [
+          {
+            "$or": [
+              { "requested.capabilities.ram_memory": { "$lte": 128 } },
+              { "requested.capabilities.ram_memory": { "$exists": false }, "scope.capabilities.ram_memory": { "$lte": 128 } }
+            ]
+          },
+          {
+            "$or": [
+              { "requested.capabilities.ram_memory_limit": { "$exists": true, "$not": { "$gt": 128 } } },
+              { "requested.capabilities.ram_memory_limit": { "$exists": false }, "scope.capabilities.ram_memory_limit": { "$not": { "$gt": 128 } } }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "max_one_instance",
+      "type": "condition",
+      "behavior": "gate",
+      "severity": "major",
+      "title": "Una instancia como maximo",
+      "description": "En ambientes no productivos el scope corre con una sola instancia (fixed_instances <= 1).\n",
+      "query": {
+        "$or": [
+          { "requested.capabilities.fixed_instances": { "$lte": 1 } },
+          { "requested.capabilities.fixed_instances": { "$exists": false }, "scope.capabilities.fixed_instances": { "$lte": 1 } }
+        ]
+      }
+    }
+  ]
+}

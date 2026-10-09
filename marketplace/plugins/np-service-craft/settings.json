@@ -12,6 +12,8 @@
       "Skill(np-api:*)",
       "Skill(np-notification-manager)",
       "Skill(np-notification-manager:*)",
+      "Skill(np-package-builder)",
+      "Skill(np-package-builder:*)",
       "Skill(np-rules)",
       "Skill(np-rules:*)",
       "Skill(np-service-craft)",
