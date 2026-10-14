@@ -77,20 +77,6 @@ Tools for developing nullplatform services: design specs, write workflows, regis
 - **np-agent-local-setup** - Set up a local nullplatform controlplane agent for development and testing
 - **np-notification-manager** - Manage notification channels, debug delivery, and resend notifications
 
-### np-setup-organization
-
-Setup a new nullplatform organization: create org, configure cloud provider, provision infrastructure, and troubleshoot.
-
-**Skills included:**
-- **np-organization-create** - Create a new nullplatform organization via the onboarding API
-- **np-setup-orchestrator** - Orchestrate the complete organization configuration end-to-end
-- **np-api** - Explore and query the Nullplatform API
-- **np-cloud-provider-setup** - Configure cloud provider credentials (AWS, Azure, GCP)
-- **np-infrastructure-wizard** - Provision VPC, Kubernetes clusters, ingress, DNS, and deploy the NP agent
-- **np-nullplatform-bindings-wizard** - Connect nullplatform with GitHub, container registries, and cloud providers
-- **np-nullplatform-wizard** - Configure core nullplatform resources: scopes, dimensions, service definitions
-- **np-setup-troubleshooting** - Diagnose failures in scopes, applications, telemetry, and permissions
-
 ## Installation
 
 ### Kiro CLI
@@ -154,8 +140,6 @@ claude plugin install np-workflow-craft@nullplatform
 claude plugin install np-catalog@nullplatform
 # or
 claude plugin install np-service-craft@nullplatform
-# or
-claude plugin install np-setup-organization@nullplatform
 ```
 
 ### Manual Installation
@@ -179,8 +163,6 @@ claude plugin install np-setup-organization@nullplatform
    cp -r marketplace/plugins/np-catalog ~/.claude/plugins/
    # or
    cp -r marketplace/plugins/np-service-craft ~/.claude/plugins/
-   # or
-   cp -r marketplace/plugins/np-setup-organization ~/.claude/plugins/
    ```
 
 3. Restart Claude Code
