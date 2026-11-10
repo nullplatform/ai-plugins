@@ -76,6 +76,37 @@ Tools for developing nullplatform services: design specs, write workflows, regis
 - **np-service-creator** - Register services in Terraform with service_definition modules and agent bindings
 - **np-agent-local-setup** - Set up a local nullplatform controlplane agent for development and testing
 - **np-notification-manager** - Manage notification channels, debug delivery, and resend notifications
+- **np-package-builder** - Build, run, and publish nullplatform packages with the np CLI
+- **np-rules** - Shared rules the service skills follow: infrastructure as code, ask instead of inferring
+
+### np-package-craft
+
+Build, run, and publish nullplatform packages (scope / service / simple) with the np CLI: init, dev, test, build, run (local agent), publish, and artifact release metadata.
+
+**Skills included:**
+- **np-api** - Explore and query the Nullplatform API
+- **np-package-builder** - Build, run, and publish nullplatform packages with the np CLI
+
+### np-communications
+
+Operate Communications through the public API or the CLI: inbox rules (write, validate, dry-run, test, activate), emitting invoked inbox rules from workflows or CI, announcements and banners, and troubleshooting who gets which notification.
+
+**Skills included:**
+- **np-api** - Explore and query the Nullplatform API
+- **np-communications** - Write and test inbox rules, emit notifications from CI or a workflow, publish announcements and banners
+
+### np-knowledge-base
+
+Navigate, curate, and extend the organizational knowledge base built on the nullplatform catalog.
+
+**Skills included:**
+- **np-api** - Explore and query the Nullplatform API
+- **np-workflow** - Build, publish, run, and debug workflows on the Nullplatform workflow engine
+- **np-catalog** - Build and query the nullplatform catalog: specifications, entities, relations, and knowledge-base ingestion
+- **np-kb-navigate** - Answer questions from the knowledge base, with provenance
+- **np-kb-curate** - Keep the knowledge base healthy: merge duplicates, review suggestions, delete instances safely
+- **np-kb-lore** - Register and consult cross-cutting norms, knowledge, and investigation instructions
+- **np-kb-extend** - Plug an external source into the knowledge base and launch re-analyses
 
 ## Installation
 
@@ -140,6 +171,12 @@ claude plugin install np-workflow-craft@nullplatform
 claude plugin install np-catalog@nullplatform
 # or
 claude plugin install np-service-craft@nullplatform
+# or
+claude plugin install np-package-craft@nullplatform
+# or
+claude plugin install np-communications@nullplatform
+# or
+claude plugin install np-knowledge-base@nullplatform
 ```
 
 ### Manual Installation
@@ -163,6 +200,12 @@ claude plugin install np-service-craft@nullplatform
    cp -r marketplace/plugins/np-catalog ~/.claude/plugins/
    # or
    cp -r marketplace/plugins/np-service-craft ~/.claude/plugins/
+   # or
+   cp -r marketplace/plugins/np-package-craft ~/.claude/plugins/
+   # or
+   cp -r marketplace/plugins/np-communications ~/.claude/plugins/
+   # or
+   cp -r marketplace/plugins/np-knowledge-base ~/.claude/plugins/
    ```
 
 3. Restart Claude Code

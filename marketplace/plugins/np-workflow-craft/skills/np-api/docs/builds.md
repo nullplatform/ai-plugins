@@ -33,7 +33,7 @@ Gets details of a build.
 
 ### Example
 ```bash
-np-api fetch-api "/build/1524929544"
+np-api fetch-api "/build/12345"
 ```
 
 ### Notes
@@ -62,8 +62,8 @@ Lists builds of an application.
 
 ### Example
 ```bash
-np-api fetch-api "/build?application_id=489238271&limit=50"
-np-api fetch-api "/build?application_id=489238271&status=failed&limit=50"
+np-api fetch-api "/build?application_id=4&limit=50"
+np-api fetch-api "/build?application_id=4&status=failed&limit=50"
 ```
 
 ---
@@ -94,7 +94,7 @@ Gets details of a release.
 
 ### Example
 ```bash
-np-api fetch-api "/release/258479089"
+np-api fetch-api "/release/12346"
 ```
 
 ---
@@ -109,7 +109,7 @@ Lists releases of an application.
 
 ### Example
 ```bash
-np-api fetch-api "/release?application_id=489238271&limit=50"
+np-api fetch-api "/release?application_id=4&limit=50"
 ```
 
 ---
@@ -134,7 +134,7 @@ Gets details of an asset (container image).
 
 ### Example
 ```bash
-np-api fetch-api "/asset/668494956"
+np-api fetch-api "/asset/12347"
 ```
 
 ---
@@ -148,5 +148,5 @@ Lists assets of a build.
 
 ### Example
 ```bash
-np-api fetch-api "/asset?build_id=1524929544"
+np-api fetch-api "/asset?build_id=12345"
 ```

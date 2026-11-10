@@ -248,7 +248,7 @@ ORDER BY services_created DESC
 SELECT entity, method, status, date, user_email
 FROM audit_events
 WHERE date >= now() - INTERVAL 7 DAY
-  AND affected_nrn LIKE 'organization=4:account=17:namespace=507252312:application=1798062750%'
+  AND affected_nrn LIKE 'organization=123:account=456:namespace=789:application=012%'
 ORDER BY date DESC LIMIT 100
 ```
 

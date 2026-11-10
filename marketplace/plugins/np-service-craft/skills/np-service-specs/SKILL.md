@@ -13,6 +13,7 @@ Conventions for service specification files: service-spec.json.tpl, link specs, 
 2. **`visible_to` is IGNORED** in the template JSON — visibility is controlled via the `nrn` parameter in the terraform module.
 3. **Link specs follow the same rule** — schema in `attributes.schema`, not `specification_schema`.
 4. **VALUES is a FILE PATH** — scripts read values.yaml via `yaml_value()`, not jq.
+5. **ALWAYS fill `name`, `slug` and `selectors` (`category`, `sub_category`, `provider`)** in `service-spec.json.tpl`, and give links the same `selectors`. They are what the nullplatform catalog and the docs Sample services page show; the docs sync flags a spec without them and keeps its old row. Never leave them empty or with the template's `My Service` / `Other` — ask the user. The slug never changes after the first release: installations and channels select on it.
 
 ## Service Spec Structure
 
@@ -42,6 +43,14 @@ Conventions for service specification files: service-spec.json.tpl, link specs, 
   }
 }
 ```
+
+### The spec does not know who runs it
+
+The same file registers a service in agent mode (packaged image + agent channel) and in CI
+mode (`github` channel dispatching a workflow). `use_default_actions: true` generates the
+action specs in both; `export` fields are written back by `np service action update --results`
+in both. Keep `slug` stable: in CI mode the channel filters on it. Mode decision and
+consequences: `np-service-craft`, `docs/execution-modes.md`.
 
 ## Field Properties
 

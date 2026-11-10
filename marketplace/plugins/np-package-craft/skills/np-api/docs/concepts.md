@@ -151,18 +151,18 @@ organization_id (from JWT)
 ```bash
 # 1. Get organization_id from token (check-auth shows it)
 np-api check-auth
-# Output: Organization ID: 1255165411
+# Output: Organization ID: 1
 
 # 2. List organization accounts
-np-api fetch-api "/account?organization_id=1255165411"
+np-api fetch-api "/account?organization_id=1"
 # Result: accounts with id, name, slug, status, repository_prefix, nrn
 
 # 3. Choose an account and list its namespaces
-np-api fetch-api "/namespace?account_id=95118862&status=active&limit=50"
+np-api fetch-api "/namespace?account_id=2&status=active&limit=50"
 # Result: namespaces with id, name, slug, status, nrn
 
 # 4. Choose a namespace and list its applications
-np-api fetch-api "/application?namespace_id=463208973&status=active&limit=100"
+np-api fetch-api "/application?namespace_id=3&status=active&limit=100"
 # Result: applications with id, name, slug, status, template_id, repository_url, nrn
 ```
 

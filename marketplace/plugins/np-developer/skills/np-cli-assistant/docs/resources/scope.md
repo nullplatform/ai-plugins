@@ -65,7 +65,7 @@ Create and manage scopes, scope domains, scope dimensions, scope types, scope ac
 | `--id` | int | The ID of the scope (required) |
 | `--body` | string | JSON body or file path (required). Patchable fields include: `name`, `capabilities`, `specification` (replicas, resources), `asset_name` |
 
-> **Example:** `np scope patch --id 415005828 --body '{"capabilities": {"auto_scaling": {"instances": {"min_amount": 2, "max_amount": 5}}}}'`
+> **Example:** `np scope patch --id 5 --body '{"capabilities": {"auto_scaling": {"instances": {"min_amount": 2, "max_amount": 5}}}}'`
 
 ### `np scope delete`
 

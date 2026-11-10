@@ -17,7 +17,7 @@ Two kinds of shared file, in two directories:
 | File | Consumers | Purpose |
 |------|-----------|---------|
 | `rules/iac-rule.md` | `np-infrastructure-wizard`, `np-setup-orchestrator`, `np-nullplatform-wizard`, `np-nullplatform-bindings-wizard`, `np-scope-craft`, `np-service-craft`, `np-service-creator` | "Infrastructure changes only via IaC" — forbids cloud / TF-modeled entity mutation outside of Terraform code; lists allowed read-only operations; defines the carve-out for workflow-managed entities (scopes, deployments, parameters, etc.). |
-| `references/scopes-services-catalog.md` | `np-infrastructure-wizard`, `np-nullplatform-wizard`, `np-nullplatform-bindings-wizard` (via `@`); `np-service-guide`, `np-service-craft`, `np-scope-guide`, `np-scope-craft` (read on demand) | Single source of truth for scope/service repos, refs, `service_path`, requirements module paths and IAM selectors. `nullplatform/services` is an index now, so the three setup layers need one catalog they all derive from. |
+| `references/scopes-services-catalog.md` | `np-infrastructure-wizard`, `np-nullplatform-wizard`, `np-nullplatform-bindings-wizard` (via `@`); `np-service-guide`, `np-service-craft`, `np-scope-guide`, `np-scope-craft` (read on demand) How to read the scope/service **inventory** from the public docs pages (`docs.nullplatform.com/docs/services/sample-services.md` for services, `…/docs/agent-backed-scopes/sample-scopes.md` for scopes), plus the verified **wiring data** (`service_path`, requirements module paths, IAM selectors) the three setup layers derive from. Refs are resolved at use, not stored. |
 
 ## How to consume a shared file from another skill
 

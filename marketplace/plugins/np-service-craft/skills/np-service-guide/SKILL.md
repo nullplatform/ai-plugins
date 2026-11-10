@@ -5,7 +5,7 @@ description: Use when the user asks about creating, understanding, or working wi
 
 # Nullplatform Service Development Guide
 
-Entry point for developing nullplatform services. A **service** is a cloud resource (database, cache, storage, messaging, etc.) that is provisioned via terraform and connected to applications via links.
+Entry point for developing nullplatform services. A **service** is a cloud resource (database, cache, storage, messaging, etc.) that is provisioned via terraform and connected to applications via links. Its actions are run either by a nullplatform **agent** (worker from a packaged image) or by the client's **CI** (a GitHub Actions workflow dispatched through a `github` notification channel) — the service code is the same in both; see `np-service-craft`, `docs/execution-modes.md`.
 
 ## Critical Rules
 
@@ -17,27 +17,19 @@ Entry point for developing nullplatform services. A **service** is a cloud resou
 
 ## Reference Repositories
 
-`https://github.com/nullplatform/services` is an **index**, not code. Each base service lives in its
-own repo with independent versioning. Cloning the index yields no implementations.
-
-Resolve which repo a service lives in — with its release ref and `service_path` — from the catalog:
-`${CLAUDE_PLUGIN_ROOT}/skills/np-rules/references/scopes-services-catalog.md`
-
-Then clone that repo at its ref:
+Each sample service lives in its own repo with independent versioning. **Choose from the docs
+table, not by crawling repos**: the **Samples** table of the docs' Sample services page already
+gives, per service, its name (with its platform), slug, category and `repo/path` (read it as the catalog explains:
+`${CLAUDE_PLUGIN_ROOT}/skills/np-rules/references/scopes-services-catalog.md`). Then clone only the repo that was picked:
 
 ```bash
-# <repo> and <ref> come from the catalog (e.g. services-rds / 1.0.0)
-git clone --branch <ref> https://github.com/nullplatform/<repo>.git /tmp/np-<repo>-reference 2>/dev/null \
-  || (cd /tmp/np-<repo>-reference && git fetch origin <ref> && git checkout <ref>)
-
-# List the services this repo implements (searches by service-spec.json.tpl)
-find /tmp/np-<repo>-reference -name "service-spec.json.tpl" -not -path "*/.git/*" | \
-  xargs -I{} sh -c 'echo "---"; dirname {} | sed "s|/tmp/np-<repo>-reference/||"; jq "{name, slug, selectors}" {}'
+# <repo> and <path> from the table row; <tag> resolved per the catalog (notes 3–3a)
+git clone --depth 1 --branch <tag> https://github.com/nullplatform/<repo>.git /tmp/np-<repo>-reference
+ls /tmp/np-<repo>-reference/<path>/specs      # path "." = specs at the repo root
 ```
 
-> Refs are release **branches** in most repos (migrating to tags), so `--branch <ref>` works for both.
-> One repo can hold more than one service: `services-rds` implements both the Postgres server and the
-> database.
+> A repo can hold more than one service (`services-postgresql-rds` has the server and the
+> database): the table lists each one as its own row with its own path.
 
 Do not hardcode the repo structure — always explore dynamically because it can change.
 
@@ -46,11 +38,12 @@ Do not hardcode the repo structure — always explore dynamically because it can
 | Task | Skill |
 |------|-------|
 | Create/list/register/test services (full cycle) | `np-service-craft` |
+| Register or test a service run by GitHub Actions (CI mode) | `np-service-craft` (`register-service-ci.md`) + `np-notification-manager` (github channel) |
 | Conventions for service-spec.json.tpl, link specs, values.yaml | `np-service-specs` |
 | Conventions for YAML workflows, build_context, do_tofu, entrypoints | `np-service-workflows` |
 | Terraform registration (service_definition, bindings) | `np-service-creator` |
-| Local agent setup for testing | `np-agent-local-setup` |
-| Notification channel management | `np-notification-manager` |
+| Local agent setup for testing (agent mode only) | `np-agent-local-setup` |
+| Notification channel management, github channels | `np-notification-manager` |
 | Nullplatform API queries | `np-api` |
 
 ## Service Philosophy
@@ -99,7 +92,7 @@ services/<service-name>/
 |   +-- write_link_outputs          # (optional) Writes credentials post-link
 |   +-- build_permissions_context   # (optional) Context for permissions module
 +-- entrypoint/
-|   +-- entrypoint                  # Main router (bridges NP_API_KEY)
+|   +-- entrypoint                  # Main router (bridges NP_API_KEY; no-op in CI mode)
 |   +-- service                     # Service action handler
 |   +-- link                        # Link action handler
 +-- values.yaml                     # Static config (region, profiles, etc)
@@ -108,6 +101,10 @@ services/<service-name>/
 ## Decision Tree: What Type of Service
 
 ```
+Who runs the actions? ──Agent──> image + package + agent channel  (np-package-builder, np-agent-local-setup)
+  │                    ──CI────> client workflow + github channel (np-notification-manager, register-service-ci.md)
+  │   (look at /controlplane/agent and the NRN's channels before asking)
+  ▼
 Has terraform provider? ──Yes──> Terraform-based service
   │                                (deployment/ with main.tf)
   No

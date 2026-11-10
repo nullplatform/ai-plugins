@@ -38,7 +38,7 @@ Gets details of a service.
 
 ### Example
 ```bash
-np-api fetch-api "/service/ef3baa4e-6144-457e-8812-280976eab7f3"
+np-api fetch-api "/service/00000032-0000-4000-8000-000000000000"
 ```
 
 ### Notes
@@ -74,10 +74,10 @@ Lists services by NRN.
 ### Example
 ```bash
 # All services of an organization
-np-api fetch-api "/service?nrn=organization%3D1255165411:account%3D*&limit=1500"
+np-api fetch-api "/service?nrn=organization%3D1:account%3D*&limit=1500"
 
 # Services of a specific account
-np-api fetch-api "/service?nrn=organization%3D1255165411:account%3D95118862"
+np-api fetch-api "/service?nrn=organization%3D1:account%3D2"
 ```
 
 ### GOTCHA: Do not use application_id as query param
@@ -157,7 +157,7 @@ POST /service/{id}/action
 ### Example
 ```bash
 # List all actions of a service
-np-api fetch-api "/service/ef3baa4e-6144-457e-8812-280976eab7f3/action?limit=200"
+np-api fetch-api "/service/00000032-0000-4000-8000-000000000000/action?limit=200"
 ```
 
 ### Notes
@@ -195,7 +195,7 @@ Gets details of a specific action.
 
 ### Example
 ```bash
-np-api fetch-api "/service/ef3baa4e/action/a031f992?include_messages=true"
+np-api fetch-api "/service/00000032-0000-4000-8000-000000000000/action/00000035-0000-4000-8000-000000000000?include_messages=true"
 ```
 
 ### Notes
@@ -279,7 +279,7 @@ Gets the template/blueprint of a service.
 
 ### Example
 ```bash
-np-api fetch-api "/service_specification/529d8786-4af4-4625-87de-664ad7c9ef5f?application_id=2052735708"
+np-api fetch-api "/service_specification/00000011-0000-4000-8000-000000000000?application_id=4"
 ```
 
 ### Notes
@@ -321,7 +321,7 @@ Lists link specifications associated with a service specification.
 
 ### Example
 ```bash
-np-api fetch-api "/service_specification/529d8786-4af4-4625-87de-664ad7c9ef5f/link_specification"
+np-api fetch-api "/service_specification/00000011-0000-4000-8000-000000000000/link_specification"
 ```
 
 ### Notes
@@ -364,7 +364,7 @@ Lists action specifications of a service specification (available action templat
 
 ### Example
 ```bash
-np-api fetch-api "/service_specification/f7248a07-909f-4241-b2c7-616d2403bf54/action_specification"
+np-api fetch-api "/service_specification/00000033-0000-4000-8000-000000000000/action_specification"
 ```
 
 ### Notes
@@ -390,8 +390,8 @@ Lists links (service → application connections) filtered by NRN.
   "results": [
     {
       "id": "uuid",
-      "name": "lnk fees",
-      "slug": "lnk-fees",
+      "name": "lnk orders",
+      "slug": "lnk-orders",
       "status": "active | pending | creating | failed",
       "service_id": "uuid-of-linked-service",
       "entity_nrn": "organization=...:application=...",
@@ -453,7 +453,7 @@ Gets detail of a specific link.
 
 ### Example
 ```bash
-np-api fetch-api "/link/9ba2dfe6-b5db-484a-9804-01718199575a"
+np-api fetch-api "/link/00000028-0000-4000-8000-000000000000"
 ```
 
 ### Notes
@@ -494,7 +494,7 @@ Lists actions executed on a link (create, update, delete).
 
 ### Example
 ```bash
-np-api fetch-api "/link/9ba2dfe6-b5db-484a-9804-01718199575a/action"
+np-api fetch-api "/link/00000028-0000-4000-8000-000000000000/action"
 ```
 
 ### POST (create action) - via np-developer-actions
@@ -598,21 +598,21 @@ This allows matching: given a service with `specification_id = X`, search for th
 
 | Name | ID | Service Spec ID | use_default_actions | status in POST |
 | --- | --- | --- | --- | --- |
-| Link SQS Queue | `99396bf5-2200-415d-b79a-d04f9a5dddad` | `529d8786-...` (SQS Queue) | false | `"active"` |
-| Link PostgreSQL | `581ef5b7-6993-47d7-b78b-36be0386cdf2` | `670da122-...` | false | `"active"` |
-| database-user | `96472045-b509-46c4-96fa-51fc654d6737` | `11063f69-...` (Postgres) | **true** | don't send |
-| Link Redis | `66919464-05e6-4d78-bb8c-902c57881ddd` | `4a4f6955-...` | false | `"active"` |
-| Link DynamoDB | `6b14b24d-ba3c-4fca-951c-472b318e278e` | `64df74c2-...` | false | `"active"` |
-| Link Pubsub Queue | `43c560d2-0aa9-4f6e-a0be-e3192b0fba90` | `b836752e-...` | false | `"active"` |
-| Link SQS Agent | `fa9f75e3-d1b9-40f0-a029-ebf78769632d` | `271c090e-...` | false | `"active"` |
-| MySQL | `32e7a096-9343-44d0-ac75-69891096365a` | `e541df6a-...` | false | `"active"` |
-| Serverless Valkey Link | `7ccfd202-9e85-49c4-a015-3acce157772a` | `5184c8ca-...` | false | `"active"` |
-| Read Access | `8dab5557-f933-43e3-827c-607ef3cf935f` | `8e778953-...` | **true** | don't send |
-| Link cache | `968976be-bfcb-4bba-9d23-2c7fa31698c5` | `8e778953-...` | **true** | don't send |
+| Link SQS Queue | `00000027-0000-4000-8000-000000000000` | `00000011-...` (SQS Queue) | false | `"active"` |
+| Link PostgreSQL | `00000012-0000-4000-8000-000000000000` | `00000016-...` | false | `"active"` |
+| database-user | `00000025-0000-4000-8000-000000000000` | `00000001-...` (Postgres) | **true** | don't send |
+| Link Redis | `00000015-0000-4000-8000-000000000000` | `00000009-...` | false | `"active"` |
+| Link DynamoDB | `00000017-0000-4000-8000-000000000000` | `00000014-...` | false | `"active"` |
+| Link Pubsub Queue | `00000007-0000-4000-8000-000000000000` | `00000029-...` | false | `"active"` |
+| Link SQS Agent | `00000034-0000-4000-8000-000000000000` | `00000003-...` | false | `"active"` |
+| MySQL | `00000005-0000-4000-8000-000000000000` | `00000030-...` | false | `"active"` |
+| Serverless Valkey Link | `00000020-0000-4000-8000-000000000000` | `00000010-...` | false | `"active"` |
+| Read Access | `00000022-0000-4000-8000-000000000000` | `00000023-...` | **true** | don't send |
+| Link cache | `00000026-0000-4000-8000-000000000000` | `00000023-...` | **true** | don't send |
 
 ### Example
 ```bash
-np-api fetch-api "/link_specification?nrn=organization%3D1255165411%3Aaccount%3D95118862"
+np-api fetch-api "/link_specification?nrn=organization%3D1%3Aaccount%3D2"
 ```
 
 ### Notes
@@ -655,7 +655,7 @@ Lists action specifications of a link specification. Only exist for link specifi
 
 ### Example
 ```bash
-np-api fetch-api "/link_specification/96472045-b509-46c4-96fa-51fc654d6737/action_specification"
+np-api fetch-api "/link_specification/00000025-0000-4000-8000-000000000000/action_specification"
 ```
 
 ### Notes

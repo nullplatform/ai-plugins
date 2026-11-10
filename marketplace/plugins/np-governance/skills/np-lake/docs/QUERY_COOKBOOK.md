@@ -449,7 +449,7 @@ Use the pre-extracted `affected_nrn` column (faster than parsing JSON):
 SELECT entity, method, status, date, user_email
 FROM audit_events
 WHERE date >= now() - INTERVAL 7 DAY
-  AND affected_nrn LIKE 'organization=4:account=17:namespace=507252312:application=1798062750%'
+  AND affected_nrn LIKE 'organization=123:account=456:namespace=789:application=012%'
 ORDER BY date DESC LIMIT 100
 ```
 
@@ -489,7 +489,7 @@ LIMIT 10
 The user ID is embedded in the JWT token's `cognito:groups` claim:
 
 ```
-@nullplatform/user=515129179
+@nullplatform/user=12345
 ```
 
 Use this ID to filter `created_by` or `updated_by` columns.

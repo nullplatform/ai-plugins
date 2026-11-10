@@ -139,7 +139,7 @@ np-api fetch-api "/metadata/metadata_specification?entity=application&nrn=<names
 ```
 
 Donde `namespace_nrn_url_encoded` es el NRN del namespace con `=` → `%3D` y `:` → `%3A`.
-Ejemplo: `organization%3D1255165411%3Aaccount%3D95118862%3Anamespace%3D463208973`
+Ejemplo: `organization%3D1%3Aaccount%3D2%3Anamespace%3D3`
 
 La respuesta contiene un JSON Schema en `results[].schema` con:
 - `required`: campos obligatorios
@@ -194,8 +194,8 @@ https://github.com/<git_org>/<namespace_slug>-<app_slug>
 ```
 
 Donde:
-- `git_org`: la organizacion de GitHub configurada en la cuenta (ej: `kwik-e-mart`)
-- `namespace_slug`: slug del namespace (ej: `nullplatform-demos`)
+- `git_org`: la organizacion de GitHub configurada en la cuenta (ej: `acme`)
+- `namespace_slug`: slug del namespace (ej: `demos`)
 - `app_slug`: slug generado del nombre de la app (ej: `test-app-discovery`)
 
 El usuario puede elegir entre:
@@ -221,9 +221,9 @@ El usuario no necesita ver la request, solo entender que se va a hacer.
 Ejemplo de confirmacion:
 
 > Voy a crear la aplicacion **orders-api** con estos datos:
-> - **Namespace**: Nullplatform Demos
+> - **Namespace**: Demos
 > - **Template**: Next.JS Build Coverage & Vulnerabilities scan
-> - **Repositorio**: https://github.com/kwik-e-mart/nullplatform-demos-orders-api
+> - **Repositorio**: https://github.com/acme/demos-orders-api
 > - **Business Unit**: OnBoarding
 > - **PCI**: No
 > - **SLO**: Critical
@@ -339,9 +339,9 @@ git push
 ```json
 {
   "name": "My New Api",
-  "namespace_id": 463208973,
+  "namespace_id": 3,
   "template_id": 1220542475,
-  "repository_url": "https://github.com/kwik-e-mart/nullplatform-demos-my-new-api",
+  "repository_url": "https://github.com/acme/demos-my-new-api",
   "metadata": {
     "application": {
       "businessUnit": "Payments",
@@ -389,9 +389,9 @@ git push
 ```bash
 action-api.sh exec-api --method POST --data '{
   "name": "Test App Discovery",
-  "namespace_id": 463208973,
+  "namespace_id": 3,
   "template_id": 1220542475,
-  "repository_url": "https://github.com/kwik-e-mart/nullplatform-demos-test-app-discovery",
+  "repository_url": "https://github.com/acme/demos-test-app-discovery",
   "metadata": {
     "application": {
       "businessUnit": "Money Market",

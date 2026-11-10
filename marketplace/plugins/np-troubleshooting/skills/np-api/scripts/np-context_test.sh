@@ -2,9 +2,9 @@
 # Tests for np-context.sh (project context from .np/ and application discovery).
 #
 # Network is replaced by NP_CONTEXT_FETCH, a fake fetch script that answers from
-# fixtures. Live check (manual): create a temp git repo with
-#   git remote add origin https://github.com/nullplatform/frontend-ui-plugins
-# and run `np-context.sh discover` — expect match = 1449966796 (ui-plugins).
+# fixtures. Live check (manual): create a temp git repo whose origin is the
+# repository of one of your applications and run `np-context.sh discover` —
+# expect match = that application's id.
 set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 S="${SCRIPT_DIR}/np-context.sh"
@@ -33,17 +33,17 @@ assert_eq "path case kept"     "https://gitlab.acme.io/Team/My-Repo" "$("$S" rem
 assert_exit "empty input" 2 "$S" remote-url ''
 
 echo "parse-link"
-LINK='https://acme.app.nullplatform.io/account/17/namespace/483721746/application/1449966796'
+LINK='https://acme.app.nullplatform.io/account/2/namespace/3/application/4'
 assert_eq "plain link" \
-  '{"base_url":"https://acme.app.nullplatform.io","account_id":"17","namespace_id":"483721746","application_id":"1449966796"}' \
+  '{"base_url":"https://acme.app.nullplatform.io","account_id":"2","namespace_id":"3","application_id":"4"}' \
   "$("$S" parse-link "$LINK" | jq -c .)"
 assert_eq "link with trailing route" \
-  '{"base_url":"https://acme.app.nullplatform.io","account_id":"17","namespace_id":"483721746","application_id":"1449966796"}' \
+  '{"base_url":"https://acme.app.nullplatform.io","account_id":"2","namespace_id":"3","application_id":"4"}' \
   "$("$S" parse-link "$LINK/scopes/123/deployments?x=1" | jq -c .)"
 assert_eq "custom console host accepted" "3" \
   "$("$S" parse-link 'https://console.acme.com/account/1/namespace/2/application/3' | jq -r .application_id)"
 assert_exit "wrong path order" 2 "$S" parse-link 'https://acme.app.nullplatform.io/namespace/2/account/1/application/3'
-assert_exit "no app in path" 2 "$S" parse-link 'https://acme.app.nullplatform.io/account/17/namespace/483721746'
+assert_exit "no app in path" 2 "$S" parse-link 'https://acme.app.nullplatform.io/account/2/namespace/3'
 assert_exit "garbage"      2 "$S" parse-link 'not a link'
 
 echo "load"
@@ -63,16 +63,16 @@ FAKE="$TMP/fake_fetch.sh"
 cat > "$FAKE" <<'EOF'
 #!/bin/bash
 case "$1" in
-  /application/1449966796)
-    echo '{"id":1449966796,"name":"ui-plugins","slug":"ui-plugins","status":"active","nrn":"organization=4:account=17:namespace=483721746:application=1449966796","repository_url":"https://github.com/nullplatform/frontend-ui-plugins","is_mono_repo":false,"repository_app_path":null,"namespace_id":483721746}' ;;
+  /application/4)
+    echo '{"id":4,"name":"storefront","slug":"storefront","status":"active","nrn":"organization=1:account=2:namespace=3:application=4","repository_url":"https://github.com/acme/storefront","is_mono_repo":false,"repository_app_path":null,"namespace_id":3}' ;;
   /application/222)
-    echo '{"id":222,"name":"api","slug":"api","status":"active","nrn":"organization=4:account=17:namespace=99:application=222","repository_url":"https://github.com/acme/mono","is_mono_repo":true,"repository_app_path":"services/api","namespace_id":99}' ;;
+    echo '{"id":222,"name":"api","slug":"api","status":"active","nrn":"organization=1:account=2:namespace=99:application=222","repository_url":"https://github.com/acme/mono","is_mono_repo":true,"repository_app_path":"services/api","namespace_id":99}' ;;
   /application/404404)
     echo '{"error":"not found"}'; exit 1 ;;
-  /organization/4)
-    echo '{"id":4,"name":"nullplatform","slug":"nullplatform"}' ;;
-  "/application?repository_url=https%3A%2F%2Fgithub.com%2Fnullplatform%2Ffrontend-ui-plugins"*)
-    echo '{"paging":{"total":1},"results":[{"id":1449966796,"name":"ui-plugins","slug":"ui-plugins","namespace_id":483721746,"is_mono_repo":false,"repository_app_path":null}]}' ;;
+  /organization/1)
+    echo '{"id":1,"name":"Example","slug":"example"}' ;;
+  "/application?repository_url=https%3A%2F%2Fgithub.com%2Facme%2Fstorefront"*)
+    echo '{"paging":{"total":1},"results":[{"id":4,"name":"storefront","slug":"storefront","namespace_id":3,"is_mono_repo":false,"repository_app_path":null}]}' ;;
   "/application?repository_url=https%3A%2F%2Fgithub.com%2Facme%2Fmono"*)
     echo '{"paging":{"total":2},"results":[{"id":222,"name":"api","slug":"api","namespace_id":99,"is_mono_repo":true,"repository_app_path":"services/api"},{"id":333,"name":"web","slug":"web","namespace_id":99,"is_mono_repo":true,"repository_app_path":"apps/web"}]}' ;;
   "/application?repository_url=https%3A%2F%2Fgithub.com%2Fdotgit%2Frepo.git"*)
@@ -87,8 +87,8 @@ export NP_CONTEXT_FETCH="$FAKE"
 
 echo "discover"
 assert_eq "single match" \
-  '{"canonical_url":"https://github.com/nullplatform/frontend-ui-plugins","candidates":[{"id":1449966796,"name":"ui-plugins","slug":"ui-plugins","namespace_id":483721746,"is_mono_repo":false,"repository_app_path":null}],"match":1449966796}' \
-  "$("$S" discover --remote 'git@github.com:nullplatform/frontend-ui-plugins.git' | jq -c .)"
+  '{"canonical_url":"https://github.com/acme/storefront","candidates":[{"id":4,"name":"storefront","slug":"storefront","namespace_id":3,"is_mono_repo":false,"repository_app_path":null}],"match":4}' \
+  "$("$S" discover --remote 'git@github.com:acme/storefront.git' | jq -c .)"
 assert_eq "monorepo resolved by path" "222" \
   "$("$S" discover --remote 'https://github.com/acme/mono' --path 'services/api/' | jq -r .match)"
 assert_eq "monorepo ambiguous without path" "null" \
@@ -102,32 +102,32 @@ assert_eq "retries with .git suffix" "555" \
 
 echo "match-app"
 assert_eq "same repo → match" "true" \
-  "$("$S" match-app 1449966796 --remote 'git@github.com:nullplatform/frontend-ui-plugins.git' | jq -r .match)"
-assert_exit "same repo → exit 0" 0 "$S" match-app 1449966796 --remote 'https://github.com/nullplatform/frontend-ui-plugins'
+  "$("$S" match-app 4 --remote 'git@github.com:acme/storefront.git' | jq -r .match)"
+assert_exit "same repo → exit 0" 0 "$S" match-app 4 --remote 'https://github.com/acme/storefront'
 assert_eq "different repo → no match" "false" \
-  "$("$S" match-app 1449966796 --remote 'https://github.com/acme/other' | jq -r .match)"
-assert_exit "different repo → exit 1" 1 "$S" match-app 1449966796 --remote 'https://github.com/acme/other'
+  "$("$S" match-app 4 --remote 'https://github.com/acme/other' | jq -r .match)"
+assert_exit "different repo → exit 1" 1 "$S" match-app 4 --remote 'https://github.com/acme/other'
 assert_eq "monorepo with matching path → match" "true" \
   "$("$S" match-app 222 --remote 'https://github.com/acme/mono' --path 'services/api' | jq -r .match)"
 assert_eq "monorepo with other path → no match" "false" \
   "$("$S" match-app 222 --remote 'https://github.com/acme/mono' --path 'apps/web' | jq -r .match)"
 assert_exit "unknown app → exit 1" 1 "$S" match-app 404404 --remote 'https://github.com/acme/mono'
-assert_exit "no remote → exit 2" 2 "$S" match-app 1449966796 --remote ''
+assert_exit "no remote → exit 2" 2 "$S" match-app 4 --remote ''
 
 echo "init"
 EXPECTED_APP='version: 1
 repository:
-  name: nullplatform/frontend-ui-plugins
-  url: https://github.com/nullplatform/frontend-ui-plugins
+  name: acme/storefront
+  url: https://github.com/acme/storefront
 nullplatform:
-  base_url: https://nullplatform.app.nullplatform.io
-  account_id: "17"
-  namespace_id: "483721746"
-  application_id: "1449966796"
-  application_slug: ui-plugins'
-assert_eq "init --app derives everything (base_url from org slug)" "$EXPECTED_APP" "$(unset NP_LOGIN_URL; "$S" init --app 1449966796)"
+  base_url: https://example.app.nullplatform.io
+  account_id: "2"
+  namespace_id: "3"
+  application_id: "4"
+  application_slug: storefront'
+assert_eq "init --app derives everything (base_url from org slug)" "$EXPECTED_APP" "$(unset NP_LOGIN_URL; "$S" init --app 4)"
 assert_eq "init --app honours NP_LOGIN_URL" "https://custom.app.nullplatform.io" \
-  "$(NP_LOGIN_URL='https://custom.app.nullplatform.io/' "$S" init --app 1449966796 | awk '/base_url/{print $2}')"
+  "$(NP_LOGIN_URL='https://custom.app.nullplatform.io/' "$S" init --app 4 | awk '/base_url/{print $2}')"
 assert_eq "init --link takes base_url from the link" "https://acme.app.nullplatform.io" \
   "$(unset NP_LOGIN_URL; "$S" init --link "$LINK" | awk '/base_url/{print $2}')"
 assert_eq "init monorepo adds app_path" "services/api" \
@@ -137,9 +137,9 @@ assert_exit "init needs --app or --link" 2 "$S" init
 
 echo "init --write"
 ROOT2="$TMP/proj2"; mkdir -p "$ROOT2"
-( unset NP_LOGIN_URL; "$S" init --app 1449966796 --write --root "$ROOT2" >/dev/null )
+( unset NP_LOGIN_URL; "$S" init --app 4 --write --root "$ROOT2" >/dev/null )
 assert_eq "writes .np/application.yaml" "$EXPECTED_APP" "$(cat "$ROOT2/.np/application.yaml")"
-assert_exit "rewrite identical content is fine" 0 "$S" init --app 1449966796 --write --root "$ROOT2"
+assert_exit "rewrite identical content is fine" 0 "$S" init --app 4 --write --root "$ROOT2"
 assert_exit "refuses to overwrite different content" 4 "$S" init --app 222 --write --root "$ROOT2"
 assert_eq "file untouched after refusal" "$EXPECTED_APP" "$(cat "$ROOT2/.np/application.yaml")"
 assert_exit "--force overwrites" 0 "$S" init --app 222 --write --force --root "$ROOT2"

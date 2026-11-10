@@ -63,7 +63,7 @@ Returns the required fields, types, enums, and descriptions defined by the organ
 ### Example
 ```bash
 # Metadata specification for applications in a namespace
-np-api fetch-api "/metadata/metadata_specification?entity=application&nrn=organization%3D1255165411%3Aaccount%3D95118862%3Anamespace%3D463208973&merge=true"
+np-api fetch-api "/metadata/metadata_specification?entity=application&nrn=organization%3D1%3Aaccount%3D2%3Anamespace%3D3&merge=true"
 ```
 
 ### Catalog Properties in the schema
@@ -140,13 +140,13 @@ Returns `200` with the entity's full metadata after the update.
 ### Example
 ```bash
 # Read application metadata
-np-api fetch-api "/metadata/application/489238271"
+np-api fetch-api "/metadata/application/4"
 
 # Read metadata for multiple entities by ID
 np-api fetch-api "/metadata/application?id=123,456,789"
 
 # Update metadata values (fetch-api is GET-only; PATCH needs a bearer token)
-curl -X PATCH "https://api.nullplatform.com/metadata/application/489238271" \
+curl -X PATCH "https://api.nullplatform.com/metadata/application/4" \
   -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   -d '{"finops":{"compute_cost":700}}'
 ```

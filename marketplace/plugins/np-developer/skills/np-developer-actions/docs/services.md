@@ -214,9 +214,9 @@ Ejemplo completo para SQS Queue:
 # Request 1: Crear servicio
 action-api.sh exec-api --method POST --data '{
   "name": "my-events-queue",
-  "specification_id": "529d8786-4af4-4625-87de-664ad7c9ef5f",
-  "entity_nrn": "organization=1255165411:account=95118862:namespace=463208973:application=2052735708",
-  "linkable_to": ["organization=1255165411:account=95118862:namespace=463208973:application=2052735708"],
+  "specification_id": "00000011-0000-4000-8000-000000000000",
+  "entity_nrn": "organization=1:account=2:namespace=3:application=4",
+  "linkable_to": ["organization=1:account=2:namespace=3:application=4"],
   "dimensions": {},
   "selectors": {"imported": false}
 }' "/service"
@@ -224,7 +224,7 @@ action-api.sh exec-api --method POST --data '{
 # Request 2: Crear action (usando el service_id del response anterior)
 action-api.sh exec-api --method POST --data '{
   "name": "create-my-events-queue",
-  "specification_id": "284c262a-dcf4-4af8-9dca-7c310c57d42b",
+  "specification_id": "00000004-0000-4000-8000-000000000000",
   "parameters": {"fifo": false, "dead_letter": true}
 }' "/service/<service_id>/action"
 ```
@@ -254,15 +254,15 @@ Si la action esta en `failed`, revisar el campo `results` para el mensaje de err
 
 | Nombre | ID | Categoria | Sub-categoria | Provider |
 |--------|----|-----------| --------------|----------|
-| SQS Queue | `529d8786-4af4-4625-87de-664ad7c9ef5f` | Messaging Services | Message Queue | AWS |
-| SQS Agent | `271c090e-aa8f-417a-9eb8-966239a67328` | Messaging Services | Message Queue | AWS |
-| Pubsub | `b836752e-51e2-4176-8093-f3f33aab3e23` | Messaging Services | Message Queue | GCP |
-| Postgres DB | `11063f69-fc35-41f6-8d37-7c0d294d7f9e` | Database | Relational Database | K8S |
-| PostgreSQL | `670da122-2947-411f-82bc-c7ef62ca08c9` | Database | Relational Database | AWS |
-| MySQL | `e541df6a-4676-46e1-81fb-e21c0fa94ad6` | Database | Relational Database | AWS |
-| Redis | `4a4f6955-5ae0-40dc-a1de-e15e5cf41abb` | Database | In-memory Cache | AWS |
-| Serverless Valkey | `5184c8ca-006b-4334-b7c4-14130b30ce38` | Database | In-memory Cache | AWS |
-| DynamoDB | `64df74c2-6967-4cd4-b202-753f61ac1159` | Database | NoSQL Database | AWS |
+| SQS Queue | `00000011-0000-4000-8000-000000000000` | Messaging Services | Message Queue | AWS |
+| SQS Agent | `00000003-0000-4000-8000-000000000000` | Messaging Services | Message Queue | AWS |
+| Pubsub | `00000029-0000-4000-8000-000000000000` | Messaging Services | Message Queue | GCP |
+| Postgres DB | `00000001-0000-4000-8000-000000000000` | Database | Relational Database | K8S |
+| PostgreSQL | `00000016-0000-4000-8000-000000000000` | Database | Relational Database | AWS |
+| MySQL | `00000030-0000-4000-8000-000000000000` | Database | Relational Database | AWS |
+| Redis | `00000009-0000-4000-8000-000000000000` | Database | In-memory Cache | AWS |
+| Serverless Valkey | `00000010-0000-4000-8000-000000000000` | Database | In-memory Cache | AWS |
+| DynamoDB | `00000014-0000-4000-8000-000000000000` | Database | NoSQL Database | AWS |
 
 **IMPORTANTE**: Los IDs pueden variar entre organizaciones. Siempre consultar `/service_specification` para obtener los IDs correctos.
 
@@ -370,7 +370,7 @@ Devuelve el objeto completo de la service specification con los campos actualiza
 
 ### Notas
 
-- **Solo funciona para specs de tu organización**. Specs compartidas con otras organizaciones (ej: `visible_to: ["organization=1255165411", "organization=4"]`) devuelven **403 Forbidden** si intentas modificarlas desde una org que no es la propietaria.
+- **Solo funciona para specs de tu organización**. Specs compartidas con otras organizaciones (ej: `visible_to: ["organization=1", "organization=2"]`) devuelven **403 Forbidden** si intentas modificarlas desde una org que no es la propietaria.
 - Requiere permisos elevados en la API key (grants de service_specification:write o similar).
 - `PUT /service_specification/{id}` **no existe** (devuelve 404). Solo PATCH.
 - Cambiar `visible_to: []` oculta la spec de la UI de "New Service" pero no afecta servicios ya creados con esa spec.
@@ -384,7 +384,7 @@ Modifica un template de aplicación. Permite renombrar templates y cambiar otros
 ### Ejemplo: renombrar un template
 
 ```bash
-action-api.sh exec-api --method PATCH --data '{"name": "Kwiki Bank - Frontend Starter Kit"}' "/template/<template_id>"
+action-api.sh exec-api --method PATCH --data '{"name": "Acme - Frontend Starter Kit"}' "/template/<template_id>"
 ```
 
 ### Respuesta

@@ -7,13 +7,18 @@
 #   manual_approve_item.sh --approval-id <id> --item-id <item_id> \
 #                          --decision <approve|reject> \
 #                          [--message <text>] \
-#                          [--inputs <json>]
+#                          [--inputs <json>] \
+#                          [--reason <text>]
 #
 # Wire contract (the real one — there is NO .../approve endpoint):
 #   PATCH /approval/:id/checklist/items/:itemId
-#   body: { "status": "passed" | "failed", "message"?, "inputs"? }
+#   body: { "status": "passed" | "failed", "message"?, "inputs"?, "reason"? }
 # `approve` maps to status=passed, `reject` to status=failed. The actor is
 # derived server-side from the caller's JWT — it is NOT part of the body.
+#
+# --reason is why the person answers as they do (e.g. when correcting an
+# earlier answer): up to 4 KB in UTF-8, sent only when given. It goes to the
+# answer's `item.answer_recorded` event, never to the item state or message.
 #
 # The item's declared `behavior` (in the snapshotted specification) determines
 # the semantics:
@@ -32,7 +37,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=_lib.sh
 source "${SCRIPT_DIR}/_lib.sh"
 
-APPROVAL_ID=""; ITEM_ID=""; DECISION=""; MESSAGE=""; INPUTS=""
+APPROVAL_ID=""; ITEM_ID=""; DECISION=""; MESSAGE=""; INPUTS=""; REASON=""
 while [[ $# -gt 0 ]]; do
     case $1 in
         --approval-id) APPROVAL_ID="$2"; shift 2 ;;
@@ -43,6 +48,7 @@ while [[ $# -gt 0 ]]; do
         --actor) shift 2 ;;
         --message) MESSAGE="$2"; shift 2 ;;
         --inputs) INPUTS="$2"; shift 2 ;;
+        --reason) REASON="$2"; shift 2 ;;
         *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
 done
@@ -65,8 +71,10 @@ DATA=$(jq -n \
     --arg status "$STATUS" \
     --arg message "$MESSAGE" \
     --argjson inputs "${INPUTS:-null}" \
+    --arg reason "$REASON" \
     '{status: $status}
      | if $message != "" then . + {message: $message} else . end
-     | if $inputs != null then . + {inputs: $inputs} else . end')
+     | if $inputs != null then . + {inputs: $inputs} else . end
+     | if $reason != "" then . + {reason: $reason} else . end')
 
 call_api PATCH "$(approval_path "${APPROVAL_ID}/checklist/items/$(urlencode "$ITEM_ID")")" "$DATA"

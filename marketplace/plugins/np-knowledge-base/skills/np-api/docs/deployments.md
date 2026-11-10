@@ -38,7 +38,7 @@ Gets details of a deployment.
 
 ### Example
 ```bash
-np-api fetch-api "/deployment/1470739357?include_messages=true"
+np-api fetch-api "/deployment/12345?include_messages=true"
 ```
 
 ### Notes
@@ -109,7 +109,7 @@ Gets details of a deployment group (multi-scope deploys).
 
 ### Example
 ```bash
-np-api fetch-api "/deployment_group?id=541542807&application_id=30290074"
+np-api fetch-api "/deployment_group?id=12346&application_id=4"
 ```
 
 ### Notes

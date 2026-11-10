@@ -50,13 +50,13 @@ levels.
 ### Example
 ```bash
 # Read specific values
-np-api fetch-api "/nrn/organization=1255165411:account=95118862?ids=key1,key2"
+np-api fetch-api "/nrn/organization=1:account=2?ids=key1,key2"
 
 # Without inheritance (only this level)
-np-api fetch-api "/nrn/organization=1255165411:account=95118862?ids=key1&no-merge=true"
+np-api fetch-api "/nrn/organization=1:account=2?ids=key1&no-merge=true"
 
 # With profile
-np-api fetch-api "/nrn/organization=1255165411:account=95118862?ids=key1&profile=my-profile"
+np-api fetch-api "/nrn/organization=1:account=2?ids=key1&profile=my-profile"
 ```
 
 ### Inheritance and merge
@@ -85,7 +85,7 @@ Lists available profiles for an NRN.
 
 ### Example
 ```bash
-np-api fetch-api "/nrn/organization=1255165411:account=95118862/available_profiles"
+np-api fetch-api "/nrn/organization=1:account=2/available_profiles"
 ```
 
 ### Notes
@@ -102,10 +102,10 @@ Some endpoints support wildcards to scan levels:
 
 ```bash
 # All org accounts (dimension, service, etc.)
-GET /dimension?nrn=organization%3D1255165411%3Aaccount%3D*
+GET /dimension?nrn=organization%3D1%3Aaccount%3D*
 
 # All org services
-GET /service?nrn=organization%3D1255165411%3Aaccount%3D*&limit=1500
+GET /service?nrn=organization%3D1%3Aaccount%3D*&limit=1500
 ```
 
 The `*` wildcard replaces the ID at a level and returns results from all children.

@@ -36,9 +36,9 @@ repository:
   app_path: services/payments                # only for monorepo applications
 nullplatform:
   base_url: https://acme.app.nullplatform.io
-  account_id: "712638527"
-  namespace_id: "1002190236"
-  application_id: "856012838"
+  account_id: "2"
+  namespace_id: "3"
+  application_id: "4"
   application_slug: payments-api             # human-readable, not used for lookups
 ```
 

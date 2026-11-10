@@ -46,10 +46,10 @@ Gets details of a scope.
 
 ### Example
 ```bash
-np-api fetch-api "/scope/415005828"
+np-api fetch-api "/scope/5"
 
 # With error messages (useful for diagnosing delete or creation failures)
-np-api fetch-api "/scope/415005828?include_messages=true"
+np-api fetch-api "/scope/5?include_messages=true"
 ```
 
 ### Notes
@@ -82,7 +82,7 @@ Paginated object:
 {
   "paging": {"total": 3, "offset": 0, "limit": 30},
   "results": [
-    {"id": 415005828, "name": "qa private", "status": "active", ...}
+    {"id": 5, "name": "qa private", "status": "active", ...}
   ]
 }
 ```
@@ -90,10 +90,10 @@ Paginated object:
 ### Example
 
 ```bash
-np-api fetch-api "/scope?application_id=489238271"
+np-api fetch-api "/scope?application_id=4"
 
 # Only active scopes
-np-api fetch-api "/scope?application_id=489238271&status=active"
+np-api fetch-api "/scope?application_id=4&status=active"
 ```
 
 ### Notes
@@ -117,7 +117,7 @@ Each scope with UUID provider has an associated service where `specification_id`
 np-api fetch-api "/service?nrn=organization%3D{org_id}:account%3D*&type=scope&limit=1500"
 
 # 2. Filter by specification_id (provider UUID)
-| jq '[.results[] | select(.specification_id == "480c7522-...") | {name, status, scope_id: (.entity_nrn | split("scope=")[1])}]'
+| jq '[.results[] | select(.specification_id == "00000008-...") | {name, status, scope_id: (.entity_nrn | split("scope=")[1])}]'
 ```
 
 ### Useful service (type=scope) fields
@@ -196,7 +196,7 @@ Array of scope types:
 
 ```bash
 # List available scope types for an application
-np-api fetch-api "/scope_type?nrn=organization%3D1255165411%3Aaccount%3D95118862%3Anamespace%3D463208973%3Aapplication%3D1914258629&status=active&include=capabilities,wildcard,available"
+np-api fetch-api "/scope_type?nrn=organization%3D1%3Aaccount%3D2%3Anamespace%3D3%3Aapplication%3D4&status=active&include=capabilities,wildcard,available"
 ```
 
 ### Notes
@@ -280,7 +280,7 @@ Array of capabilities:
 
 ```bash
 # Get scope capabilities for an application
-np-api fetch-api "/capability?nrn=organization%3D1255165411%3Aaccount%3D95118862%3Anamespace%3D463208973%3Aapplication%3D1914258629&target=scope"
+np-api fetch-api "/capability?nrn=organization%3D1%3Aaccount%3D2%3Anamespace%3D3%3Aapplication%3D4&target=scope"
 ```
 
 ### Notes

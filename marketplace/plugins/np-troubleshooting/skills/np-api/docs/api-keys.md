@@ -36,22 +36,22 @@ Gets details of a specific API key.
 
 ### Example
 ```bash
-np-api fetch-api "/api-key/1896628918"
+np-api fetch-api "/api-key/12345"
 ```
 
 ### Example Response
 ```json
 {
-  "id": 1896628918,
+  "id": 12345,
   "name": "SCOPE_DEFINITION_AGENT_ASSOCIATION",
   "api_key": "np_...8a4f",
   "grants": [
     {
-      "nrn": "organization=1875247450:account=1514930957",
+      "nrn": "organization=1:account=2",
       "role_slug": "controlplane:agent"
     },
     {
-      "nrn": "organization=1875247450:account=1514930957",
+      "nrn": "organization=1:account=2",
       "role_slug": "ops"
     }
   ],
@@ -89,7 +89,7 @@ Lists API keys with filters.
   },
   "results": [
     {
-      "id": 1896628918,
+      "id": 12345,
       "name": "SCOPE_DEFINITION_AGENT_ASSOCIATION",
       "grants": [...],
       "tags": [...],
@@ -105,13 +105,13 @@ Lists API keys with filters.
 ### Examples
 ```bash
 # List all API keys of an organization
-np-api fetch-api "/api-key?nrn=organization%3D1875247450"
+np-api fetch-api "/api-key?nrn=organization%3D1"
 
 # Search by specific name
 np-api fetch-api "/api-key?name=SCOPE_DEFINITION_AGENT_ASSOCIATION"
 
 # With pagination
-np-api fetch-api "/api-key?nrn=organization%3D1875247450&limit=10&offset=0"
+np-api fetch-api "/api-key?nrn=organization%3D1&limit=10&offset=0"
 ```
 
 ### Notes
@@ -146,10 +146,10 @@ To verify differences between a channel's API key and the agent's:
 
 ```bash
 # Channel API key (created by Terraform)
-np-api fetch-api "/api-key/1896628918"
+np-api fetch-api "/api-key/12345"
 
 # Agent API key (more permissions)
-np-api fetch-api "/api-key/1724072588"
+np-api fetch-api "/api-key/12346"
 ```
 
 The agent's typically has more roles than the channel's.

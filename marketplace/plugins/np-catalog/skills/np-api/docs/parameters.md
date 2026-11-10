@@ -27,7 +27,7 @@ organization={org_id}:account={acc_id}:namespace={ns_id}:application={app_id}:sc
   "paging": {"offset": 0, "limit": 30, "total": 5},
   "results": [
     {
-      "id": 671080587,
+      "id": 12345,
       "name": "CONSULTING_PRICES_DB_HOSTNAME",
       "nrn": "organization=...:account=...:namespace=...:application=...",
       "type": "environment",
@@ -35,10 +35,10 @@ organization={org_id}:account={acc_id}:namespace={ns_id}:application={app_id}:sc
       "variable": "CONSULTING_PRICES_DB_HOSTNAME",
       "secret": false,
       "read_only": true,
-      "version_id": 1791955022,
+      "version_id": 12346,
       "values": [
         {
-          "id": "683303163",
+          "id": "12347",
           "nrn": "organization=...:account=...:namespace=...:application=...",
           "value": "172.20.144.91",
           "created_at": "2026-02-12T14:44:02.872Z",
@@ -85,10 +85,10 @@ organization={org_id}:account={acc_id}:namespace={ns_id}:application={app_id}:sc
 
 ```bash
 # Application parameters
-np-api fetch-api "/parameter?nrn=organization=1255165411:account=95118862:namespace=463208973:application=2052735708"
+np-api fetch-api "/parameter?nrn=organization=1:account=2:namespace=3:application=4"
 
 # Resolved parameters for a specific scope
-np-api fetch-api "/parameter?nrn=organization=1255165411:account=95118862:namespace=463208973:application=2052735708:scope=675195311"
+np-api fetch-api "/parameter?nrn=organization=1:account=2:namespace=3:application=4:scope=5"
 ```
 
 ---
@@ -114,7 +114,7 @@ Same structure as each element of `/parameter`, including `values[]`.
 ### Example
 
 ```bash
-np-api fetch-api "/parameter/671080587"
+np-api fetch-api "/parameter/12345"
 ```
 
 ---
@@ -133,9 +133,9 @@ Lists all available versions of a parameter.
 {
   "results": [
     {
-      "id": 1791955022,
+      "id": 12346,
       "created_at": "2026-02-12T14:44:02.813Z",
-      "user_id": 629868107
+      "user_id": 12349
     }
   ]
 }
@@ -154,7 +154,7 @@ Lists all available versions of a parameter.
 ### Example
 
 ```bash
-np-api fetch-api "/parameter/671080587/version"
+np-api fetch-api "/parameter/12345/version"
 ```
 
 ---
@@ -172,7 +172,7 @@ Compares two values of the same parameter.
 ### Example
 
 ```bash
-np-api fetch-api "/parameter/671080587/value/683303163/compare/683303164"
+np-api fetch-api "/parameter/12345/value/12347/compare/12348"
 ```
 
 ### Notes
@@ -218,7 +218,7 @@ Common namespaces: `global`, `prod`, `staging`
 ### Example
 
 ```bash
-np-api fetch-api "/nrn/organization=549683990:account=463975847:namespace=476951634?ids=global.key1,prod.key2"
+np-api fetch-api "/nrn/organization=1:account=2:namespace=3?ids=global.key1,prod.key2"
 ```
 
 ### Notes
