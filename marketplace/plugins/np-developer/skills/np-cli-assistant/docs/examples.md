@@ -113,7 +113,7 @@
 
 ## Example 7: Chunked iteration when filter limits are exceeded
 
-- **User says**: "List all applications in account 95118862"
+- **User says**: "List all applications in account 2"
 - **Result**: `np application list` only accepts `--namespace_id` (not `--account_id`), and `--namespace_id` accepts up to 10 values. Script that iterates namespaces in chunks:
   ```bash
   #!/bin/bash

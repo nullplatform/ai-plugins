@@ -29,7 +29,7 @@ Gets details of an application.
 
 ### Example
 ```bash
-np-api fetch-api "/application/489238271"
+np-api fetch-api "/application/4"
 ```
 
 ### Notes

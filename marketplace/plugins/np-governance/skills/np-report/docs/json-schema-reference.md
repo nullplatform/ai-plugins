@@ -209,6 +209,7 @@ instead, which is worse than blank: they render something plausible off the wron
 | --- | --- | --- |
 | `donut-chart` / `pie-chart` | `labelKey`, `valueKey` (default `label`, `value`) | **silently auto-detects** — first non-numeric field becomes the label, first numeric the value. Renders fine off a column you did not choose. |
 | cartesian (`bar`, `line`, `area`) | `categoryKey`, `series[].dataKey` | blank — categories become `''`, data points `null`. (Omitting `series` altogether auto-detects every numeric field instead.) |
+| `scatter-chart` | `xKey`, `yKey` (**required**, no default), `labelKey` (default `label`), `sizeKey`, `idKey`, `colorKey` (optional) | blank — never auto-detects. A row whose `x` or `y` is not numeric is dropped, so a wrong `xKey`/`yKey` draws "No data"; a wrong `labelKey` draws unlabelled dots. Numeric strings count. |
 | `data-table` | each column's `accessor` | that cell renders empty |
 | `kpi` | the target property name | **silently positional** — with no matching key the FIRST column is used, so a multi-column KPI query shows the wrong metric under the right label |
 

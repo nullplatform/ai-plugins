@@ -6,8 +6,8 @@
 #   ./resend_notification.sh <notification_id> [channel_id]
 #
 # Examples:
-#   ./resend_notification.sh 957dc1b5-3cbd-4d5f-aa6e-47aa319174e7
-#   ./resend_notification.sh 957dc1b5-3cbd-4d5f-aa6e-47aa319174e7 476678878
+#   ./resend_notification.sh 00000024-0000-4000-8000-000000000000
+#   ./resend_notification.sh 00000024-0000-4000-8000-000000000000 12345
 #
 # Output:
 #   JSON with the resend result
@@ -33,8 +33,8 @@ if [ $# -lt 1 ]; then
     echo "  channel_id       - Optional. Resend only to this specific channel"
     echo ""
     echo "Examples:"
-    echo "  $0 957dc1b5-3cbd-4d5f-aa6e-47aa319174e7"
-    echo "  $0 957dc1b5-3cbd-4d5f-aa6e-47aa319174e7 476678878"
+    echo "  $0 00000024-0000-4000-8000-000000000000"
+    echo "  $0 00000024-0000-4000-8000-000000000000 12345"
     echo ""
     echo "Finding notification IDs:"
     echo "  np-api fetch-api \"/notification?nrn=organization%3D<org_id>%3Aaccount%3D<acct_id>%3Anamespace%3D<ns_id>%3Aapplication%3D<app_id>&source=service\""

@@ -36,15 +36,27 @@ approval-request fields:
   "mode": "checklist",
   "checklist_run_id": "crun_xxx",
   "checklist": {
+    "run_id": "crun_xxx",
     "aggregate_status": "pending_items",
-    "items_total": 5,
-    "items_passed": 3,
-    "items_failed": 0,
-    "items_pending": 2,
-    "first_pending_actionable_by_me": "security_signoff"
+    "final_outcome": null,
+    "outcome_reason": null,
+    "items_summary": {
+      "total": 5,
+      "passed": 3,
+      "failed": 0,
+      "pending": 2,
+      "skipped": 0,
+      "undetermined": 0,
+      "hidden": 0,
+      "first_pending_actionable_by_me": "security_signoff"
+    },
+    "action_config": { "on_checklist_fail": "pending" }
   }
 }
 ```
+
+`items_summary` is the same summary the run read carries. Items hidden
+from the runner count only in `hidden` (see "Hidden items" below).
 
 Tip: for cross-cutting analyses (e.g. "all checklist runs that took >24h
 to resolve"), use `np-lake` rather than this endpoint — much faster.
@@ -125,6 +137,49 @@ ${CLAUDE_PLUGIN_ROOT}/skills/np-checklist/scripts/get_run.sh --approval-id 99421
       items: [.items[] | {id, status, message}]
     }'
 ```
+
+### Hidden items
+
+A specification can declare `visibility: hidden` on an item or a group
+(`docs/concepts/item-types.md`, "Visibility"). The run read resolves it
+for this run, so an agent reads the result instead of re-deriving it:
+
+- Every entry of `items[]`, groups included, carries the effective
+  `visibility`: `visible`, or `hidden` while the item neither decides nor
+  holds the run. A hidden gate that failed, or that the open run waits on,
+  arrives `visible`, and so do its ancestor groups. Under a hidden `any`
+  group the group decides: once it passed, a child that failed or is
+  still open arrives `hidden`.
+- `items_summary` leaves effectively hidden items out of `total`, every
+  bucket and `first_pending_actionable_by_me`, and counts them in
+  `hidden`. A run waiting on a tech lead approval, with one hidden gate
+  waiting on it too:
+
+  ```jsonc
+  {
+    "total": 3,
+    "passed": 2,
+    "failed": 0,
+    "pending": 1,
+    "skipped": 0,
+    "undetermined": 0,
+    "hidden": 1,
+    "first_pending_actionable_by_me": "tech_lead_approval"
+  }
+  ```
+- `specification_snapshot` still carries every item as declared: nothing
+  is pruned.
+
+To see what the runner leaves out, and why:
+
+```bash
+${CLAUDE_PLUGIN_ROOT}/skills/np-checklist/scripts/get_run.sh --approval-id 99421 \
+  | jq '[.items[] | select(.visibility == "hidden")
+         | {id, type, behavior, status, sub_status, depends_on}]'
+```
+
+A hidden item is still evaluated, aggregated and audited: its events and
+logs read the same as any other item's.
 
 ## Audit trail (events)
 

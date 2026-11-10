@@ -4,19 +4,20 @@
 # the Nullplatform agent (agent-side wrappers at nullplatform/scopes/k8s/).
 #
 # Usage:
-#   agent-kubectl.sh <get|logs> [--nrn <nrn>] [--selector key=value]... -- <kubectl-args...>
+#   agent-kubectl.sh <get|logs> --nrn <nrn> [--selector key=value]... -- <kubectl-args...>
 #
 # Arguments:
 #   <verb>           get | logs
-#   --nrn            NRN for agent search. Default: organization=4
+#   --nrn            Required. NRN for agent search, e.g. organization=<org_id>
+#                    (check_auth.sh prints the organization of your credentials)
 #   --selector k=v   Selector pair(s) to match the agent. Default: cluster=runtime
 #                    Repeat to add more pairs (they merge into one selector object).
 #   --               Separator. Everything after is passed through as kubectl args.
 #
 # Examples:
-#   agent-kubectl.sh get -- pods -n nullplatform
-#   agent-kubectl.sh get --selector service=sync-ad -- pods -n nullplatform
-#   agent-kubectl.sh logs --selector cluster=runtime -- my-pod --tail 200 --previous
+#   agent-kubectl.sh get --nrn organization=1 -- pods -n nullplatform
+#   agent-kubectl.sh get --nrn organization=1 --selector service=my-service -- pods -n nullplatform
+#   agent-kubectl.sh logs --nrn organization=1:account=2 --selector cluster=runtime -- my-pod --tail 200 --previous
 #
 # Output: raw JSON from POST /controlplane/agent_command (same shape as the
 # existing deploy-agent-dump.sh / scope-agent-dump.sh helpers). Read
@@ -28,21 +29,22 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 usage() {
     cat >&2 <<EOF
-Usage: $(basename "$0") <get|logs> [--nrn <nrn>] [--selector key=value]... -- <kubectl-args...>
+Usage: $(basename "$0") <get|logs> --nrn <nrn> [--selector key=value]... -- <kubectl-args...>
 
 Runs 'kubectl get' or 'kubectl logs' on the customer's cluster via the
 Nullplatform agent. Read-only; passes through kubectl arguments verbatim.
 
 Arguments:
   <verb>           get | logs
-  --nrn            NRN for agent search. Default: organization=4
+  --nrn            Required. NRN for agent search, e.g. organization=<org_id>
+                   (check_auth.sh prints the organization of your credentials)
   --selector k=v   Selector pair(s). Default: cluster=runtime. Repeat to merge.
   --               Separator. Everything after is passed as kubectl args.
 
 Examples:
-  $(basename "$0") get -- pods -n nullplatform
-  $(basename "$0") get --selector service=sync-ad -- pods -n nullplatform
-  $(basename "$0") logs --selector cluster=runtime -- my-pod --tail 200 --previous
+  $(basename "$0") get --nrn organization=1 -- pods -n nullplatform
+  $(basename "$0") get --nrn organization=1 --selector service=my-service -- pods -n nullplatform
+  $(basename "$0") logs --nrn organization=1:account=2 --selector cluster=runtime -- my-pod --tail 200 --previous
 EOF
 }
 
@@ -60,7 +62,7 @@ case "$VERB" in
     *) echo "Error: first argument must be 'get' or 'logs' (got: '$VERB')" >&2; usage; exit 1 ;;
 esac
 
-NRN="organization=4"
+NRN=""
 SELECTOR_PAIRS=()
 KUBECTL_ARGS=()
 SAW_SEPARATOR=false
@@ -98,6 +100,12 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+if [[ -z "$NRN" ]]; then
+    echo "Error: missing --nrn. Pass the NRN that owns the agent, e.g. --nrn organization=<org_id>." >&2
+    usage
+    exit 1
+fi
 
 if [[ "$SAW_SEPARATOR" != "true" ]] || [[ ${#KUBECTL_ARGS[@]} -eq 0 ]]; then
     echo "Error: missing kubectl args. Put them after '--'." >&2

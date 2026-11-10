@@ -24,16 +24,16 @@ Lists dimensions available at an NRN, including dimensions inherited from upper 
   "paging": {"total": 2, "offset": 0, "limit": 30},
   "results": [
     {
-      "id": 1599217067,
+      "id": 12345,
       "name": "Environment",
       "slug": "environment",
-      "nrn": "organization=1255165411",
+      "nrn": "organization=1",
       "status": "active",
       "order": 1,
       "values": [
-        {"id": 1977891659, "name": "Development", "slug": "development"},
-        {"id": 209213675, "name": "Production", "slug": "production"},
-        {"id": 217338261, "name": "Stress Test", "slug": "stress-test"}
+        {"id": 12346, "name": "Development", "slug": "development"},
+        {"id": 12347, "name": "Production", "slug": "production"},
+        {"id": 12348, "name": "Stress Test", "slug": "stress-test"}
       ],
       "created_at": "...",
       "updated_at": "..."
@@ -78,16 +78,16 @@ Dimensions cascade downward in the NRN hierarchy:
 ### Example
 ```bash
 # Organization dimensions (highest level)
-np-api fetch-api "/dimension?nrn=organization%3D1255165411"
+np-api fetch-api "/dimension?nrn=organization%3D1"
 
 # Dimensions visible from an account (includes inherited from org)
-np-api fetch-api "/dimension?nrn=organization%3D1255165411%3Aaccount%3D95118862"
+np-api fetch-api "/dimension?nrn=organization%3D1%3Aaccount%3D2"
 
 # Dimensions from all accounts (wildcard)
-np-api fetch-api "/dimension?nrn=organization%3D1255165411%3Aaccount%3D*"
+np-api fetch-api "/dimension?nrn=organization%3D1%3Aaccount%3D*"
 
 # Only active dimensions with their values
-np-api fetch-api "/dimension?nrn=organization%3D1255165411" | jq '[.results[] | {name: .slug, values: [.values[] | .slug]}]'
+np-api fetch-api "/dimension?nrn=organization%3D1" | jq '[.results[] | {name: .slug, values: [.values[] | .slug]}]'
 ```
 
 ### Notes
@@ -110,9 +110,9 @@ Gets detail of a specific dimension (without its values).
 ### Response
 ```json
 {
-  "id": 1599217067,
+  "id": 12345,
   "name": "Environment",
-  "nrn": "organization=1255165411",
+  "nrn": "organization=1",
   "slug": "environment",
   "status": "active",
   "order": 1,
@@ -140,10 +140,10 @@ Lists dimension values filtered by NRN.
   "paging": {"total": 10, "offset": 0, "limit": 30},
   "results": [
     {
-      "id": 587888267,
+      "id": 12349,
       "name": "AR",
       "slug": "argentina",
-      "nrn": "organization=1255165411",
+      "nrn": "organization=1",
       "status": "active",
       "created_at": "...",
       "updated_at": "..."
@@ -155,10 +155,10 @@ Lists dimension values filtered by NRN.
 ### Example
 ```bash
 # Dimension values at organization level
-np-api fetch-api "/dimension/value?nrn=organization%3D1255165411"
+np-api fetch-api "/dimension/value?nrn=organization%3D1"
 
 # Values with wildcard (all accounts)
-np-api fetch-api "/dimension/value?nrn=organization%3D1255165411%3Aaccount%3D*"
+np-api fetch-api "/dimension/value?nrn=organization%3D1%3Aaccount%3D*"
 ```
 
 ### Notes
@@ -177,10 +177,10 @@ Gets detail of a specific dimension value.
 ### Response
 ```json
 {
-  "id": 587888267,
+  "id": 12349,
   "name": "AR",
   "slug": "argentina",
-  "nrn": "organization=1255165411",
+  "nrn": "organization=1",
   "status": "active",
   "created_at": "...",
   "updated_at": "..."

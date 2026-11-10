@@ -76,6 +76,7 @@ Common `event_type` values:
 
 - `checklist.created` — run created, items pre-evaluated.
 - `item.status_changed` — any item state transition.
+- `item.answer_recorded` — a person answered a `manual` item (tick, reject, edit, untick): `{item_id, previous, next, reason}`, right before that item's `item.status_changed`.
 - `item.dispatched` — `external` item HTTP dispatch sent.
 - `item.callback_received` — `external` item callback applied.
 - `item.log_appended` — a log row was added (cross-reference into `checklist_item_log`).

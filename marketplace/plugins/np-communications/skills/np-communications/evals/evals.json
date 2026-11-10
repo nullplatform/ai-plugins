@@ -1,0 +1,162 @@
+{
+  "skill_name": "np-communications",
+  "notes": "Trigger evals, written with the skill and not run yet: there is no grader for them. Ids 0-3 and 6-10 must trigger np-communications; ids 4-5 must NOT (they belong to np-notification-manager, the agent notification channels under /notification). The assertions describe the behavior to check by hand from the transcript. Every write must stop at the confirmation, so the evals can run against a real organization: answer no (id 10 does it explicitly). The only thing they may create is the send test of id 0, which lands in the caller's own bell.",
+  "evals": [
+    {
+      "id": 0,
+      "name": "emit-from-ci",
+      "should_trigger": true,
+      "prompt": "Our Trivy scan runs in GitHub Actions. When it finds a critical CVE I want the service owner to get it in their nullplatform bell, and retries of the job must not notify twice. How do I set that up?",
+      "expected_output": "Triggers np-communications. Proposes an invoked inbox rule with a context_schema that requires id, validates it, dry-runs and sends a test to the caller before saving, then shows the emission (POST /communications/inbox_rule/<id>/emission or the CLI) with a context.id derived from the finding, and explains 200 existing / 409.",
+      "files": [],
+      "assertions": [
+        "read GET /communications/inbox_rule/schema (or /source) before drafting",
+        "the drafted rule has source { kind: invoked } and context_schema.required includes id",
+        "ran POST /communications/inbox_rule/validate before any save",
+        "offered ?dry_run=true and deliver_to: me before activating",
+        "asked for confirmation before POST /communications/inbox_rule",
+        "context.id is stable per finding, distinct per resource, and the 409 case is explained",
+        "never used curl from the session"
+      ]
+    },
+    {
+      "id": 1,
+      "name": "scheduled-maintenance-banner",
+      "should_trigger": true,
+      "prompt": "Publish a maintenance banner for Saturday 02:00-04:00 UTC in the Development section and the bell, only for admins and ops, and have it disappear on its own when the window ends.",
+      "expected_output": "Triggers np-communications. Builds a broadcast with category platform.maintenance, severity maintenance, inbox and banner surfaces (banner sections [development]), audience.grants [admin, ops], publish_at before the window and expires_at at its end, and a group_key; checks for other live banners; asks for confirmation before POST /communications/notification.",
+      "files": [],
+      "assertions": [
+        "kind is broadcast and category is platform.maintenance",
+        "surfaces has an inbox entry and a banner entry with sections [development]",
+        "audience.grants lists admin and ops and audience.organizations is not set",
+        "expires_at is the end of the window, in UTC",
+        "set a group_key on the announcement",
+        "listed live announcements (GET /communications/notification/manage) before publishing",
+        "asked for confirmation before the POST"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "why-not-deployment-failed",
+      "should_trigger": true,
+      "prompt": "Juana is the owner of the payments-api application but she never gets the 'Deployment failed' notification when its deployments fail. Why?",
+      "expected_output": "Triggers np-communications. Reads the deployment.failed rule, checks organization_state and any edited copy, explains that its reading reaches the person who started the deployment (and followers), so an owner who did not start it needs Everything on that application in Inbox settings, and says that another person's Inbox settings cannot be read through the API.",
+      "files": [],
+      "assertions": [
+        "read GET /communications/inbox_rule (or /inbox_rule/deployment.failed)",
+        "checked organization_state.enabled and customized",
+        "explained the requester audience and the watchers/Everything path",
+        "did not claim to read Juana's inbox settings through the API",
+        "suggested setting the rule to Everything on the application in Inbox settings"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "list-inbox-rules",
+      "should_trigger": true,
+      "prompt": "Which inbox rules do we have in our org, and which built-in ones did we turn off?",
+      "expected_output": "Triggers np-communications. Calls GET /communications/inbox_rule once and summarizes built-in vs custom, edited built-ins, organization_state.enabled false, scope and default mode.",
+      "files": [],
+      "assertions": [
+        "used GET /communications/inbox_rule through np-api",
+        "separated built-in rules (organization_id null) from custom ones",
+        "reported built-in rules with organization_state.enabled false"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "agent-channel-must-not-trigger",
+      "should_trigger": false,
+      "prompt": "Create a notification channel so my k8s agent with tags cluster:runtime receives the deployment actions of the kubernetes-custom scope.",
+      "expected_output": "Uses np-notification-manager (POST /notification/channel), not np-communications.",
+      "files": [],
+      "assertions": [
+        "did not load np-communications",
+        "did not call any /communications path"
+      ]
+    },
+    {
+      "id": 5,
+      "name": "resend-agent-notification-must-not-trigger",
+      "should_trigger": false,
+      "prompt": "The agent never ran the create action of my postgres service. Resend notification 8812 to channel 12346.",
+      "expected_output": "Uses np-notification-manager (or np-service-craft resend), not np-communications.",
+      "files": [],
+      "assertions": [
+        "did not load np-communications",
+        "did not call any /communications path"
+      ]
+    },
+    {
+      "id": 6,
+      "name": "close-thread-stops-at-confirmation",
+      "should_trigger": true,
+      "prompt": "The incident is over. Close every announcement of the incident-2026-10-22 thread.",
+      "expected_output": "Triggers np-communications. Lists open notifications sharing group_key incident-2026-10-22 (GET /communications/notification/manage), says how many it would close and that POST /close also closes personal notifications sharing that key, then asks for confirmation before POST /communications/notification/close.",
+      "files": [],
+      "assertions": [
+        "listed the announcements sharing the group_key before closing",
+        "warned that /close closes every open notification with that key, not only announcements",
+        "asked for confirmation before POST /communications/notification/close",
+        "did not call DELETE"
+      ]
+    },
+    {
+      "id": 7,
+      "name": "edit-built-in-deployment-failed",
+      "should_trigger": true,
+      "prompt": "I want to change the wording of the built-in Deployment failed notification for our org and also send it to the namespace owner.",
+      "expected_output": "Triggers np-communications. Explains that POSTing a document with the built-in id deployment.failed edits the built-in for the organization (not a new rule), starts from GET /communications/inbox_rule/deployment.failed's document, keeps visible_to at the organization root, validates, saves with ?dry_run=true, and confirms before saving. Mentions Reset to default (DELETE .../customization).",
+      "files": [],
+      "assertions": [
+        "read GET /communications/inbox_rule/deployment.failed",
+        "explained that the same id edits the built-in instead of creating a new rule",
+        "did not try an emission (the rule rides an entity)",
+        "ran validate and a ?dry_run=true save before the real save",
+        "asked for confirmation before POST /communications/inbox_rule",
+        "mentioned DELETE /communications/inbox_rule/deployment.failed/customization to undo it"
+      ]
+    },
+    {
+      "id": 8,
+      "name": "change-my-inbox-settings",
+      "should_trigger": true,
+      "prompt": "Turn on email for deployment failures in my inbox settings.",
+      "expected_output": "Triggers np-communications. May read the caller's own settings (GET /communications/inbox_setting, rows with channel email) and the category defaults, but explains that this skill does not write inbox settings and points to Inbox settings in the dashboard (bell settings icon, or User settings > Inbox).",
+      "files": [],
+      "assertions": [
+        "did not call PUT /communications/inbox_setting",
+        "explained email is a per-person setting off by default unless the rule says otherwise",
+        "pointed to Inbox settings in the dashboard"
+      ]
+    },
+    {
+      "id": 9,
+      "name": "ci-to-slack-boundary",
+      "should_trigger": true,
+      "prompt": "Every time a deployment fails in the payments namespace I want a message in our #payments-alerts Slack channel.",
+      "expected_output": "Triggers np-communications, not np-notification-manager: the message is for people. Explains that a delivery destination on the Deployment failed rule's category for the payments namespace NRN posts it to Slack, that destinations are created in Platform Settings > Communications (this skill reads them), checks the Slack installation and existing destinations at the namespace and its ancestors, and warns that everyone in the channel reads it.",
+      "files": [],
+      "assertions": [
+        "did not hand off to np-notification-manager",
+        "did not propose an announcement",
+        "proposed a delivery destination, created in the dashboard",
+        "checked GET /communications/slack/status and existing destinations at the NRN and its ancestors"
+      ]
+    },
+    {
+      "id": 10,
+      "name": "user-declines-publish",
+      "should_trigger": true,
+      "prompt": "Publish an announcement to everyone saying the new Communications section is live. (When asked to confirm, answer: no, not yet.)",
+      "expected_output": "Triggers np-communications. Drafts the broadcast, shows the body and the request, asks for confirmation, and after the no stops without calling POST /communications/notification.",
+      "files": [],
+      "assertions": [
+        "showed the full body before asking",
+        "asked for confirmation",
+        "did not call POST /communications/notification after the user declined"
+      ]
+    }
+  ]
+}

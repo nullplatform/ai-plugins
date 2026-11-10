@@ -6,8 +6,8 @@
 #   ./fetch_np_api_url.sh <endpoint> [output_file]
 #
 # Examples:
-#   ./fetch_np_api_url.sh "/application/441069822"
-#   ./fetch_np_api_url.sh "/application/441069822?include_messages=true" app.json
+#   ./fetch_np_api_url.sh "/application/4"
+#   ./fetch_np_api_url.sh "/application/4?include_messages=true" app.json
 #   ./fetch_np_api_url.sh "/deployment/123456?include_messages=true"
 #
 # Authentication precedence:
@@ -87,6 +87,19 @@ ALLOWED_MODIFY=(
     "config"
     "config/*"
 
+    # Communications (np-communications skill). inbox_rule/* covers PUT/DELETE
+    # of a rule, /validate, /emission (draft dry run and send test),
+    # /<id>/emission, /<id>/organization_state, /<id>/customization and
+    # /<id>/permanent; notification/* covers PATCH/DELETE of an announcement
+    # and /close; render previews an announcement's copy (writes nothing);
+    # delivery_destination/*/test posts a sample to a Slack channel.
+    "communications/inbox_rule"
+    "communications/inbox_rule/*"
+    "communications/notification"
+    "communications/notification/*"
+    "communications/render"
+    "communications/delivery_destination/*/test"
+
     # Reports API
     "report"
     "report/*"
@@ -158,7 +171,7 @@ done
 if [ -z "$ENDPOINT" ]; then
     echo "Error: endpoint required"
     echo "Usage: $0 [--method GET|POST|PUT|PATCH|DELETE] [--data <json>] <endpoint> [output_file]"
-    echo "Example: $0 /application/441069822"
+    echo "Example: $0 /application/4"
     echo "Example: $0 --method PATCH --data '{\"status\":\"resolved\"}' /governance/action_item/abc123"
     exit 1
 fi

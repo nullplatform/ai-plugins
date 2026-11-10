@@ -153,6 +153,161 @@ Only relevant when at least one `gate` item is `failed`. An approved
 `override` item resolves the run as `approve_with_override`. Typically
 used for CAB emergency approvals or off-hours fast-tracks.
 
+## Visibility
+
+`visibility` keeps an item out of the runner without taking it out of the
+run. It is optional on any item, groups and items that declare `for_each`
+included, and takes `visible` (the default: absent or `null` reads the
+same) or `hidden`. The API stores the definition as sent and never writes
+the default.
+
+**Inheritance.** A hidden group hides its whole branch, at any depth. An
+item that declares `for_each` (expanded in the run into a group with one
+child per resource) hides the group and every child.
+
+### When a hidden item shows anyway
+
+A hidden item shows while it **decides** or **holds** the run, so nothing
+out of sight can deny a request, let it through over a check, or keep it
+waiting:
+
+- **It decided.** A gate that ended without passing (`failed`,
+  `timed_out`, `cancelled` or `skipped`) shows, even when an override then
+  let the run through. A gate that passed stays hidden. Under a hidden
+  `any` group the group decides, not its children (see below).
+- **It holds the run.** A gate still open (`pending`, `in_progress`,
+  `validating`, `undetermined`) shows while the run is not resolved,
+  during a retry too; under a hidden `any` group, only when the group
+  itself decides or holds (see below).
+  - Exception: an item that waits on other items (`status: undetermined`,
+    its `depends_on` naming them) stays hidden when everything open it
+    waits on is visible. What it waits on is already on screen. If it
+    waits on another hidden item, or on nothing open, it shows.
+- **A closure reveals nothing.** These stay hidden:
+  - an item that did not apply: `applicable: false`, or
+    `sub_status: not_applicable`;
+  - an item the resolved run never needed or never reached:
+    `sub_status` `not_required` (on an approval) or `not_evaluated` (on a
+    fail);
+  - what the manual review swept (`sub_status: early_routed_to_manual`);
+  - what the run's cancellation or expiry swept as `cancelled`.
+
+  So a `skipped` reveals only when no closure explains it, as when a
+  callback reports it; a `skipped` with `sub_status: not_applicable`
+  stays hidden. A gate that failed, or that a callback cancelled, before
+  the run was cancelled or expired stays visible: it is why the run did
+  not approve.
+- **An `informational` item never shows.** It neither decides nor holds
+  anything.
+
+A revealed item brings its ancestor groups. In a fan-out (`for_each`) it
+brings the group and all of its children.
+
+A hidden `any` group decides as a unit. When it ended without passing, or
+the open run waits on it, it shows with its children that neither passed
+nor closed, still-open ones included (an `informational` child stays
+hidden). When it passed, its children stay hidden whatever their state, a
+failed or a still-open one included.
+
+### What the API returns
+
+- `GET /approval/:id/checklist`: every entry of `items[]`, groups
+  included, carries its effective `visibility` (`visible` once revealed).
+- `items_summary`, on the run read and under `checklist` on
+  `GET /approval/:id` and on each row of `GET /approval`: effectively
+  hidden items leave `total`, every bucket and
+  `first_pending_actionable_by_me`, and `hidden` counts them.
+- `POST /approval/dry-run`: every entry of `policies[]` carries
+  `visibility`, computed on the predicted states (`preview.items[]` does
+  not carry it). When the prediction resolves to `fail`, hidden gates
+  still pending stay hidden and hidden gates predicted to fail show.
+- `specification_snapshot` carries every item as declared. Nothing is
+  pruned from any response.
+
+Inspecting a run: `docs/operations/runs-inspection.md`.
+
+### Validation
+
+The validator refuses to hide an item that someone must act on, or that
+could decide the run unseen:
+
+| Rule | Type | When |
+|---|---|---|
+| `item.visibility.invalid` | error | A value other than `visible` or `hidden` (uppercase and booleans included). |
+| `item.visibility.needs_user` | error | A hidden `manual` item or `trigger: on_demand` external, hidden by its own `visibility` or by a group above it. |
+| `item.visibility.override` | error | A hidden item with `behavior: override`, groups included, hidden by its own `visibility` or by a group above it. |
+| `item.visibility.unsafe_ancestor` | error | An item that declares `hidden` under a visible `any` group or under an override. Hiding the whole `any` group is valid. |
+| `item.visibility.custom_expression` | error | An item that declares `hidden` in a specification with `aggregation.type: expression`. |
+| `group.visibility.all_children_hidden` | warning | A visible group whose children all declare `hidden`: the runner would draw it empty. |
+
+Errors come back as `422 VALIDATION_FAILED` on create and update, with
+`path` at the item's `visibility` when it declares `hidden`, or at the
+item when a group hides it. The warning saves the specification and rides
+back in `warnings[]`.
+
+### What does not change
+
+- **The engine.** A hidden item is evaluated, aggregated, audited (events,
+  item logs) and notified like any other.
+- **Older runs.** Runs created before `visibility` existed have none in
+  their snapshot: every item stays visible.
+- **The frozen snapshot.** `visibility` is read from the run's
+  `specification_snapshot`. Changing it means a new specification version
+  re-associated with the action, and only runs created afterwards see it.
+- **Not authorization.** The specification, the snapshot, events and logs
+  expose a hidden item to anyone with `approval_request:read`.
+
+### When to use it
+
+- **An auxiliary gate** that exists only so a rejection denies the run:
+  for example, a gate whose `applies_when` reads
+  `run.items.<approval>.status`, so it applies, and fails, only when that
+  approval is rejected. Hidden, it stays out of the runner while it waits
+  on the visible approval, and shows when it fails.
+- **A data provider**, such as an external that feeds other items'
+  `applies_when`. Prefer `informational`: a hidden `gate` shows while it
+  runs, because it holds the run.
+- **A silent audit**, recorded on every run and read later from the
+  events or with `np-lake`. Use `informational`.
+- **Shadow mode** for a new gate: ship it `informational` and hidden,
+  measure it, then promote it.
+
+```yaml
+items:
+  - id: coverage_gate
+    type: condition
+    behavior: gate
+    title: "Coverage at least 80%"
+    query:
+      "build.metadata.coverage": { "$gte": 80 }
+
+  # Shadow mode: evaluated and recorded on every run, never shown.
+  - id: coverage_90_shadow
+    type: condition
+    behavior: informational
+    visibility: hidden
+    title: "Coverage at least 90% (shadow)"
+    query:
+      "build.metadata.coverage": { "$gte": 90 }
+
+  # A hidden group hides its branch: its gates show only while they decide
+  # or hold the run (here, when a check fails).
+  - id: release_checks
+    type: group
+    behavior: gate
+    visibility: hidden
+    title: "Release checks"
+    children:
+      - id: tests_passed
+        type: condition
+        behavior: gate
+        title: "Tests passed"
+        query:
+          "build.metadata.tests_status": { "$eq": "passed" }
+      # A manual item here is rejected (item.visibility.needs_user):
+      # someone has to act on it in the runner.
+```
+
 ## Aggregate transitions
 
 The aggregation engine derives `aggregate_status` based on item states:

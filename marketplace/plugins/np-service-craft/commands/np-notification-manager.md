@@ -1,7 +1,7 @@
 ---
 name: np-notification-manager
 description: Manage nullplatform notification channels — list, create, inspect, debug channels and resend notifications
-allowed-tools: Read, Glob, Grep, Bash
+allowed-tools: Read, Glob, Grep, Bash, AskUserQuestion
 argument-hint: [list|create|inspect|notifications|resend|debug] [id]
 ---
 
@@ -29,5 +29,6 @@ Load the full skill reference for detailed command flows:
 ## Critical Rules
 
 - Always use `/np-api fetch-api` for API access. Never `curl` directly.
+- Ask with `AskUserQuestion`; offer what the platform already knows (providers, existing channels, specifications, repository) as options before asking for free text.
 - Confirm before creating or modifying channels.
-- Validate selector tags match agent configuration before creating channels.
+- Validate per channel type before creating: `agent` → selector tags match a live agent; `github` → repository, reference and workflow exist and accept `workflow_dispatch`. Never create a channel with an empty filter value.

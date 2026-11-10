@@ -19,7 +19,7 @@ Gets details of an organization.
 
 ### Example
 ```bash
-np-api fetch-api "/organization/549683990"
+np-api fetch-api "/organization/1"
 ```
 
 ---
@@ -58,7 +58,7 @@ Gets details of an account.
 
 ### Example
 ```bash
-np-api fetch-api "/account/463975847"
+np-api fetch-api "/account/2"
 ```
 
 ---
@@ -79,14 +79,14 @@ Lists accounts of an organization.
   "paging": {"total": 8, "offset": 0, "limit": 30},
   "results": [
     {
-      "id": 95118862,
+      "id": 2,
       "name": "main",
-      "organization_id": 1255165411,
-      "repository_prefix": "kwik-e-mart",
+      "organization_id": 1,
+      "repository_prefix": "acme",
       "repository_provider": "github",
       "status": "active",
-      "slug": "kwik-e-mart-main",
-      "nrn": "organization=1255165411:account=95118862"
+      "slug": "acme-main",
+      "nrn": "organization=1:account=2"
     }
   ]
 }
@@ -99,10 +99,10 @@ Lists accounts of an organization.
 ### Example
 ```bash
 # List organization accounts (organization_id from JWT)
-np-api fetch-api "/account?organization_id=1255165411"
+np-api fetch-api "/account?organization_id=1"
 
 # Only active accounts
-np-api fetch-api "/account?organization_id=1255165411&status=active"
+np-api fetch-api "/account?organization_id=1&status=active"
 ```
 
 ### Notes
@@ -135,7 +135,7 @@ Gets details of a namespace.
 
 ### Example
 ```bash
-np-api fetch-api "/namespace/476951634"
+np-api fetch-api "/namespace/3"
 ```
 
 ---
@@ -156,12 +156,12 @@ Lists namespaces of an account.
   "paging": {"total": 143, "offset": 0, "limit": 30},
   "results": [
     {
-      "id": 463208973,
-      "name": "Nullplatform Demos",
-      "account_id": 95118862,
-      "slug": "nullplatform-demos",
+      "id": 3,
+      "name": "Demos",
+      "account_id": 2,
+      "slug": "demos",
       "status": "active",
-      "nrn": "organization=1255165411:account=95118862:namespace=463208973"
+      "nrn": "organization=1:account=2:namespace=3"
     }
   ]
 }
@@ -174,7 +174,7 @@ Lists namespaces of an account.
 ### Example
 ```bash
 # List namespaces of an account
-np-api fetch-api "/namespace?account_id=95118862&status=active&limit=50"
+np-api fetch-api "/namespace?account_id=2&status=active&limit=50"
 ```
 
 ### Notes
@@ -195,7 +195,7 @@ Lists providers (configured cloud provider instances).
 
 ### Example
 ```bash
-np-api fetch-api "/provider?nrn=organization=4&show_descendants=true&limit=200"
+np-api fetch-api "/provider?nrn=organization=1&show_descendants=true&limit=200"
 ```
 
 ### Notes
@@ -218,7 +218,7 @@ https://providers.nullplatform.com/provider_specification?nrn=organization=123
 
 ### Example
 ```bash
-np-api fetch-api "https://providers.nullplatform.com/provider_specification?nrn=organization=549683990"
+np-api fetch-api "https://providers.nullplatform.com/provider_specification?nrn=organization=1"
 ```
 
 ---
@@ -243,7 +243,7 @@ match their tags.
     {
       "id": "uuid",
       "name": "my-agent-name",
-      "nrns": ["organization=1255165411:account=95118862"],
+      "nrns": ["organization=1:account=2"],
       "status": "active",
       "capabilities": [],
       "tags": {"cloud": "aws", "region": "us-east-1"},
@@ -285,10 +285,10 @@ and authenticate with the control plane.
 ### Example
 ```bash
 # By organization_id and account_id
-np-api fetch-api "/controlplane/agent?organization_id=1255165411&account_id=95118862"
+np-api fetch-api "/controlplane/agent?organization_id=1&account_id=2"
 
 # By NRN
-np-api fetch-api "/controlplane/agent?nrn=organization%3D1255165411%3Aaccount%3D95118862"
+np-api fetch-api "/controlplane/agent?nrn=organization%3D1%3Aaccount%3D2"
 ```
 
 ### Notes

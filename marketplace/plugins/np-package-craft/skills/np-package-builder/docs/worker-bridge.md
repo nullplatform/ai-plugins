@@ -71,3 +71,37 @@ Secrets/vars per repo: `AWS_ROLE_ARN_ECR_PUSH`, `ARTIFACT_NP_API_KEY`
 (dedicated key), `NP_ARTIFACT_NRN`. The ECR repository must exist first — ECR
 never creates on push; a 403 on push = the role's permission policy misses that
 repository; "repository does not exist" = wrong name or truly missing repo.
+
+### nullplatform's own agent plugins (`scopes-*` / `services-*`)
+
+They start from `nullplatform/templates-scopes` or `nullplatform/templates-services`,
+which already carry this chain plus a beta workflow. Images go to ECR Public as
+`agent-plugins/{scopes,services}/<slug>` (older repos keep `services/<name>`; don't rename
+them). What the templates do not do for you:
+
+- **ECR repository + role**: add the **Public ECR** service (`services-public-ecr`) to the
+  application, with `images` = the exact `image_name` of `release.yml`. It PRs
+  `infrastructure-iac-agent-plugins` (repo, its `beta/` twin, publisher role) and writes
+  `AWS_ROLE_ARN_ECR_PUSH` into the repo; its `update` retries only that secret. It refuses a
+  **private** GitHub repo (`does not exist on GitHub, or is private`).
+- **`NP_ARTIFACT_NRN`**: a repo variable nobody sets — do it by hand, or both `release` and
+  `beta` stop at preflight.
+- **Betas**: every same-repo, non-bot PR pushes `beta/<image>:test-<branch>-<short sha>` and
+  registers it as its own artifact, assuming the org secret `AWS_BETA_ROLE_ARN` (writes only
+  `beta/*`).
+- **Release PR checks are red by design**: PRs opened by `github-actions[bot]` get their
+  `pull_request` runs held, so every check on the release-please PR fails with "workflow file
+  issue"; `auto-merge-release` merges it via `workflow_run`. Not a defect — and
+  `branches-ignore` filters the base branch, so it can't exclude it.
+- A `chore:`/`docs:` merge cuts no release; it takes `feat:` or `fix:`.
+- **Spec selectors**: `category` / `sub_category` / `provider` in the service and link specs
+  are what the catalog and the docs index show; the template ships `Other` / `Other` / `AWS`,
+  and its release preflight refuses to publish them.
+- **Repository name**: `services-<slug>` or `scopes-<slug>` — the docs sync finds repos by
+  that prefix (public, with a release, no template placeholders left). A one-line GitHub
+  description is welcome but optional; a new scope row uses it.
+- **Public index**: after its first release the daily sync in `nullplatform/docsite` proposes
+  it (a reviewed PR, up to a day) — a service in
+  [Sample services](https://docs.nullplatform.com/docs/services/sample-services), one row
+  per spec; a scope in [Sample scopes](https://docs.nullplatform.com/docs/agent-backed-scopes/sample-scopes), one row per scope type.
+  Don't add it by hand.

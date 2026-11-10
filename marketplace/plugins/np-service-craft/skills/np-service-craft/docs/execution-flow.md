@@ -4,14 +4,26 @@ Chain from notification to tofu apply.
 
 ## Diagram
 
+The chain has two halves. The **outer** half — how the action reaches the service's code —
+depends on the execution mode (`execution-modes.md`). The **inner** half — from
+`np service-action exec` through tofu — is the same in both.
+
+### Outer half, agent mode
+
 ```
 User creates service in UI
   -> Service API -> SNS/SQS -> infrastructure-service-provisioner (Lambda)
   -> Notification API: creates notification, finds channels by NRN
-  -> For agent channel: agents-api finds agent by tags + org + capability
-  -> agents-api dispatches via WebSocket to agent
-  -> np-agent receives exec command
-  -> entrypoint
+  -> the service's channel is a PACKAGE-EXEC channel (emitted by the agent
+     association with worker_orchestrator = true), not a git-clone exec one
+  -> agents-api finds the agent by tags + org + capability
+  -> np-agent starts a WORKER POD for the service's package
+     |-- pulls the package's OCI image (must match worker.allowedRegistries)
+     |-- runs under the agent's ServiceAccount if the package slug is in
+     |   worker_orchestrated_packages, else the namespace default
+     |-- memory limit = worker_memory_limit (2Gi default; the chart's own
+     |   default OOMs mid-tofu-apply)
+  -> entrypoint (inside the image)
      |-- Bridge: NP_API_KEY -> NULLPLATFORM_API_KEY
      |-- Clean NP_ACTION_CONTEXT (remove quotes)
      |-- Parse CONTEXT, SERVICE_ACTION, SERVICE_ACTION_TYPE
@@ -33,6 +45,34 @@ User creates service in UI
                                  -> do_tofu (step 2)
 ```
 
+### Outer half, CI mode
+
+```
+User creates service in UI
+  -> Service API -> Notification API: creates notification, finds channels by NRN
+  -> the service's channel is a GITHUB channel (type github, filtered by spec slug)
+  -> Notification API calls GitHub: POST /repos/<account>/<repository>/actions/workflows/<workflow_id>/dispatches
+     {ref: <reference>, inputs: {context: <notification JSON>}}
+     |-- /notification/<id>/result stores GitHub's HTTP status: 204 = accepted, NOT executed
+  -> GitHub starts the workflow on <reference>
+     |-- the job exports NP_ACTION_CONTEXT = inputs.context
+     |-- NULLPLATFORM_API_KEY comes from a repo/Environment secret (no bridge needed)
+     |-- installs the np CLI, authenticates to the cloud (OIDC or secrets)
+     |-- checks out the repo: SERVICE_PATH is the checkout, not an image
+  -> np service-action exec --live-report --live-output --script <handler>
+     |-- exposes ACTION_* (ACTION_TYPE, ACTION_SERVICE_ID, ACTION_SERVICE_SLUG,
+     |   ACTION_SERVICE_SPECIFICATION_ID, ACTION_LINK_ID, ACTION_LINK_SLUG, …)
+     |-- PATCHes the action status as the handler runs
+     -> handler: either this bundle's entrypoint (-> np service workflow exec, inner half
+        below, unchanged) or a runner that resolves the module with
+        `np service-action get-exec-path` and calls tofu itself
+     -> `np service action update --results <json>` / `np link action update --results`
+        writes the outputs back (this is what moves the service out of `pending`)
+```
+
+The whole GitHub-side contract and the payload shape are in
+`@${CLAUDE_PLUGIN_ROOT}/skills/np-notification-manager/docs/github-channel.md`.
+
 ## Key Behaviors
 
 ### NP_API_KEY vs NULLPLATFORM_API_KEY
@@ -43,6 +83,9 @@ User creates service in UI
 | np CLI | `NULLPLATFORM_API_KEY` | Env var or flag |
 
 Without the bridge in entrypoint: `np service-action exec` fails with "please login first".
+
+In CI mode there is no `NP_API_KEY`: the workflow sets `NULLPLATFORM_API_KEY` from a secret
+and the bridge is a no-op. Keep it anyway so the same entrypoint runs in both modes.
 
 ### VALUES is a File Path
 
@@ -63,17 +106,38 @@ Steps declare `output` variables that become env vars for subsequent steps.
 
 YAML files use `$SERVICE_PATH` in `file:` paths. The workflow executor expands it before running each step.
 
-### CWD Gotcha
+### CWD Gotcha (legacy command-executor only)
 
-Agent child process inherits CWD from where np-agent was started, NOT `~/.np/`. The entrypoint must resolve SERVICE_PATH with fallback to `~/.np/`.
+Under the legacy flow the agent child process inherited CWD from where np-agent was
+started, not `~/.np/`, so the entrypoint had to resolve `SERVICE_PATH` with a fallback.
+
+Under worker orchestration the code lives at a fixed path inside the image and there is no
+basepath to resolve against. If you see `SERVICE_PATH` resolution failures on a packaged
+service, the cause is the image layout, not the CWD.
+
+### Worker never starts
+
+The package published fine but its first action hangs or fails. In order of likelihood:
+
+1. The image's registry is not in `worker.allowedRegistries` (defaults to
+   `public.ecr.aws/nullplatform/*` and nothing else).
+2. The package slug is not in `worker_orchestrated_packages`.
+3. The channel's entrypoint path does not exist in the image — the association defaults to
+   `/app/packages/<slug>/entrypoint` while the reference Dockerfiles bake
+   `/app/pkg/<slug>/entrypoint/entrypoint`.
+4. `tags_selectors` on the association do not match the agent's tags. Packaging does not
+   remove this — the channel still routes by tags.
+
+None of the four is validated at `tofu apply`.
 
 ## Variables by Stage
 
 | Variable | Set by | Available in |
 |----------|--------|-------------|
-| `NP_ACTION_CONTEXT` | Agent (binding env) | entrypoint |
-| `NP_API_KEY` | Agent (flag/env) | entrypoint |
-| `NULLPLATFORM_API_KEY` | entrypoint (bridge) | np CLI, handlers |
+| `NP_ACTION_CONTEXT` | Agent (binding env) — CI: the job, from `inputs.context` | entrypoint |
+| `NP_API_KEY` | Agent (flag/env) — CI: absent | entrypoint |
+| `NULLPLATFORM_API_KEY` | entrypoint (bridge) — CI: the job, from a secret | np CLI, handlers |
+| `ACTION_*` | np service-action exec (both modes) | handlers |
 | `CONTEXT` | np service-action exec | build_context, handlers |
 | `VALUES` | np service workflow exec | build_context |
 | `SERVICE_PATH` | entrypoint | all scripts |

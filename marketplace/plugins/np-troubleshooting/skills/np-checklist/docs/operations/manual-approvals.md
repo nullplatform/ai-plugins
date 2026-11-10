@@ -4,10 +4,23 @@ Operations on items that require a human decision: `type: manual` items
 (any behavior) and any item with `behavior: override`.
 
 Wire contract: `PATCH /approval/:id/checklist/items/:itemId` with body
-`{status: "passed" | "failed", message?, inputs?}` — `approve` maps to
-`passed`, `reject` to `failed`. The decision is attributed to the
+`{status: "passed" | "failed", message?, inputs?, reason?}` — `approve` maps
+to `passed`, `reject` to `failed`. The decision is attributed to the
 **caller's JWT** (no actor in the body). There is no `…/items/:id/approve`
 endpoint.
+
+`reason` is optional: why the person answers as they do, a string of up to
+4 KB in UTF-8. `null`, empty or blank count as absent; any other type, or a
+longer string, answers `422 INVALID_STATUS` with a detail naming `reason`
+and writes nothing. It goes to the answer's `item.answer_recorded` event
+(and its audit notification) only — never to the item state nor to
+`message`.
+
+While the run is open, an answer is corrected with another PATCH on the
+same item; each correction leaves its own `item.answer_recorded`. A `retry`
+(`POST …/items/:itemId/retry`) on a `failed` or `timed_out` `manual` item
+answers `400 INVALID_RETRY`: a manual answer is corrected with the PATCH,
+never retried.
 
 ## Approve a manual item
 
@@ -39,8 +52,12 @@ What happens server-side:
    says which, and covers the exceptions (a deployment inside a deployment
    group, an approval with nothing to run): `docs/concepts/modes.md`,
    "Success path".
-6. Writes a `checklist_event` row (`event_type: item.status_changed`,
-   `actor: alice@acme.com`, payload with `from/to/message`).
+6. Writes, for the item, `checklist_event` rows (`actor: alice@acme.com`)
+   in this order: first an `item.answer_recorded` with the answer the call
+   replaces (`previous`), the new one (`next`) and the `reason`; then the
+   `item.status_changed` (payload with `from/to/message`). With external
+   validations that transition is to `validating`, followed by one
+   `item.validation_dispatched` per external validation.
 
 ## Reject a manual item
 
@@ -96,7 +113,7 @@ hence the same script handles both manual approvals and overrides.
 | `404` | `APPROVAL_REQUEST.NOT_FOUND` | No request with that id |
 | `404` | `CHECKLIST_RUN.NOT_FOUND` | The request exists but is not in checklist mode |
 | `404` | `CHECKLIST_ITEM.NOT_FOUND` | No item with that id in the run's specification snapshot |
-| `409` | `CHECKLIST_ITEM.NOT_ACTIONABLE` | Item is not `type: manual` or is already resolved |
+| `409` | `CHECKLIST_ITEM.NOT_ACTIONABLE` | Item is not `type: manual` |
 | `409` | `CHECKLIST_RUN.ALREADY_RESOLVED` | Run is already in a terminal `aggregate_status` |
 | `409` | `CHECKLIST_RUN.NOT_AWAITING_OVERRIDE` | Override approve attempted but `aggregate_status != pending_override` |
 
@@ -123,13 +140,18 @@ This requires the caller's authz info — the server computes
 ## Audit trail
 
 After any approval / reject, the call also produces:
-- A `checklist_event` row capturing the transition (visible via
-  `list_events.sh`).
+- An `item.answer_recorded` event with the answer it replaces and the new
+  one, then an `item.status_changed` event with the transition (both
+  visible via `list_events.sh`).
 - Updates to `item_states[itemId].details` capturing approver + message.
 - `override_metadata` on the run (for override applications).
 
-Use `list_events.sh --types item.status_changed` to get just the
-human-driven transitions.
+Use `list_events.sh --types item.answer_recorded` to get every human answer
+to a manual item — also the ones a correction replaced — each with
+`previous` (the answer it replaced; `null` when nothing of an earlier answer
+survives on the item), `next` (the answer it left) and `reason`. Inputs in
+them are redacted as `docs/concepts/inputs-and-validations.md` describes.
+`item.status_changed` covers every transition, human or not.
 
 ## Escalation: ask for manual review (`ask_for_manual.sh`)
 

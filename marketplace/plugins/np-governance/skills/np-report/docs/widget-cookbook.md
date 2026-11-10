@@ -148,6 +148,18 @@ a reader reaches for first fails validation with `must be object`.
 {"ui_schema":{"type":"VerticalLayout","elements":[{"type":"HorizontalLayout","elements":[{"type":"Control","scope":"#/properties/environment","label":"Environment"}]},{"type":"Categorization","elements":[{"type":"Category","label":"Overview","options":{"icon":"material-symbols:speed-outline"},"elements":[{"type":"VerticalLayout","elements":[{"type":"HorizontalLayout","options":{"columns":[6,6]},"elements":[{"type":"Control","scope":"#/properties/totalDeploys","options":{"widget":"kpi","showBackground":true}},{"type":"Control","scope":"#/properties/successRate","options":{"widget":"kpi","showBackground":true,"unit":"%"}}]},{"type":"Control","scope":"#/properties/dailyTrend","label":"Daily Trend","options":{"widget":"area-chart","categoryKey":"date","series":[{"dataKey":"count","name":"Deployments"}],"xAxisLabel":"Date","yAxisLabel":"Deployments","height":300}}]}]},{"type":"Category","label":"Detail","options":{"icon":"material-symbols:table-rows-outline"},"elements":[{"type":"VerticalLayout","elements":[{"type":"Control","scope":"#/properties/recentDeploys","label":"Recent Deployments","options":{"widget":"data-table","features":["sorting","pagination"],"pagination":{"pageSize":10,"pageSizeOptions":[10,25,50]},"emptyState":{"title":"No deployments","description":"Try adjusting the filters."}}}]}]}]}]}}
 ```
 
+## Pattern 13: Priority map (scatter-chart)
+
+Items placed by two measures, a third as dot size, with named corners: "where to start". Use it when each row is an item (an application, a pattern, a team) and the question is which ones are both wide and severe — not for a series over time (that is a line chart).
+
+```json
+{"schema":{"type":"object","properties":{"patterns":{"type":"array","items":{"type":"object","properties":{"title":{"type":"string"},"apps":{"type":"number"},"highShare":{"type":"number"},"findings":{"type":"number"}}}}}},"ui_schema":{"type":"VerticalLayout","elements":[{"type":"Control","scope":"#/properties/patterns","label":"Where to start","options":{"widget":"scatter-chart","xKey":"apps","yKey":"highShare","sizeKey":"findings","labelKey":"title","xScale":"log","yFormat":"percent","yMax":1,"xAxisLabel":"Applications","yAxisLabel":"High severity","sizeLabel":"Open findings","quadrants":{"x":9,"y":0.25,"labels":["Severe, contained","Start here: wide and severe","Local","Wide, low risk"],"colors":["warning","error","grey","info"]},"showBackground":true,"height":380}}]}}
+```
+
+- `xKey` and `yKey` are required; alias the SQL columns to them (`SELECT title, count(DISTINCT app) AS apps, … AS highShare, count() AS findings`).
+- `quadrants.x` / `.y` are in data units (here 9 applications and 25 %). `labels` and `colors` go top-left, top-right, bottom-left, bottom-right; a point without a `colorKey` takes its corner's color.
+- `xScale: "log"` drops rows with `x <= 0` — use it for counts that span orders of magnitude. At most 400 points are drawn: aggregate or `LIMIT` in SQL.
+
 ## Pattern: Clickable links
 
 The FE `LinkFormatterCell` uses `config.targetUrl` / `config.displayText` when given, and **falls back
@@ -179,7 +191,7 @@ SQL, expose it as its own column, and declare a link formatter with no `targetUr
 SELECT
   action_item_id,
   title,
-  concat('https://nullplatform.app.nullplatform.io/account/', toString(account_id),
+  concat('https://<your-org>.app.nullplatform.io/account/', toString(account_id),
          '/namespace/', toString(namespace_id), '/action-item/', toString(action_item_id)) AS url
 FROM governance_action_items_action_items FINAL
 WHERE _deleted = 0
@@ -314,12 +326,12 @@ Apply these rules to every dashboard to produce polished, production-quality out
 Always set `showBackground: true` in the options of ALL widgets **except `data-table`**. This adds a subtle tinted background that gives each widget visual separation and a polished look.
 
 - **KPI**: `"options": { "widget": "kpi", "showBackground": true }`
-- **Charts** (line-chart, area-chart, bar-chart, pie-chart, donut-chart, radial-bar-chart): `"options": { "widget": "line-chart", "showBackground": true, ... }`
+- **Charts** (line-chart, area-chart, bar-chart, pie-chart, donut-chart, radial-bar-chart, scatter-chart): `"options": { "widget": "line-chart", "showBackground": true, ... }`
 - **Data tables**: do NOT set `showBackground` — tables have their own visual structure
 
-### Axis Labels (cartesian charts)
+### Axis Labels (cartesian and scatter charts)
 
-Always set `xAxisLabel` and `yAxisLabel` on line, area, and bar charts. Use short, descriptive names (e.g. `"Date"`, `"Count"`, `"Deployments"`) in the dashboard's confirmed language (default English). Some legacy examples show Spanish strings — they illustrate JSON shape, not the output language.
+Always set `xAxisLabel` and `yAxisLabel` on line, area, bar and scatter charts (a scatter without them names its axes "x" and "y"; give it a `sizeLabel` too when it uses `sizeKey`). Use short, descriptive names (e.g. `"Date"`, `"Count"`, `"Deployments"`) in the dashboard's confirmed language (default English). Some legacy examples show Spanish strings — they illustrate JSON shape, not the output language.
 
 ### KPI Thresholds
 

@@ -1,0 +1,12 @@
+{
+  "name": "np-communications",
+  "version": "1.8.0",
+  "description": "Operate Communications through the public API or the CLI: inbox rules (write, validate, dry-run, test, activate), emitting invoked inbox rules from workflows or CI, announcements and banners, and troubleshooting who gets which notification",
+  "author": {
+    "name": "Nullplatform",
+    "email": "support@nullplatform.com",
+    "url": "https://nullplatform.com"
+  },
+  "repository": "https://github.com/nullplatform/np-claude-skills",
+  "license": "Apache-2.0"
+}

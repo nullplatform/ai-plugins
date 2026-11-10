@@ -272,7 +272,7 @@ El CLI detecta `## @action` como marcador y extrae la documentacion automaticame
 
 Base URL: `https://{org_slug}.app.nullplatform.io`
 
-El `org_slug` se obtiene de la organizacion (ej: `kwik-e-mart`). Los IDs se extraen del NRN.
+El `org_slug` se obtiene de la organizacion (ej: `acme`). Los IDs se extraen del NRN.
 
 | Entidad | URL |
 |---------|-----|
@@ -285,7 +285,7 @@ El `org_slug` se obtiene de la organizacion (ej: `kwik-e-mart`). Los IDs se extr
 | Logs | `.../application/{app_id}/log` |
 | Performance | `.../application/{app_id}/performance` |
 
-Dado un NRN `organization=1255165411:account=95118862:namespace=463208973:application=1730423309`:
-→ `https://kwik-e-mart.app.nullplatform.io/account/95118862/namespace/463208973/application/1730423309`
+Dado un NRN `organization=1:account=2:namespace=3:application=4`:
+→ `https://acme.app.nullplatform.io/account/2/namespace/3/application/4`
 
 **Siempre incluir el link a la UI** cuando se muestre informacion de una entidad al usuario.

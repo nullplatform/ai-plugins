@@ -132,6 +132,23 @@ would otherwise fail silently at run time:
 
 All three come back as `422 VALIDATION_FAILED`, on create and on update.
 
+`visibility` (`visible | hidden`) adds five more `422`s:
+
+- `item.visibility.invalid`: a value other than `visible` or `hidden`.
+- `item.visibility.needs_user`: a hidden `manual` item or `on_demand`
+  external, by its own `visibility` or a group's.
+- `item.visibility.override`: a hidden `behavior: override`, own or
+  inherited.
+- `item.visibility.unsafe_ancestor`: an item that declares `hidden` under a
+  visible `any` group or under an override.
+- `item.visibility.custom_expression`: an item that declares `hidden` in a
+  specification with `aggregation.type: expression`.
+
+A visible group whose children are all hidden still saves, and the
+response carries a `group.visibility.all_children_hidden` entry in
+`warnings[]`. What hiding does, and when a hidden item shows anyway:
+`docs/concepts/item-types.md` ("Visibility").
+
 See `docs/concepts/item-types.md` for the full addressing rules (including
 how to rewrite an old `context.`-rooted definition) and the reserved-id
 rationale.

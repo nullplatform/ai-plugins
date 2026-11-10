@@ -299,7 +299,7 @@ To explore the API safely:
 | `${CLAUDE_PLUGIN_ROOT}/skills/np-api/scripts/fetch_np_api_url.sh <url>` | Direct API fetch |
 | `${CLAUDE_PLUGIN_ROOT}/skills/np-api/scripts/deploy-agent-dump.sh <deployment_id>` | K8s dump of deployment |
 | `${CLAUDE_PLUGIN_ROOT}/skills/np-api/scripts/scope-agent-dump.sh <scope_id>` | K8s dump of scope |
-| `${CLAUDE_PLUGIN_ROOT}/skills/np-api/scripts/agent-kubectl.sh <get\|logs> -- <args>` | Read-only kubectl get/logs via agent |
+| `${CLAUDE_PLUGIN_ROOT}/skills/np-api/scripts/agent-kubectl.sh <get\|logs> --nrn <nrn> -- <args>` | Read-only kubectl get/logs via agent |
 | `${CLAUDE_PLUGIN_ROOT}/skills/np-api/scripts/np-context.sh <load\|remote-url\|parse-link\|discover\|match-app\|init>` | Project context (`.np/`) and application discovery by git remote |
 
 ---

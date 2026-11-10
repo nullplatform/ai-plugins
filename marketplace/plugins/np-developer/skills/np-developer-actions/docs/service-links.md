@@ -359,10 +359,10 @@ Notar: NO enviar `status` en el request 1. El request 2 crea la action que el ag
 ```json
 {
   "name": "lnk scoring-feed",
-  "service_id": "76c3ebf9-443b-4f5c-b7ee-abc8b6b221bc",
-  "entity_nrn": "organization=1255165411:account=95118862:namespace=463208973:application=2052735708",
+  "service_id": "00000019-0000-4000-8000-000000000000",
+  "entity_nrn": "organization=1:account=2:namespace=3:application=4",
   "dimensions": {"environment": "production"},
-  "specification_id": "99396bf5-2200-415d-b79a-d04f9a5dddad",
+  "specification_id": "00000027-0000-4000-8000-000000000000",
   "status": "active"
 }
 ```
@@ -372,17 +372,17 @@ Notar: NO enviar `status` en el request 1. El request 2 crea la action que el ag
 ```bash
 # Request 1: Crear link
 action-api.sh exec-api --method POST --data '{
-  "name": "lnk consulting-fees-db",
-  "service_id": "3e807a6f-e51d-4248-ab6b-c7b837fa8676",
-  "entity_nrn": "organization=1255165411:account=95118862:namespace=463208973:application=2052735708",
+  "name": "lnk orders-db",
+  "service_id": "00000006-0000-4000-8000-000000000000",
+  "entity_nrn": "organization=1:account=2:namespace=3:application=4",
   "dimensions": {},
-  "specification_id": "96472045-b509-46c4-96fa-51fc654d6737"
+  "specification_id": "00000025-0000-4000-8000-000000000000"
 }' "/link"
 
 # Request 2: Crear action (usando el link_id del response anterior)
 action-api.sh exec-api --method POST --data '{
-  "name": "create-lnk-consulting-fees-db",
-  "specification_id": "74fa28f2-94d2-4423-a517-84e997ca53cd",
+  "name": "create-lnk-orders-db",
+  "specification_id": "00000018-0000-4000-8000-000000000000",
   "parameters": {"permisions": {"read": true, "admin": false, "write": false}}
 }' "/link/<link_id>/action"
 ```

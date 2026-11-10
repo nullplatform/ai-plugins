@@ -12,8 +12,10 @@ Conventions for YAML workflows, build_context/do_tofu scripts, and service entry
 1. **Always `set -euo pipefail`** in all scripts
 2. **VALUES is a FILE PATH** — read with `yaml_value()`, never `echo "$VALUES" | jq`
 3. **Merge parameters with attributes** — `(.service.attributes // {}) * (.parameters // {})`
-4. **Entrypoint MUST bridge** `NP_API_KEY` → `NULLPLATFORM_API_KEY`
-5. **$SERVICE_PATH must be absolute** — resolve relative paths with fallback to `~/.np/`
+4. **Entrypoint MUST bridge** `NP_API_KEY` → `NULLPLATFORM_API_KEY` (agent mode; in CI mode the
+   key is already `NULLPLATFORM_API_KEY` from a secret and the bridge is a harmless no-op — keep it)
+5. **$SERVICE_PATH must be absolute** — resolve relative paths with fallback to `~/.np/` (agent
+   mode; in CI mode it is the checkout, pass it explicitly from the job)
 6. **Derive names from `$CONTEXT`** — scope slug, app slug, tags, and role names are in `$LINK`. Do NOT call the API to resolve them. See `docs/build-context-patterns.md`
 7. **Truncate ALL resource names** with `sanitize_name()` — IAM User max 64, IAM Policy max 128, S3/RDS max 63, ElastiCache max 40. See Resource Name Limits table in `docs/build-context-patterns.md`
 
@@ -63,8 +65,10 @@ Optional post-tofu step for services with export fields:
 
 | Variable | Set by | Available in | Content |
 |----------|--------|-------------|---------|
-| `NP_API_KEY` | Agent (flag/env) | entrypoint | API key |
-| `NULLPLATFORM_API_KEY` | entrypoint (bridge) | np CLI, handlers | Same key, np CLI name |
+| `NP_ACTION_CONTEXT` | Agent (binding env) — CI: the job, from the `workflow_dispatch` input | entrypoint | Notification JSON |
+| `NP_API_KEY` | Agent (flag/env) — CI: absent | entrypoint | API key |
+| `NULLPLATFORM_API_KEY` | entrypoint (bridge) — CI: the job, from a secret | np CLI, handlers | Same key, np CLI name |
+| `ACTION_*` | np service-action exec (both modes) | handlers | `ACTION_TYPE`, `ACTION_SERVICE_ID`, `ACTION_SERVICE_SLUG`, `ACTION_SERVICE_SPECIFICATION_ID`, `ACTION_LINK_ID`, `ACTION_LINK_SLUG`, … |
 | `CONTEXT` | np service-action exec | build_context | Notification JSON |
 | `VALUES` | np service workflow exec | build_context | **File path** to values.yaml |
 | `SERVICE_PATH` | entrypoint | all scripts | Absolute path to service dir |
@@ -95,6 +99,30 @@ Optional post-tofu step for services with export fields:
 - Bridges `NP_API_KEY` → `NULLPLATFORM_API_KEY`
 - Resolves `SERVICE_PATH` to absolute (with `~/.np/` fallback)
 - Dispatches to `./service` or `./link` handler
+
+## Running in CI (github channel)
+
+The scripts above do not change. What changes is who sets the first three variables and how
+results go back:
+
+- The job exports `NP_ACTION_CONTEXT` from the `workflow_dispatch` input and
+  `NULLPLATFORM_API_KEY` from a secret, installs the np CLI, authenticates to the cloud, and
+  calls `np service-action exec --live-report --live-output --script <handler>` from the
+  checkout. `--live-report` reports progress on the action; `--live-output` streams logs.
+- `SERVICE_PATH` is a path inside the checkout. Export it from the job (or let the entrypoint
+  derive it from its own location) — the `~/.np/` fallback never applies.
+- Results must be written back explicitly or the service stays `pending`:
+  `np service action update --results '<json>'` for service actions,
+  `np link action update --results '<json>'` for link actions. `write_service_outputs` /
+  `write_link_outputs` already do this in agent mode; in a runner that calls `tofu` directly,
+  the runner has to.
+- Two handler styles are valid: this bundle's `entrypoint` → `np service workflow exec`
+  (recommended, keeps every convention here), or a runner that resolves the module with
+  `np service-action get-exec-path --lookup-by descend-by-action-and-link-slug` and runs
+  `tofu` itself. Read the client's workflow before choosing; it dictates the repository layout.
+
+The channel, the payload shape and the workflow contract:
+`@${CLAUDE_PLUGIN_ROOT}/skills/np-notification-manager/docs/github-channel.md`.
 
 For detailed patterns and templates, see:
 - `docs/build-context-patterns.md` — yaml_value, merge, provider profiles, permissions context

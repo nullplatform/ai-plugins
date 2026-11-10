@@ -56,7 +56,7 @@ Gets details of an approval.
 
 ### Example
 ```bash
-np-api fetch-api "/approval/541210877"
+np-api fetch-api "/approval/12345"
 ```
 
 ### Supported entity/action combinations
@@ -287,7 +287,7 @@ Lists notification channels.
 
 ### Example
 ```bash
-np-api fetch-api "https://notifications.nullplatform.com/notification/channel?nrn=organization%3D4&showDescendants=true&limit=500"
+np-api fetch-api "https://notifications.nullplatform.com/notification/channel?nrn=organization%3D1&showDescendants=true&limit=500"
 ```
 
 ### Notes
@@ -369,7 +369,7 @@ Gets details of a user.
 
 ### Example
 ```bash
-np-api fetch-api "/user/111433570"
+np-api fetch-api "/user/12346"
 ```
 
 ---

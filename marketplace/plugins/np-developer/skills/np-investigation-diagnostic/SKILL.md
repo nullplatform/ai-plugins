@@ -186,7 +186,7 @@ Dado el scope/service/application que estás investigando, encontrar qué select
    ```
    /np-api fetch-api "/notification/channel/{channel_id}"
    ```
-   → leer `configuration.agent.channel_selectors` (ej: `{cluster: "runtime"}`, `{service: "sync-ad"}`, `{environment: "javi-k8s"}`).
+   → leer `configuration.agent.channel_selectors` (ej: `{cluster: "runtime"}`, `{service: "my-service"}`, `{environment: "production"}`).
 
 4. **Elegir el selector**:
    - Si hay un único agent channel, usá su `channel_selectors`.
@@ -197,10 +197,10 @@ Dado el scope/service/application que estás investigando, encontrar qué select
 
 #### Paso B: Ejecutar queries útiles
 
-Pasá el selector al helper:
+Pasá al helper el NRN (Paso A.1) y el selector:
 
 ```bash
-${CLAUDE_PLUGIN_ROOT}/skills/np-api/scripts/agent-kubectl.sh <verb> [--nrn <nrn>] [--selector key=value]... -- <kubectl-args>
+${CLAUDE_PLUGIN_ROOT}/skills/np-api/scripts/agent-kubectl.sh <verb> --nrn <nrn> [--selector key=value]... -- <kubectl-args>
 ```
 
 La respuesta es JSON; el output del kubectl está en `.executions[].results.stdOut`. Leelo, no lo transformes.

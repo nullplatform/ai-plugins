@@ -6,8 +6,8 @@
 #   ./fetch_np_api.sh <endpoint>
 #
 # Examples:
-#   ./fetch_np_api.sh "/notification/84147783-fc53-404f-beff-2d0172d61baa"
-#   ./fetch_np_api.sh "/application/441069822"
+#   ./fetch_np_api.sh "/notification/00000021-0000-4000-8000-000000000000"
+#   ./fetch_np_api.sh "/application/4"
 #   ./fetch_np_api.sh "/deployment/123456?include_messages=true"
 #
 # Authentication precedence:
@@ -30,7 +30,7 @@ ENDPOINT="$1"
 if [ -z "$ENDPOINT" ]; then
     echo "Error: endpoint required"
     echo "Usage: $0 <endpoint>"
-    echo "Example: $0 /application/441069822"
+    echo "Example: $0 /application/4"
     exit 1
 fi
 

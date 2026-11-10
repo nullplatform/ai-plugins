@@ -610,7 +610,7 @@ np-api fetch-api "/notification?nrn=organization%3D<org_id>:account%3D<acc_id>&s
 - **Policies**: La organización puede tener policies que validen el scope (ej: "producción debe ser K8s", "producción debe tener 2-4GB RAM"). Si hay conflictos, el scope queda en `pending_approval`. **Siempre consultar `/approval` en el Paso 5 para descubrir policies y cumplirlas**
 - **`asset_name`**: El scope se crea sin `asset_name` (es `null`). Es necesario setearlo antes del primer deployment. Ver `deployments.md` Paso 5. Valores tipicos: `docker-image-asset` (K8s, EC2), `lambda-asset` (serverless)
 
-### Policies conocidas (referencia, org 1255165411)
+### Policies de ejemplo (referencia)
 
 **IMPORTANTE**: Las policies varían por organización. SIEMPRE consultar `/approval` con el NRN
 de la aplicación para descubrir las policies actuales antes de crear scopes. Esta tabla es solo
@@ -671,7 +671,7 @@ action-api.sh exec-api --method POST --data '<json>' "/approval/dry-run"
       "environment": "stress-test",
       "country": "uruguay"
     },
-    "application_id": 2021082335,
+    "application_id": 4,
     "capabilities": {
       "memory": { "memory_in_gb": 1 },
       "scheduled_stop": { "timer": "3600", "enabled": true },
@@ -699,7 +699,7 @@ action-api.sh exec-api --method POST --data '<json>' "/approval/dry-run"
 {
   "policies": [
     {
-      "id": 737280069,
+      "id": 12345,
       "name": "[SRE] Stress-test Scopes Should be EC2",
       "conditions": { "scope.type": "web_pool" },
       "selector": {},
@@ -712,7 +712,7 @@ action-api.sh exec-api --method POST --data '<json>' "/approval/dry-run"
   ],
   "action": "approve" | "manual",
   "approvalAction": {
-    "id": 745472071,
+    "id": 12346,
     "entity": "scope",
     "action": "scope:create",
     "dimensions": { "environment": "stress-test" },
@@ -855,7 +855,7 @@ action-api.sh exec-api --method POST --data '{
 
 Mostrar un resumen amigable:
 
-> Voy a modificar el scope **Production Argentina** (ID: 891203065):
+> Voy a modificar el scope **Production Argentina** (ID: 5):
 >
 > - **Memoria**: 1 GB -> 2 GB
 > - **Auto-scaling**: deshabilitado -> habilitado (min: 2, max: 5)
@@ -903,16 +903,16 @@ Solo enviar los campos que se quieren cambiar:
 
 ```bash
 # Cambiar asset_name (prerequisito para primer deployment)
-action-api.sh exec-api --method PATCH --data '{"asset_name":"docker-image-asset"}' "/scope/891203065"
+action-api.sh exec-api --method PATCH --data '{"asset_name":"docker-image-asset"}' "/scope/5"
 
 # Cambiar memoria
-action-api.sh exec-api --method PATCH --data '{"capabilities":{"memory":{"memory_in_gb":2}}}' "/scope/891203065"
+action-api.sh exec-api --method PATCH --data '{"capabilities":{"memory":{"memory_in_gb":2}}}' "/scope/5"
 
 # Habilitar auto-scaling
-action-api.sh exec-api --method PATCH --data '{"capabilities":{"auto_scaling":{"enabled":true,"instances":{"amount":1,"min_amount":2,"max_amount":10},"cpu":{"min_percentage":30,"max_percentage":50},"memory":{"target":50,"enabled":false}}}}' "/scope/891203065"
+action-api.sh exec-api --method PATCH --data '{"capabilities":{"auto_scaling":{"enabled":true,"instances":{"amount":1,"min_amount":2,"max_amount":10},"cpu":{"min_percentage":30,"max_percentage":50},"memory":{"target":50,"enabled":false}}}}' "/scope/5"
 
 # Habilitar scheduled stop
-action-api.sh exec-api --method PATCH --data '{"capabilities":{"scheduled_stop":{"timer":"3600","enabled":true}}}' "/scope/891203065"
+action-api.sh exec-api --method PATCH --data '{"capabilities":{"scheduled_stop":{"timer":"3600","enabled":true}}}' "/scope/5"
 ```
 
 ### Notas
@@ -970,7 +970,7 @@ Mostrar un resumen claro de lo que se va a destruir:
 
 > **ATENCION: Operacion destructiva e irreversible**
 >
-> Voy a eliminar el scope **Production Argentina** (ID: 891203065):
+> Voy a eliminar el scope **Production Argentina** (ID: 5):
 >
 > - **Tipo**: Kubernetes
 > - **Dimensions**: environment=production, country=argentina

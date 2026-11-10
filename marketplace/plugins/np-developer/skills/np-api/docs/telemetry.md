@@ -35,13 +35,13 @@ Gets application logs (container stdout/stderr).
 
 ### Example
 ```bash
-np-api fetch-api "/telemetry/application/489238271/log?type=application&scope=415005828&limit=100"
+np-api fetch-api "/telemetry/application/4/log?type=application&scope=5&limit=100"
 
 # With search filter
-np-api fetch-api "/telemetry/application/489238271/log?type=application&scope=415005828&q=error&limit=100"
+np-api fetch-api "/telemetry/application/4/log?type=application&scope=5&q=error&limit=100"
 
 # By time range
-np-api fetch-api "/telemetry/application/489238271/log?type=application&scope=415005828&start_time=2025-11-28T17:00:00Z&end_time=2025-11-28T18:00:00Z"
+np-api fetch-api "/telemetry/application/4/log?type=application&scope=5&start_time=2025-11-28T17:00:00Z&end_time=2025-11-28T18:00:00Z"
 ```
 
 ### Notes
@@ -76,7 +76,7 @@ Gets application metrics.
 ### Response
 ```json
 {
-  "application_id": 989212014,
+  "application_id": 4,
   "metric": "system.cpu_usage_percentage",
   "start_time": "2025-11-28T16:55:46Z",
   "end_time": "2025-11-28T17:15:46Z",
@@ -94,7 +94,7 @@ Gets application metrics.
 
 ### Example
 ```bash
-np-api fetch-api "/telemetry/application/489238271/metric/system.cpu_usage_percentage?scope_id=415005828&minutes=60&period=300"
+np-api fetch-api "/telemetry/application/4/metric/system.cpu_usage_percentage?scope_id=5&minutes=60&period=300"
 ```
 
 ### Notes

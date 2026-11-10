@@ -6,16 +6,16 @@
 #   ./deploy-agent-dump.sh <deployment_id> [nrn] [selector_key] [selector_value]
 #
 # Examples:
-#   ./deploy-agent-dump.sh 1850350294
-#   ./deploy-agent-dump.sh 1850350294 "organization=4:account=17"
-#   ./deploy-agent-dump.sh 1850350294 "organization=1255165411:account=95118862" environment javi-k8s
+#   ./deploy-agent-dump.sh 12345
+#   ./deploy-agent-dump.sh 12345 "organization=1:account=2"
+#   ./deploy-agent-dump.sh 12345 "organization=1:account=2" environment production
 #
 # Output:
 #   JSON with K8s deployment status, pod events, and logs
 #
 # Notes:
-#   - Default selector is {cluster: "runtime"} for org=4
-#   - Different organizations may use different selectors (e.g., environment: javi-k8s)
+#   - Without an nrn, the agent search uses the organization of the deployment (read from its NRN)
+#   - Default selector is {cluster: "runtime"}; organizations may use others (e.g., environment: production)
 #   - Check the notification channel configuration to find the correct selector
 #
 
@@ -30,27 +30,36 @@ if [ $# -lt 1 ]; then
     echo ""
     echo "Arguments:"
     echo "  deployment_id   - The deployment ID to dump status for"
-    echo "  nrn             - Optional. NRN to scope the agent search (default: organization=4)"
+    echo "  nrn             - Optional. NRN to scope the agent search (default: the deployment's organization)"
     echo "  selector_key    - Optional. Selector key for agent matching (default: cluster)"
     echo "  selector_value  - Optional. Selector value for agent matching (default: runtime)"
     echo ""
     echo "Examples:"
-    echo "  $0 1850350294"
-    echo "  $0 1850350294 \"organization=4:account=17\""
-    echo "  $0 1850350294 \"organization=1255165411:account=95118862\" environment javi-k8s"
+    echo "  $0 12345"
+    echo "  $0 12345 \"organization=1:account=2\""
+    echo "  $0 12345 \"organization=1:account=2\" environment production"
     echo ""
     echo "Notes:"
     echo "  Different organizations use different agent selectors. Common ones:"
-    echo "    cluster runtime       - Default for org=4"
-    echo "    environment javi-k8s  - Kwik-e-mart org"
+    echo "    cluster runtime       - Default"
+    echo "    environment <name>    - Agents tagged by environment"
     echo "  Check the notification channel config to find the correct selector."
     exit 1
 fi
 
 DEPLOYMENT_ID="$1"
-NRN="${2:-organization=4}"
+NRN="${2:-}"
 SELECTOR_KEY="${3:-cluster}"
 SELECTOR_VALUE="${4:-runtime}"
+
+# Default the agent search to the deployment's own organization
+if [ -z "$NRN" ]; then
+    NRN=$("$SCRIPT_DIR/fetch_np_api_url.sh" "/deployment/$DEPLOYMENT_ID" | jq -r '.nrn // empty | split(":")[0]' 2>/dev/null || true)
+    if [ -z "$NRN" ]; then
+        echo "Error: could not read the NRN of deployment $DEPLOYMENT_ID; pass it as the second argument" >&2
+        exit 1
+    fi
+fi
 
 # Build request body with configurable selector
 REQUEST_BODY=$(jq -n \

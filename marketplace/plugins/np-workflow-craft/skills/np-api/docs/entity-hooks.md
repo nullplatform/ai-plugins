@@ -21,10 +21,10 @@ Lists entity hook instances executed.
     {
       "id": "uuid",
       "entity_hook_action_id": "uuid-of-the-hook-definition",
-      "entity_id": "987962648",
+      "entity_id": "4",
       "entity_name": "application",
       "entity_action": "application:create",
-      "nrn": "organization=...:application=987962648",
+      "nrn": "organization=...:application=4",
       "status": "success | pending | failed | recoverable_failure | cancelled",
       "execution_status": "pending | running | completed",
       "when": "before | after",
@@ -38,7 +38,7 @@ Lists entity hook instances executed.
       "dimensions": {"country": "uruguay", "environment": "development"},
       "dependencies": [],
       "requests": [],
-      "user_id": 421006915,
+      "user_id": 12346,
       "policy_context": null,
       "context": null,
       "created_at": "...",
@@ -73,16 +73,16 @@ Lists entity hook instances executed.
 ### Example
 ```bash
 # All organization hooks
-np-api fetch-api "/entity_hook?nrn=organization%3D1255165411"
+np-api fetch-api "/entity_hook?nrn=organization%3D1"
 
 # Only scope hooks
-np-api fetch-api "/entity_hook?nrn=organization%3D1255165411&entity_name=scope"
+np-api fetch-api "/entity_hook?nrn=organization%3D1&entity_name=scope"
 
 # Only deployment hooks
-np-api fetch-api "/entity_hook?nrn=organization%3D1255165411&entity_name=deployment"
+np-api fetch-api "/entity_hook?nrn=organization%3D1&entity_name=deployment"
 
 # Filter failed hooks with jq
-np-api fetch-api "/entity_hook?nrn=organization%3D1255165411&limit=100" | jq '[.results[] | select(.status == "failed")]'
+np-api fetch-api "/entity_hook?nrn=organization%3D1&limit=100" | jq '[.results[] | select(.status == "failed")]'
 ```
 
 ### Notes
@@ -106,7 +106,7 @@ Same structure as a list element (see above).
 
 ### Example
 ```bash
-np-api fetch-api "/entity_hook/2477f213-926d-423e-89ce-d18c5570d24c"
+np-api fetch-api "/entity_hook/00000002-0000-4000-8000-000000000000"
 ```
 
 ### Notes
@@ -135,7 +135,7 @@ which hooks execute when an operation occurs on an entity.
       "when": "before",
       "type": "hook",
       "on": "create",
-      "nrn": "organization=1255165411:account=95118862",
+      "nrn": "organization=1:account=2",
       "dimensions": {"environment": "production"},
       "notification_channel_id": 12345,
       "created_at": "...",
@@ -164,10 +164,10 @@ an instance is created with `entity_hook_action_id` pointing to the definition.
 ### Example
 ```bash
 # List all organization hook definitions
-np-api fetch-api "/entity_hook/action?nrn=organization%3D1255165411"
+np-api fetch-api "/entity_hook/action?nrn=organization%3D1"
 
 # Filter by entity_name
-np-api fetch-api "/entity_hook/action?nrn=organization%3D1255165411" | jq '[.results[] | select(.entity == "scope")]'
+np-api fetch-api "/entity_hook/action?nrn=organization%3D1" | jq '[.results[] | select(.entity == "scope")]'
 ```
 
 ### Notes
@@ -190,7 +190,7 @@ Same structure as a list element from `/entity_hook/action`.
 
 ### Example
 ```bash
-np-api fetch-api "/entity_hook/action/5c545ae0-bb00-424c-8dcd-d4e64af51ad8"
+np-api fetch-api "/entity_hook/action/00000013-0000-4000-8000-000000000000"
 ```
 
 ---
